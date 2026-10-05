@@ -11,6 +11,9 @@ return new class extends Migration {
             $table->foreignUuid('supplier_id')->constrained('supplier_profiles')->onDelete('cascade');
             $table->foreignUuid('commodity_id')->constrained('commodities')->onDelete('cascade');
             $table->decimal('price', 15, 2);
+            $table->string('stock_capacity')->nullable();
+            $table->string('stock_status', 50)->default('Tersedia');
+            $table->string('image_url')->nullable();
             $table->timestamps();
         });
     }
