@@ -11,6 +11,8 @@ class Commodity extends Model
 {
     use HasFactory, HasUuids;
 
+    protected $table = 'commodities';
+
     protected $fillable = [
         'name',
         'category',
@@ -25,5 +27,10 @@ class Commodity extends Model
     public function supplierProducts(): HasMany
     {
         return $this->hasMany(SupplierProduct::class, 'commodity_id');
+    }
+
+    public function supplierProfiles(): HasMany
+    {
+        return $this->hasMany(SupplierProfile::class, 'commodity_id');
     }
 }
