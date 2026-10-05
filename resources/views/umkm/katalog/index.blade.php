@@ -110,7 +110,7 @@
                                 'unit' => $product->commodity->unit,
                                 'price' => 'Rp ' . number_format($product->price, 0, ',', '.') . ' / ' . $product->commodity->unit
                             ]) }}; showModal = true"
-                            class="w-full bg-[#FFB703] hover:bg-[#FFB703]/90 text-black font-extrabold text-sm py-2.5 px-4 rounded-full border-2 border-black shadow-[0_2px_0_0_rgba(0,0,0,1)] transition flex items-center justify-center gap-1">
+                            class="w-full bg-[#FFB703] hover:bg-[#FFB703]/90 text-black font-extrabold text-sm py-2.5 px-4 rounded-full transition flex items-center justify-center gap-1">
                             Ajukan Permintaan &rarr;
                         </button>
                     </div>
@@ -191,10 +191,10 @@
 
                     <!-- Footer Buttons -->
                     <div class="flex flex-col sm:flex-row gap-4 mt-10">
-                        <button type="button" @click="showModal = false" class="w-full sm:w-1/2 inline-flex justify-center rounded-full bg-white px-6 py-4 text-[15px] font-extrabold text-black border-2 border-black hover:bg-gray-50 transition">
+                        <button type="button" @click="showModal = false" class="w-full sm:w-1/2 inline-flex justify-center rounded-full bg-gray-100 px-6 py-4 text-[15px] font-extrabold text-black hover:bg-gray-200 transition">
                             Batal
                         </button>
-                        <button type="submit" class="w-full sm:w-1/2 inline-flex justify-center rounded-full bg-[#FFB703] px-6 py-4 text-[15px] font-extrabold text-black border-2 border-black shadow-[0_2px_0_0_rgba(0,0,0,1)] hover:bg-[#FFB703]/90 transition">
+                        <button type="submit" class="w-full sm:w-1/2 inline-flex justify-center rounded-full bg-[#FFB703] px-6 py-4 text-[15px] font-extrabold text-black hover:bg-[#FFB703]/90 transition">
                             Kirim Permintaan &rarr;
                         </button>
                     </div>

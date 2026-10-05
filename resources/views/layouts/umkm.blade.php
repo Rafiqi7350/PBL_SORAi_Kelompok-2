@@ -22,10 +22,10 @@
 
     <!-- Top Navbar -->
     <header class="p-4 px-6 md:px-12 w-full pt-6">
-        <div class="bg-white rounded-full px-6 py-3 flex items-center justify-between border-2 border-black shadow-[0_4px_0_0_rgba(0,0,0,1)]">
+        <div class="bg-white rounded-full px-6 py-3 flex items-center justify-between shadow-sm">
             <!-- Logo -->
             <div class="flex items-center gap-3">
-                <div class="bg-[#FFB703] border-2 border-black rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg">
+                <div class="bg-[#FFB703] rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg text-black">
                     S
                 </div>
                 <div class="flex flex-col leading-none">
@@ -36,25 +36,24 @@
 
             <!-- Navigation Links -->
             <nav class="hidden lg:flex items-center gap-2">
-                <a href="{{ route('umkm.katalog.index') }}" class="px-5 py-2 rounded-full font-bold text-sm bg-[#FFB703] border-2 border-black shadow-[0_2px_0_0_rgba(0,0,0,1)] hover:bg-[#FFB703]/90 transition">
+                <a href="{{ route('umkm.katalog.index') }}" class="px-5 py-2 text-sm transition rounded-full {{ request()->routeIs('umkm.katalog.*') ? 'bg-[#FFB703] font-bold text-[#1E222D]' : 'font-semibold text-gray-700 hover:text-black hover:bg-gray-100' }}">
                     Katalog Bahan Baku
                 </a>
-                <a href="#" class="px-5 py-2 rounded-full font-semibold text-sm text-gray-700 hover:text-black hover:bg-gray-100 transition flex items-center gap-2">
+                <a href="#" class="px-5 py-2 text-sm transition rounded-full flex items-center gap-2 {{ request()->routeIs('umkm.pemesanan.*') ? 'bg-[#FFB703] font-bold text-[#1E222D]' : 'font-semibold text-gray-700 hover:text-black hover:bg-gray-100' }}">
                     Pemesanan & Supply Planning
                     <span class="bg-[#FF8FA3] text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">2</span>
                 </a>
-                <a href="#" class="px-5 py-2 rounded-full font-semibold text-sm text-gray-700 hover:text-black hover:bg-gray-100 transition">
+                <a href="#" class="px-5 py-2 text-sm transition rounded-full {{ request()->routeIs('umkm.dashboard.*') ? 'bg-[#FFB703] font-bold text-[#1E222D]' : 'font-semibold text-gray-700 hover:text-black hover:bg-gray-100' }}">
                     Dashboard Analisis
                 </a>
-                <a href="#" class="px-5 py-2 rounded-full font-semibold text-sm text-gray-700 hover:text-black hover:bg-gray-100 transition">
+                <a href="#" class="px-5 py-2 text-sm transition rounded-full {{ request()->routeIs('umkm.contract.*') ? 'bg-[#FFB703] font-bold text-[#1E222D]' : 'font-semibold text-gray-700 hover:text-black hover:bg-gray-100' }}">
                     Contract Monitoring
                 </a>
             </nav>
 
             <!-- Actions -->
             <div class="flex items-center gap-3">
-                <button class="px-4 py-2 rounded-full font-bold text-sm bg-pink-50 text-[#C1121F] border-2 border-black shadow-[0_2px_0_0_rgba(0,0,0,1)] hover:bg-pink-100 transition flex items-center gap-2">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                <button class="px-6 py-2.5 rounded-full font-semibold text-sm bg-gray-100 text-gray-900 hover:bg-gray-200 transition flex items-center gap-2">
                     Keluar
                 </button>
             </div>
