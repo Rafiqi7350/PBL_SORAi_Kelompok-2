@@ -11,6 +11,7 @@ return new class extends Migration {
             $table->string('name');
             $table->string('category');
             $table->string('unit');
+            $table->decimal('government_ref_price', 15, 2)->nullable();
             $table->timestamps();
         });
     }
