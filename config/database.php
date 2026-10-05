@@ -96,6 +96,8 @@ return [
             'prefix' => '',
             'prefix_indexes' => true,
             'search_path' => 'laravel',
+            'search_path' => 'public',
+            'schema' => 'public',
             'sslmode' => 'require',
         ],
 
