@@ -62,9 +62,9 @@
                     <!-- Card Header / Image Placeholder -->
                     <div class="h-44 w-full bg-gradient-to-br from-gray-700 to-gray-900 relative rounded-t-3xl overflow-hidden">
                         @if($product->image_url)
-                            <img src="{{ $product->image_url }}" alt="{{ $product->commodity->name }}" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" onerror="this.src='https://source.unsplash.com/400x300/?food,{{ urlencode($product->commodity->category) }}'">
+                            <img src="{{ $product->image_url }}" alt="{{ $product->commodity->name }}" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" onerror="this.src='https://placehold.co/400x300?text={{ urlencode($product->commodity->name) }}'">
                         @else
-                            <img src="https://source.unsplash.com/400x300/?food,{{ urlencode($product->commodity->category) }}" alt="{{ $product->commodity->name }}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" onerror="this.style.display='none'">
+                            <img src="https://placehold.co/400x300?text={{ urlencode($product->commodity->name) }}" alt="{{ $product->commodity->name }}" class="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" onerror="this.style.display='none'">
                         @endif
                         
                         <span class="absolute top-4 left-4 bg-white text-[#1E222D] text-[10px] font-black px-3 py-1.5 rounded-full shadow-sm uppercase tracking-wider border border-gray-100">

@@ -78,12 +78,6 @@
         @yield('content')
     </main>
 
-    <footer class="bg-white border-t-2 border-gray-200 mt-auto py-6">
-        <div class="text-center flex flex-col items-center justify-center">
-            <p class="font-extrabold text-sm text-[#1E222D]">SORAI — PORTAL KEMITRAAN UMKM & PEMASOK BAHAN BAKU LOKAL</p>
-            <p class="text-[11px] font-mono text-gray-500 mt-1">Project Based Learning Kelompok 2 (SIB-3F) Politeknik Negeri Malang 2026</p>
-        </div>
-    </footer>
 
 </body>
 </html>
