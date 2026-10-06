@@ -18,10 +18,22 @@ class CommoditySeeder extends Seeder
                 'government_ref_price' => 36000.00,
             ],
             [
-                'name' => 'Telur Ayam Ras Premium',
+                'name' => 'Bawang Merah Biru Probolinggo',
+                'category' => 'Bumbu & Rempah',
+                'unit' => 'kg',
+                'government_ref_price' => 30000.00,
+            ],
+            [
+                'name' => 'Telur Ayam Ras Grade A',
                 'category' => 'Daging & Unggas',
                 'unit' => 'kg',
                 'government_ref_price' => 28500.00,
+            ],
+            [
+                'name' => 'Cabai Rawit Merah Super',
+                'category' => 'Bumbu & Rempah',
+                'unit' => 'kg',
+                'government_ref_price' => 45000.00,
             ],
             [
                 'name' => 'Daging Sapi Lokal Super',
@@ -30,22 +42,10 @@ class CommoditySeeder extends Seeder
                 'government_ref_price' => 135000.00,
             ],
             [
-                'name' => 'Bawang Merah Probolinggo',
-                'category' => 'Bumbu & Rempah',
-                'unit' => 'kg',
-                'government_ref_price' => 30000.00,
-            ],
-            [
                 'name' => 'Bawang Putih Honan',
                 'category' => 'Bumbu & Rempah',
                 'unit' => 'kg',
                 'government_ref_price' => 38000.00,
-            ],
-            [
-                'name' => 'Cabai Merah Keriting',
-                'category' => 'Bumbu & Rempah',
-                'unit' => 'kg',
-                'government_ref_price' => 45000.00,
             ],
             [
                 'name' => 'Beras Medium SPHP',
@@ -58,18 +58,6 @@ class CommoditySeeder extends Seeder
                 'category' => 'Sembako',
                 'unit' => 'Liter',
                 'government_ref_price' => 15700.00,
-            ],
-            [
-                'name' => 'Ikan Gurame Segar',
-                'category' => 'Perikanan & Seafood',
-                'unit' => 'kg',
-                'government_ref_price' => 42000.00,
-            ],
-            [
-                'name' => 'Tomat Merah Segar',
-                'category' => 'Sayuran',
-                'unit' => 'kg',
-                'government_ref_price' => 14000.00,
             ],
         ];
 
