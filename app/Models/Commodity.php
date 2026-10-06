@@ -18,6 +18,7 @@ class Commodity extends Model
         'category',
         'unit',
         'government_ref_price',
+        'description',
     ];
 
     protected $casts = [
