@@ -12,34 +12,64 @@ class CommoditySeeder extends Seeder
     {
         $commodities = [
             [
-                'name' => 'Peternakan (Ayam, Daging, Telur)',
+                'name' => 'Daging Ayam Broiler Segar',
                 'category' => 'Daging & Unggas',
-                'unit' => 'Kg',
+                'unit' => 'kg',
+                'government_ref_price' => 36000.00,
             ],
             [
-                'name' => 'Sayur & Buah Dapur',
-                'category' => 'Sayuran',
-                'unit' => 'Kg',
+                'name' => 'Telur Ayam Ras Premium',
+                'category' => 'Daging & Unggas',
+                'unit' => 'kg',
+                'government_ref_price' => 28500.00,
             ],
             [
-                'name' => 'Bumbu & Rempah',
-                'category' => 'Bumbu',
-                'unit' => 'Kg',
+                'name' => 'Daging Sapi Lokal Super',
+                'category' => 'Daging & Unggas',
+                'unit' => 'kg',
+                'government_ref_price' => 135000.00,
             ],
             [
-                'name' => 'Sembako & Minyak',
+                'name' => 'Bawang Merah Probolinggo',
+                'category' => 'Bumbu & Rempah',
+                'unit' => 'kg',
+                'government_ref_price' => 30000.00,
+            ],
+            [
+                'name' => 'Bawang Putih Honan',
+                'category' => 'Bumbu & Rempah',
+                'unit' => 'kg',
+                'government_ref_price' => 38000.00,
+            ],
+            [
+                'name' => 'Cabai Merah Keriting',
+                'category' => 'Bumbu & Rempah',
+                'unit' => 'kg',
+                'government_ref_price' => 45000.00,
+            ],
+            [
+                'name' => 'Beras Medium SPHP',
                 'category' => 'Sembako',
-                'unit' => 'Kg/Liter',
+                'unit' => 'kg',
+                'government_ref_price' => 12500.00,
             ],
             [
-                'name' => 'Perikanan & Seafood',
-                'category' => 'Ikan',
-                'unit' => 'Kg',
+                'name' => 'Minyak Goreng Sawit Kita',
+                'category' => 'Sembako',
+                'unit' => 'Liter',
+                'government_ref_price' => 15700.00,
             ],
             [
-                'name' => 'Lainnya',
-                'category' => 'Umum',
-                'unit' => 'Item',
+                'name' => 'Ikan Gurame Segar',
+                'category' => 'Perikanan & Seafood',
+                'unit' => 'kg',
+                'government_ref_price' => 42000.00,
+            ],
+            [
+                'name' => 'Tomat Merah Segar',
+                'category' => 'Sayuran',
+                'unit' => 'kg',
+                'government_ref_price' => 14000.00,
             ],
         ];
 
@@ -50,6 +80,7 @@ class CommoditySeeder extends Seeder
                     'id' => (string) Str::uuid(),
                     'category' => $data['category'],
                     'unit' => $data['unit'],
+                    'government_ref_price' => $data['government_ref_price'],
                 ]
             );
         }
