@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Umkm;
 
 use App\Http\Controllers\Controller;
-
 use App\Models\Commodity;
 use App\Models\Partnership;
 use App\Models\SupplierProduct;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -17,28 +17,45 @@ class KatalogController extends Controller
         $search = $request->input('search');
         $category = $request->input('category');
         $maxPrice = $request->input('max_price');
+        $stockStatus = $request->input('stock_status');
+        $isHalal = $request->boolean('is_halal');
         $sort = $request->input('sort', 'terbaru');
 
         $query = SupplierProduct::with(['supplier.user', 'commodity']);
 
-        // Search by commodity name, supplier company name, or warehouse address
+        // Search filter
         if ($search) {
-            $query->whereHas('commodity', function ($q) use ($search) {
-                $q->where('name', 'ilike', '%' . $search . '%');
-            })->orWhereHas('supplier', function ($q) use ($search) {
-                $q->where('company_name', 'ilike', '%' . $search . '%')
-                  ->orWhere('warehouse_address', 'ilike', '%' . $search . '%');
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('commodity', function ($cq) use ($search) {
+                    $cq->where('name', 'like', '%'.$search.'%')
+                        ->orWhere('category', 'like', '%'.$search.'%');
+                })->orWhereHas('supplier', function ($sq) use ($search) {
+                    $sq->where('company_name', 'like', '%'.$search.'%')
+                        ->orWhere('warehouse_address', 'like', '%'.$search.'%')
+                        ->orWhere('delivery_area', 'like', '%'.$search.'%');
+                })->orWhere('description', 'like', '%'.$search.'%')
+                    ->orWhere('quality_grade', 'like', '%'.$search.'%');
             });
         }
 
-        // Filter by category
+        // Category filter
         if ($category && $category !== 'Semua Kategori') {
             $query->whereHas('commodity', function ($q) use ($category) {
                 $q->where('category', $category);
             });
         }
-        
-        // Filter by Max Price
+
+        // Stock Status filter
+        if ($stockStatus && $stockStatus !== 'Semua Status') {
+            $query->where('stock_status', $stockStatus);
+        }
+
+        // Halal filter
+        if ($isHalal) {
+            $query->where('is_halal_certified', true);
+        }
+
+        // Max Price filter
         if ($maxPrice && is_numeric($maxPrice)) {
             $query->where('price', '<=', $maxPrice);
         }
@@ -48,9 +65,10 @@ class KatalogController extends Controller
             case 'harga_terendah':
                 $query->orderBy('price', 'asc');
                 break;
+            case 'harga_tertinggi':
+                $query->orderBy('price', 'desc');
+                break;
             case 'kapasitas_terbesar':
-                // Note: stock_capacity is a string, so this sorting might not be perfect in DB, 
-                // but we provide it as requested. Ideally it should be numeric.
                 $query->orderBy('stock_capacity', 'desc');
                 break;
             case 'terbaru':
@@ -60,27 +78,36 @@ class KatalogController extends Controller
         }
 
         $products = $query->paginate(12)->withQueryString();
-        
+
         // Get unique categories for the filter
         $categories = Commodity::select('category')->distinct()->pluck('category');
 
-        return view('umkm.katalog.index', compact('products', 'categories', 'search', 'category', 'maxPrice', 'sort'));
+        return view('umkm.katalog.index', compact(
+            'products',
+            'categories',
+            'search',
+            'category',
+            'maxPrice',
+            'stockStatus',
+            'isHalal',
+            'sort'
+        ));
     }
 
     public function ajukanKemitraan(Request $request)
     {
         $request->validate([
             'supplier_id' => 'required|exists:supplier_profiles,id',
-            'volume' => 'required|numeric',
+            'volume' => 'required|numeric|min:1',
             'unit' => 'required|string',
             'frekuensi' => 'required|string',
             'submission_details' => 'nullable|string',
         ]);
 
-        // MOCK LOGIN FOR DEMO PURPOSES: 
+        // MOCK LOGIN FOR DEMO PURPOSES:
         // Automatically login the seeded UMKM user if nobody is logged in
-        if (!Auth::check()) {
-            $dummyUmkmUser = \App\Models\User::where('role', 'umkm')->first();
+        if (! Auth::check()) {
+            $dummyUmkmUser = User::where('role', 'umkm')->first();
             if ($dummyUmkmUser) {
                 Auth::login($dummyUmkmUser);
             }
@@ -88,11 +115,11 @@ class KatalogController extends Controller
 
         $umkm = Auth::user()?->umkmProfile;
 
-        if (!$umkm) {
+        if (! $umkm) {
             return redirect()->back()->with('error', 'Anda harus memiliki profil UMKM untuk mengajukan kemitraan.');
         }
 
-        $deliveryNotes = $request->input('volume') . ' ' . $request->input('unit') . ' | Frekuensi: ' . $request->input('frekuensi');
+        $deliveryNotes = $request->input('volume').' '.$request->input('unit').' | Frekuensi: '.$request->input('frekuensi');
 
         Partnership::create([
             'umkm_id' => $umkm->id,
@@ -102,6 +129,6 @@ class KatalogController extends Controller
             'status' => 'pending',
         ]);
 
-        return redirect()->route('umkm.katalog.index')->with('success', 'Pengajuan kemitraan berhasil dikirim!');
+        return redirect()->route('umkm.katalog.index')->with('success', 'Pengajuan kemitraan pasokan berhasil dikirim ke pemasok!');
     }
 }
