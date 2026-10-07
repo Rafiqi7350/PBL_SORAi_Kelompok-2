@@ -19,86 +19,103 @@
         body { font-family: 'Outfit', sans-serif; }
     </style>
 </head>
-<body class="bg-[#FDF5E6] text-gray-900 antialiased min-h-screen flex flex-col">
+<body class="bg-[#FDF5E6] text-gray-900 antialiased min-h-screen flex">
 
-    <!-- Top Navbar -->
-    <header class="p-4 px-6 md:px-12 w-full pt-6">
-        <div class="bg-[#1E222D] text-white rounded-full px-6 py-3 flex items-center justify-between shadow-lg">
-            <!-- Logo & Badge -->
+    <!-- Sidebar Kiri (Dark Theme) -->
+    <aside class="w-64 bg-[#1E222D] text-white flex flex-col justify-between min-h-screen p-6 shrink-0">
+        <div class="space-y-6">
+            <!-- Brand / Logo -->
             <div class="flex items-center gap-3">
-                <div class="bg-[#FFB703] rounded-full w-10 h-10 flex items-center justify-center font-bold text-lg text-black">
+                <div class="bg-[#FFB703] text-black rounded-full w-10 h-10 flex items-center justify-center font-bold text-xl">
                     S
                 </div>
-                <div class="flex flex-col leading-none">
-                    <span class="font-extrabold text-xl tracking-tight text-white">SORAI</span>
-                    <span class="text-[10px] font-bold tracking-widest text-[#FFB703] uppercase">Portal Pemasok / Supplier</span>
+                <div>
+                    <h1 class="font-extrabold text-xl tracking-wide text-white leading-none">SORAI</h1>
+                    <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Portal Pemasok B2B</span>
                 </div>
             </div>
 
-            <!-- Navigation Links -->
-            <nav class="hidden lg:flex items-center gap-2">
-                <a href="{{ route('supplier.katalog.index') }}" class="px-5 py-2 text-sm transition rounded-full {{ request()->routeIs('supplier.katalog.*') ? 'bg-[#FFB703] font-bold text-[#1E222D]' : 'font-semibold text-gray-300 hover:text-white hover:bg-gray-800' }}">
-                    Kelola Katalog & Stok
+            <!-- Panel Tag -->
+            <div class="text-[10px] font-black uppercase text-[#E07A5F] tracking-widest px-1">
+                PANEL PEMASOK
+            </div>
+
+            <!-- Navigation Menu -->
+            <nav class="space-y-2">
+                <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                    Dashboard & Analisis
                 </a>
-                <a href="{{ route('umkm.katalog.index') }}" class="px-5 py-2 text-sm transition rounded-full font-semibold text-gray-300 hover:text-white hover:bg-gray-800 flex items-center gap-1.5">
-                    <svg class="w-4 h-4 text-[#FFB703]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                    Lihat Katalog UMKM
+
+                <a href="#" class="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        Pengajuan Masuk
+                    </div>
+                    <span class="bg-orange-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full">2</span>
+                </a>
+
+                <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                    Pesanan & Pengiriman
+                </a>
+
+                <!-- Active Link: Kelola Stok -->
+                <a href="{{ route('supplier.katalog.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-black bg-[#FFB703] text-black shadow-md transition">
+                    <svg class="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    Kelola Stok (CRUD)
+                </a>
+
+                <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    Supply Planning
+                </a>
+
+                <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Contract Monitoring
                 </a>
             </nav>
-
-            <!-- Profile / Actions -->
-            <div class="flex items-center gap-2.5">
-                <div class="hidden sm:flex flex-col text-right">
-                    <span class="text-xs font-bold text-white">
-                        {{ auth()->user()?->supplierProfile?->company_name ?? 'Pemasok' }}
-                    </span>
-                    <span class="text-[10px] font-mono text-emerald-400">
-                        🟢 Sesi Pemasok Aktif
-                    </span>
-                </div>
-
-                <a href="{{ route('logout') }}"
-                   @click.prevent="$dispatch('open-logout-modal')"
-                   onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('open-logout-modal'));"
-                   class="px-4 py-2 rounded-full font-bold text-xs bg-red-600/20 hover:bg-red-600 text-red-200 hover:text-white border border-red-500/30 transition flex items-center gap-1.5 cursor-pointer"
-                   title="Keluar dari akun ini">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
-                    <span>Keluar</span>
-                </a>
-            </div>
         </div>
-    </header>
 
-    <!-- Main Content -->
-    <main class="flex-1 flex flex-col w-full px-6 md:px-12 py-6">
-        @if(session('success'))
-            <div class="bg-emerald-50 border-2 border-emerald-500 text-emerald-900 px-5 py-3.5 rounded-2xl shadow-sm mb-6 flex items-center justify-between" role="alert">
-                <div class="flex items-center gap-3">
-                    <span class="bg-emerald-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs">✓</span>
-                    <span class="font-bold text-sm">{{ session('success') }}</span>
+        <!-- Sidebar Bottom Actions -->
+        <div class="space-y-3 pt-6">
+            <div class="bg-gray-800/60 p-3 rounded-2xl flex items-center gap-3 border border-gray-700/50">
+                <div class="w-8 h-8 rounded-full bg-amber-500 text-black flex items-center justify-center font-extrabold text-xs">
+                    {{ substr(auth()->user()?->supplierProfile?->company_name ?? 'P', 0, 1) }}
                 </div>
-                <button onclick="this.parentElement.remove()" class="text-emerald-700 hover:text-emerald-900 font-bold">&times;</button>
+                <div class="overflow-hidden">
+                    <p class="text-xs font-bold text-white truncate">{{ auth()->user()?->supplierProfile?->company_name ?? 'Pemasok' }}</p>
+                    <p class="text-[10px] text-amber-400 font-medium">Pemasok Terverifikasi</p>
+                </div>
             </div>
-        @endif
-        @if(session('error'))
-            <div class="bg-rose-50 border-2 border-rose-500 text-rose-900 px-5 py-3.5 rounded-2xl shadow-sm mb-6 flex items-center justify-between" role="alert">
-                <div class="flex items-center gap-3">
-                    <span class="bg-rose-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs">✕</span>
-                    <span class="font-bold text-sm">{{ session('error') }}</span>
-                </div>
-                <button onclick="this.parentElement.remove()" class="text-rose-700 hover:text-rose-900 font-bold">&times;</button>
+
+            <a href="{{ route('umkm.katalog.index') }}" class="w-full py-2.5 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition">
+                <span>Switch Ke Sisi UMKM</span>
+            </a>
+
+            <a href="{{ route('logout') }}"
+               @click.prevent="$dispatch('open-logout-modal')"
+               onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('open-logout-modal'));"
+               class="w-full py-2.5 px-4 bg-gray-800 hover:bg-red-600/80 text-gray-300 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                <span>Keluar</span>
+            </a>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 p-8 md:p-10 overflow-y-auto">
+        @if(session('success'))
+            <div class="bg-emerald-50 border border-emerald-400 text-emerald-900 px-5 py-3 rounded-2xl mb-6 flex items-center justify-between">
+                <span class="font-bold text-sm">{{ session('success') }}</span>
+                <button onclick="this.parentElement.remove()" class="font-bold text-lg">&times;</button>
             </div>
         @endif
 
         @yield('content')
     </main>
 
-    <!-- Footer -->
-    <footer class="py-6 text-center text-xs font-semibold text-gray-500">
-        SORAI Portal Kemitraan UMKM & Pemasok Bahan Baku Lokal &copy; {{ date('Y') }}
-    </footer>
-
-    <!-- Modal Konfirmasi Keluar -->
     @include('partials.logout-modal')
 
 </body>
