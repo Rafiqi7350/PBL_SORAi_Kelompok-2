@@ -71,7 +71,7 @@
 
                                 <!-- KAPASITAS PASOK -->
                                 <td class="py-5 px-6 font-mono font-bold text-gray-800 text-sm">
-                                    {{ $product->weekly_capacity ? number_format($product->weekly_capacity, 0, ',', '.') . ' ' . $product->effective_unit . '/minggu' : ($product->stock_capacity ?? '-') }}
+                                    {{ $product->stock_capacity ?? '-' }}
                                 </td>
 
                                 <!-- AKSI (CRUD) -->
