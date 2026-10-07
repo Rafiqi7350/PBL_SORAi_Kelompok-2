@@ -45,7 +45,8 @@ class UmkmRegisterController extends Controller
             ]);
         });
 
-        return redirect()->route('register.umkm')
+        return redirect()->route('register.pending', ['email' => $validated['email']])
+            ->with('registered_email', $validated['email'])
             ->with('success', 'Pendaftaran UMKM berhasil diajukan! Akun Anda sedang dalam proses verifikasi oleh Administrator sebelum dapat diakses.');
     }
 }

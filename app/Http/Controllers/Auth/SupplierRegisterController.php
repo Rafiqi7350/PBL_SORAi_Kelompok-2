@@ -52,7 +52,8 @@ class SupplierRegisterController extends Controller
             ]);
         });
 
-        return redirect()->route('register.supplier')
+        return redirect()->route('register.pending', ['email' => $validated['email']])
+            ->with('registered_email', $validated['email'])
             ->with('success', 'Pendaftaran pemasok berhasil diajukan! Akun Anda sedang dalam proses verifikasi oleh Administrator sebelum dapat diakses.');
     }
 }

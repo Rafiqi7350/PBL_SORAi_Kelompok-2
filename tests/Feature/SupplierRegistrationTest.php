@@ -54,8 +54,12 @@ class SupplierRegistrationTest extends TestCase
             'warehouse_address' => 'Jl. Kebun Raya No. 1, Batu',
         ]);
 
-        $response->assertRedirect('/register/supplier');
+        $response->assertRedirect(route('register.pending', ['email' => $testEmail]));
         $response->assertSessionHas('success');
+
+        $pendingResponse = $this->get(route('register.pending', ['email' => $testEmail]));
+        $pendingResponse->assertOk();
+        $pendingResponse->assertSee('STATUS: MENUNGGU ACC ADMIN');
 
         $this->assertDatabaseHas('users', [
             'email' => $testEmail,
