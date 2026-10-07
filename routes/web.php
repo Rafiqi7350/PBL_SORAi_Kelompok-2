@@ -3,7 +3,9 @@
 use App\Http\Controllers\Admin\CommodityCategoryController;
 use App\Http\Controllers\Admin\CommodityController;
 use App\Http\Controllers\Admin\CommodityUnitController;
+use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\SupplierRegisterController;
+use App\Http\Controllers\Auth\UmkmRegisterController;
 use App\Http\Controllers\Supplier\KatalogSupplierController;
 use App\Http\Controllers\Umkm\KatalogController;
 use App\Http\Middleware\EnsureUserIsAdmin;
@@ -13,8 +15,16 @@ Route::get('/', function () {
     return view('landing.index');
 });
 
+/* Authentication Routes */
+Route::get('/login', [LoginController::class, 'create'])->name('login');
+Route::post('/login', [LoginController::class, 'store'])->name('login.store');
+Route::match(['get', 'post'], '/logout', [LoginController::class, 'destroy'])->name('logout');
+
 Route::get('/register/supplier', [SupplierRegisterController::class, 'create'])->name('register.supplier');
 Route::post('/register/supplier', [SupplierRegisterController::class, 'store'])->name('register.supplier.store');
+
+Route::get('/register/umkm', [UmkmRegisterController::class, 'create'])->name('register.umkm');
+Route::post('/register/umkm', [UmkmRegisterController::class, 'store'])->name('register.umkm.store');
 
 /* UMKM Routes */
 Route::prefix('umkm')->name('umkm.')->group(function () {
