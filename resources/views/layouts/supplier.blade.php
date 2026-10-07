@@ -20,128 +20,105 @@
         .font-mono-code { font-family: 'Space Mono', monospace; }
     </style>
 </head>
-<body class="bg-[#FDF5E6] text-gray-900 antialiased min-h-screen flex flex-col md:flex-row">
+<body class="bg-[#FDF5E6] text-gray-900 antialiased min-h-screen flex">
 
-    <!-- Left Sidebar -->
-    <aside class="w-full md:w-64 lg:w-72 bg-[#1E222D] text-white flex flex-col justify-between min-h-screen p-6 flex-shrink-0">
-        <div class="space-y-8">
-            <!-- Brand Header -->
+    <!-- Sidebar Kiri (Dark Theme) -->
+    <aside class="w-64 bg-[#1E222D] text-white flex flex-col justify-between min-h-screen p-6 shrink-0">
+        <div class="space-y-6">
+            <!-- Brand / Logo -->
             <div class="flex items-center gap-3">
-                <div class="bg-[#FFB703] rounded-full w-12 h-12 flex items-center justify-center font-black text-2xl text-black border-2 border-black shadow-md">
+                <div class="bg-[#FFB703] text-black rounded-full w-10 h-10 flex items-center justify-center font-bold text-xl">
                     S
                 </div>
-                <div class="flex flex-col leading-none">
-                    <span class="font-extrabold text-2xl tracking-tight text-[#FFB703]">SORAI</span>
-                    <span class="text-[10px] font-bold tracking-widest text-gray-300 uppercase">PORTAL PEMASOK B2B</span>
+                <div>
+                    <h1 class="font-extrabold text-xl tracking-wide text-white leading-none">SORAI</h1>
+                    <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Portal Pemasok B2B</span>
                 </div>
             </div>
 
-            <!-- Sidebar Navigation -->
-            <div class="space-y-5">
-                <p class="text-[11px] font-bold tracking-widest text-[#FFB703] uppercase font-mono-code">PANEL PEMASOK</p>
-                
-                <nav class="space-y-1.5">
-                    <!-- Dashboard -->
-                    <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-full text-sm font-semibold text-gray-300 hover:text-white hover:bg-gray-800 transition">
-                        <svg class="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
-                        <span>Dashboard & Analisis</span>
-                    </a>
-
-                    <!-- Pengajuan Masuk -->
-                    <a href="#" class="flex items-center justify-between px-4 py-3 rounded-full text-sm font-semibold text-gray-300 hover:text-white hover:bg-gray-800 transition">
-                        <div class="flex items-center gap-3">
-                            <svg class="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                            <span>Pengajuan Masuk</span>
-                        </div>
-                        <span class="bg-[#F4511E] text-white text-xs font-black rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">2</span>
-                    </a>
-
-                    <!-- Pesanan & Pengiriman -->
-                    <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-full text-sm font-semibold text-gray-300 hover:text-white hover:bg-gray-800 transition">
-                        <svg class="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 100 4 2 2 0 000-4zm10 0a2 2 0 100 4 2 2 0 000-4z"></path></svg>
-                        <span>Pesanan & Pengiriman</span>
-                    </a>
-
-                    <!-- Kelola Stok (CRUD) — ACTIVE when on katalog pages -->
-                    <a href="{{ route('supplier.katalog.index') }}" class="flex items-center gap-3 px-5 py-3.5 rounded-full text-sm font-extrabold transition
-                        {{ request()->routeIs('supplier.katalog.*') 
-                            ? 'bg-[#FFB703] text-[#1E222D] shadow-lg border-2 border-black' 
-                            : 'text-gray-300 hover:text-white hover:bg-gray-800' }}">
-                        <svg class="w-5 h-5 flex-shrink-0 {{ request()->routeIs('supplier.katalog.*') ? 'text-[#1E222D]' : 'text-gray-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
-                        <span>Kelola Stok (CRUD)</span>
-                    </a>
-
-                    <!-- Supply Planning -->
-                    <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-full text-sm font-semibold text-gray-300 hover:text-white hover:bg-gray-800 transition">
-                        <svg class="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                        <span>Supply Planning</span>
-                    </a>
-
-                    <!-- Contract Monitoring -->
-                    <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-full text-sm font-semibold text-gray-300 hover:text-white hover:bg-gray-800 transition">
-                        <svg class="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        <span>Contract Monitoring</span>
-                    </a>
-                </nav>
+            <!-- Panel Tag -->
+            <div class="text-[10px] font-black uppercase text-[#E07A5F] tracking-widest px-1">
+                PANEL PEMASOK
             </div>
+
+            <!-- Navigation Menu -->
+            <nav class="space-y-2">
+                <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                    Dashboard & Analisis
+                </a>
+
+                <a href="#" class="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        Pengajuan Masuk
+                    </div>
+                    <span class="bg-orange-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full">2</span>
+                </a>
+
+                <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                    Pesanan & Pengiriman
+                </a>
+
+                <!-- Active Link: Kelola Stok -->
+                <a href="{{ route('supplier.katalog.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-black bg-[#FFB703] text-black shadow-md transition">
+                    <svg class="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    Kelola Stok (CRUD)
+                </a>
+
+                <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    Supply Planning
+                </a>
+
+                <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Contract Monitoring
+                </a>
+            </nav>
         </div>
 
-        <!-- Sidebar Footer: Profile + Switch + Logout -->
-        <div class="space-y-3 pt-8 border-t border-gray-800">
-            <!-- User Profile Box -->
-            <div class="bg-[#2A2E3D] p-3.5 rounded-2xl flex items-center gap-3 border border-gray-700">
-                <div class="bg-[#FFB703] text-black w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0">
-                    👤
+        <!-- Sidebar Bottom Actions -->
+        <div class="space-y-3 pt-6">
+            <div class="bg-gray-800/60 p-3 rounded-2xl flex items-center gap-3 border border-gray-700/50">
+                <div class="w-8 h-8 rounded-full bg-amber-500 text-black flex items-center justify-center font-extrabold text-xs">
+                    {{ substr(auth()->user()?->supplierProfile?->company_name ?? 'P', 0, 1) }}
                 </div>
-                <div class="leading-tight overflow-hidden">
-                    <p class="font-extrabold text-xs text-white truncate">
-                        {{ auth()->user()?->supplierProfile?->company_name ?? 'Kelompok Tani Poultry ...' }}
-                    </p>
-                    <p class="text-[10px] font-bold text-[#FFB703]">Pemasok Terverifikasi</p>
+                <div class="overflow-hidden">
+                    <p class="text-xs font-bold text-white truncate">{{ auth()->user()?->supplierProfile?->company_name ?? 'Pemasok' }}</p>
+                    <p class="text-[10px] text-amber-400 font-medium">Pemasok Terverifikasi</p>
                 </div>
             </div>
 
-            <!-- Switch to UMKM Button -->
-            <a href="{{ route('umkm.katalog.index') }}" class="w-full flex items-center justify-center gap-2 bg-[#FFB703] hover:bg-[#FFB703]/90 text-black font-extrabold text-xs py-3 px-4 rounded-full border-2 border-black transition shadow-sm">
-                <span>🔄</span> Switch Ke Sisi UMKM
+            <a href="{{ route('umkm.katalog.index') }}" class="w-full py-2.5 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition">
+                <span>Switch Ke Sisi UMKM</span>
             </a>
 
-            <!-- Logout Button -->
-            <form method="POST" action="{{ route('logout') }}">
-                @csrf
-                <button type="submit" class="w-full flex items-center justify-center gap-2 bg-[#3A2228] hover:bg-[#4A262E] text-rose-300 font-extrabold text-xs py-2.5 px-4 rounded-full transition border border-rose-900">
-                    <span>🚪</span> Keluar
-                </button>
-            </form>
+            <a href="{{ route('logout') }}"
+               @click.prevent="$dispatch('open-logout-modal')"
+               onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('open-logout-modal'));"
+               class="w-full py-2.5 px-4 bg-gray-800 hover:bg-red-600/80 text-gray-300 hover:text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                <span>Keluar</span>
+            </a>
         </div>
     </aside>
+    </aside>
 
-    <!-- Main Content Right Column -->
-    <main class="flex-1 p-6 md:p-10 overflow-y-auto">
+    <!-- Main Content Area -->
+    <main class="flex-1 p-8 md:p-10 overflow-y-auto">
         @if(session('success'))
-            <div class="bg-emerald-50 border-2 border-emerald-500 text-emerald-900 px-5 py-3.5 rounded-2xl shadow-sm mb-6 flex items-center justify-between" role="alert">
-                <div class="flex items-center gap-3">
-                    <span class="bg-emerald-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs">✓</span>
-                    <span class="font-bold text-sm">{{ session('success') }}</span>
-                </div>
-                <button onclick="this.parentElement.remove()" class="text-emerald-700 hover:text-emerald-900 font-bold">&times;</button>
-            </div>
-        @endif
-
-        @if(session('error'))
-            <div class="bg-rose-50 border-2 border-rose-500 text-rose-900 px-5 py-3.5 rounded-2xl shadow-sm mb-6 flex items-center justify-between" role="alert">
-                <div class="flex items-center gap-3">
-                    <span class="bg-rose-500 text-white rounded-full w-6 h-6 flex items-center justify-center font-bold text-xs">✕</span>
-                    <span class="font-bold text-sm">{{ session('error') }}</span>
-                </div>
-                <button onclick="this.parentElement.remove()" class="text-rose-700 hover:text-rose-900 font-bold">&times;</button>
+            <div class="bg-emerald-50 border border-emerald-400 text-emerald-900 px-5 py-3 rounded-2xl mb-6 flex items-center justify-between">
+                <span class="font-bold text-sm">{{ session('success') }}</span>
+                <button onclick="this.parentElement.remove()" class="font-bold text-lg">&times;</button>
             </div>
         @endif
 
         @yield('content')
     </main>
 
-    @include('partials.action-confirm-modal')
+    @include('partials.logout-modal')
 
 </body>
 </html>

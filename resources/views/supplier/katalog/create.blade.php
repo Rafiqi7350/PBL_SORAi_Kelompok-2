@@ -40,7 +40,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label class="block text-xs font-extrabold text-[#1E222D] uppercase tracking-wider mb-2">Harga Grosir (Rp per Satuan) (*)</label>
-                    <input type="number" step="100" min="1" name="price" value="{{ old('price') }}" required placeholder="Contoh: 32000" class="w-full px-4 py-3 bg-[#FFFDF5] border-2 border-black rounded-xl font-bold text-sm focus:outline-none focus:border-[#FFB703]">
+                    <input type="number" step="100" name="price" value="{{ old('price') }}" required placeholder="Contoh: 32000" class="w-full px-4 py-3 bg-[#FFFDF5] border-2 border-black rounded-xl font-bold text-sm focus:outline-none focus:border-[#FFB703]">
                     @error('price')
                         <p class="text-xs text-rose-600 font-bold mt-1">{{ $message }}</p>
                     @enderror
@@ -69,7 +69,6 @@
                         <p class="text-xs text-rose-600 font-bold mt-1">{{ $message }}</p>
                     @enderror
                 </div>
-
                 <div>
                     <label class="block text-xs font-extrabold text-[#1E222D] uppercase tracking-wider mb-2">Minimal Pemesanan (Min. Order)</label>
                     <input type="text" name="minimum_order" value="{{ old('minimum_order', '10 kg') }}" placeholder="Contoh: 10 kg" class="w-full px-4 py-3 bg-[#FFFDF5] border-2 border-black rounded-xl font-bold text-sm focus:outline-none focus:border-[#FFB703]">

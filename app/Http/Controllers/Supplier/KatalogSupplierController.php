@@ -89,15 +89,15 @@ class KatalogSupplierController extends Controller
         }
 
         $validated = $request->validate([
-            'commodity_id' => 'required|exists:commodities,id',
-            'price' => 'required|numeric|min:0',
-            'stock_capacity' => 'required|string|max:255',
-            'stock_status' => 'required|string|in:Tersedia,Stok Terbatas,Stok Habis,Pre-Order',
-            'minimum_order' => 'nullable|string|max:100',
-            'quality_grade' => 'nullable|string|max:100',
-            'is_halal_certified' => 'nullable|boolean',
-            'description' => 'nullable|string',
-            'image_url' => 'nullable|url',
+            'commodity_id'      => 'required|exists:commodities,id',
+            'price'             => 'required|numeric|min:0',
+            'stock_capacity'    => 'required|string|max:255',
+            'stock_status'      => 'required|string|in:Tersedia,Stok Terbatas,Stok Habis,Pre-Order',
+            'minimum_order'     => 'nullable|string|max:100',
+            'quality_grade'     => 'nullable|string|max:100',
+            'is_halal_certified'=> 'nullable|boolean',
+            'description'       => 'nullable|string',
+            'image_url'         => 'nullable|url',
         ]);
 
         $validated['supplier_id'] = $supplier->id;
@@ -124,15 +124,15 @@ class KatalogSupplierController extends Controller
         $product = SupplierProduct::where('supplier_id', $supplier->id)->findOrFail($id);
 
         $validated = $request->validate([
-            'commodity_id' => 'required|exists:commodities,id',
-            'price' => 'required|numeric|min:0',
-            'stock_capacity' => 'required|string|max:255',
-            'stock_status' => 'required|string|in:Tersedia,Stok Terbatas,Stok Habis,Pre-Order',
-            'minimum_order' => 'nullable|string|max:100',
-            'quality_grade' => 'nullable|string|max:100',
-            'is_halal_certified' => 'nullable|boolean',
-            'description' => 'nullable|string',
-            'image_url' => 'nullable|url',
+            'commodity_id'      => 'required|exists:commodities,id',
+            'price'             => 'required|numeric|min:0',
+            'stock_capacity'    => 'required|string|max:255',
+            'stock_status'      => 'required|string|in:Tersedia,Stok Terbatas,Stok Habis,Pre-Order',
+            'minimum_order'     => 'nullable|string|max:100',
+            'quality_grade'     => 'nullable|string|max:100',
+            'is_halal_certified'=> 'nullable|boolean',
+            'description'       => 'nullable|string',
+            'image_url'         => 'nullable|url',
         ]);
 
         $validated['is_halal_certified'] = $request->has('is_halal_certified');
@@ -149,7 +149,7 @@ class KatalogSupplierController extends Controller
         $product = SupplierProduct::where('supplier_id', $supplier->id)->findOrFail($id);
 
         $validated = $request->validate([
-            'stock_status' => 'required|string|in:Tersedia,Stok Terbatas,Stok Habis,Pre-Order',
+            'stock_status'   => 'required|string|in:Tersedia,Stok Terbatas,Stok Habis,Pre-Order',
             'stock_capacity' => 'nullable|string|max:255',
         ]);
 
