@@ -15,6 +15,7 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
+        [x-cloak] { display: none !important; }
         body { font-family: 'Outfit', sans-serif; }
         .font-mono-code { font-family: 'Space Mono', monospace; }
     </style>
@@ -35,50 +36,36 @@
                 </div>
             </div>
 
-            <!-- Sidebar Navigation -->
-            <div class="space-y-6">
-                <p class="text-[11px] font-bold tracking-widest text-[#FFB703] uppercase font-mono-code">PANEL PEMASOK</p>
-                
-                <nav class="space-y-2.5">
-                    <!-- Dashboard -->
-                    <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-full text-sm font-semibold text-gray-300 hover:text-white hover:bg-gray-800 transition">
-                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
-                        <span>Dashboard & Analisis</span>
-                    </a>
+            <!-- Navigation Links -->
+            <nav class="hidden lg:flex items-center gap-2">
+                <a href="{{ route('supplier.katalog.index') }}" class="px-5 py-2 text-sm transition rounded-full {{ request()->routeIs('supplier.katalog.*') ? 'bg-[#FFB703] font-bold text-[#1E222D]' : 'font-semibold text-gray-300 hover:text-white hover:bg-gray-800' }}">
+                    Kelola Katalog & Stok
+                </a>
+                <a href="{{ route('umkm.katalog.index') }}" class="px-5 py-2 text-sm transition rounded-full font-semibold text-gray-300 hover:text-white hover:bg-gray-800 flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-[#FFB703]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                    Lihat Katalog UMKM
+                </a>
+            </nav>
 
-                    <!-- Pengajuan Masuk -->
-                    <a href="#" class="flex items-center justify-between px-4 py-3 rounded-full text-sm font-semibold text-gray-300 hover:text-white hover:bg-gray-800 transition">
-                        <div class="flex items-center gap-3">
-                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                            <span>Pengajuan Masuk</span>
-                        </div>
-                        <span class="bg-[#F4511E] text-white text-xs font-black rounded-full w-5 h-5 flex items-center justify-center">2</span>
-                    </a>
+            <!-- Profile / Actions -->
+            <div class="flex items-center gap-2.5">
+                <div class="hidden sm:flex flex-col text-right">
+                    <span class="text-xs font-bold text-white">
+                        {{ auth()->user()?->supplierProfile?->company_name ?? 'Pemasok' }}
+                    </span>
+                    <span class="text-[10px] font-mono text-emerald-400">
+                        🟢 Sesi Pemasok Aktif
+                    </span>
+                </div>
 
-                    <!-- Pesanan & Pengiriman -->
-                    <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-full text-sm font-semibold text-gray-300 hover:text-white hover:bg-gray-800 transition">
-                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 100 4 2 2 0 000-4zm10 0a2 2 0 100 4 2 2 0 000-4z"></path></svg>
-                        <span>Pesanan & Pengiriman</span>
-                    </a>
-
-                    <!-- Kelola Stok (CRUD) ACTIVE -->
-                    <a href="{{ route('supplier.katalog.index') }}" class="flex items-center gap-3 px-5 py-3.5 rounded-full text-sm font-extrabold bg-[#FFB703] text-[#1E222D] shadow-lg border-2 border-black">
-                        <svg class="w-5 h-5 text-[#1E222D]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
-                        <span>Kelola Stok (CRUD)</span>
-                    </a>
-
-                    <!-- Supply Planning -->
-                    <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-full text-sm font-semibold text-gray-300 hover:text-white hover:bg-gray-800 transition">
-                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-                        <span>Supply Planning</span>
-                    </a>
-
-                    <!-- Contract Monitoring -->
-                    <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-full text-sm font-semibold text-gray-300 hover:text-white hover:bg-gray-800 transition">
-                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                        <span>Contract Monitoring</span>
-                    </a>
-                </nav>
+                <a href="{{ route('logout') }}"
+                   @click.prevent="$dispatch('open-logout-modal')"
+                   onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('open-logout-modal'));"
+                   class="px-4 py-2 rounded-full font-bold text-xs bg-red-600/20 hover:bg-red-600 text-red-200 hover:text-white border border-red-500/30 transition flex items-center gap-1.5 cursor-pointer"
+                   title="Keluar dari akun ini">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    <span>Keluar</span>
+                </a>
             </div>
         </div>
 
@@ -121,6 +108,14 @@
 
         @yield('content')
     </main>
+
+    <!-- Footer -->
+    <footer class="py-6 text-center text-xs font-semibold text-gray-500">
+        SORAI Portal Kemitraan UMKM & Pemasok Bahan Baku Lokal &copy; {{ date('Y') }}
+    </footer>
+
+    <!-- Modal Konfirmasi Keluar -->
+    @include('partials.logout-modal')
 
 </body>
 </html>

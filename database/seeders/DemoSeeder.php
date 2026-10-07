@@ -40,14 +40,17 @@ class DemoSeeder extends Seeder
 
         // 3. Seed Master Units
         $units = [
-            ['name' => 'kg', 'symbol' => 'kg', 'description' => 'Kilogram'],
-            ['name' => 'liter', 'symbol' => 'L', 'description' => 'Liter'],
-            ['name' => 'pcs', 'symbol' => 'pcs', 'description' => 'Pieces / Buah'],
-            ['name' => 'dus', 'symbol' => 'dus', 'description' => 'Dus / Karton'],
+            ['name' => 'kg', 'symbol' => 'kg', 'description' => 'Kilogram (standar berat grosir)'],
+            ['name' => 'liter', 'symbol' => 'L', 'description' => 'Liter (standar volume minyak/cairan)'],
+            ['name' => 'pcs', 'symbol' => 'pcs', 'description' => 'Pieces / Butir / Buah'],
+            ['name' => 'dus', 'symbol' => 'dus', 'description' => 'Karton / Dus kemasan grosir'],
+            ['name' => 'gram', 'symbol' => 'g', 'description' => 'Gram'],
+            ['name' => 'ikat', 'symbol' => 'ikt', 'description' => 'Ikat (sayuran)'],
+            ['name' => 'karung', 'symbol' => 'krg', 'description' => 'Karung 25kg/50kg'],
         ];
 
         foreach ($units as $u) {
-            CommodityUnit::firstOrCreate(
+            CommodityUnit::updateOrCreate(
                 ['name' => $u['name']],
                 [
                     'id' => (string) Str::uuid(),
@@ -63,10 +66,25 @@ class DemoSeeder extends Seeder
             ['password' => Hash::make('password'), 'role' => 'supplier', 'status' => 'active']
         );
 
+        $supplierUser2 = User::firstOrCreate(
+            ['email' => 'supplier2@sorai.id'],
+            ['password' => Hash::make('password'), 'role' => 'supplier', 'status' => 'active']
+        );
+
+        $umkm = UmkmProfile::firstOrCreate(
+            ['user_id' => $umkmUser->id],
+            [
+                'business_name' => 'Resto Ayam & Bebek Bakar Budi',
+                'owner_name' => 'Budi Santoso',
+                'phone' => '081122334455',
+                'address' => 'Jl. Merdeka Raya No. 12, Jakarta Selatan',
+            ]
+        );
+
         $supplier = SupplierProfile::firstOrCreate(
             ['user_id' => $supplierUser->id],
             [
-                'company_name' => 'Kelompok Tani Poultry ...',
+                'company_name' => 'Kelompok Tani Poultry Jaya',
                 'owner_name' => 'H. Tani Kurniawan',
                 'phone' => '089988776655',
                 'warehouse_address' => 'Pergudangan Tani Jaya, Blok A1',
@@ -76,15 +94,29 @@ class DemoSeeder extends Seeder
             ]
         );
 
-        // Fetch Commodities matching the UI screenshot
-        $ayam = Commodity::where('name', 'Daging Ayam Broiler Segar')->first();
-        $bawang = Commodity::where('name', 'Bawang Merah Biru Probolinggo')->first();
-        $telur = Commodity::where('name', 'Telur Ayam Ras Grade A')->first();
-        $cabai = Commodity::where('name', 'Cabai Rawit Merah Super')->first();
+        $supplier2 = SupplierProfile::firstOrCreate(
+            ['user_id' => $supplierUser2->id],
+            [
+                'company_name' => 'CV Berkah Tani Nusantara',
+                'owner_name' => 'Siti Rahayu',
+                'phone' => '081234567890',
+                'warehouse_address' => 'Jl. Raya Pertanian No. 5, Bogor',
+                'max_capacity' => '5 Ton / Minggu',
+                'delivery_area' => 'Jabodetabek',
+                'nib_number' => '9120004567890',
+            ]
+        );
 
-        // 5. Seed Supplier Products (exact data matching user screenshot)
+        // Fetch Commodities matching the UI screenshot & user request
+        $ayam = Commodity::where('name', 'like', '%Daging Ayam%')->first();
+        $bawang = Commodity::where('name', 'like', '%Bawang Merah%')->first();
+        $telur = Commodity::where('name', 'like', '%Telur Ayam%')->first();
+        $cabai = Commodity::where('name', 'like', '%Cabai%')->first();
+        $beras = Commodity::where('name', 'like', '%Beras%')->first();
+
+        // 5. Seed / Update Supplier Products with high quality clear images
         if ($ayam) {
-            SupplierProduct::firstOrCreate(
+            SupplierProduct::updateOrCreate(
                 ['supplier_id' => $supplier->id, 'commodity_id' => $ayam->id],
                 [
                     'price' => 34000.00,
@@ -94,14 +126,16 @@ class DemoSeeder extends Seeder
                     'stock_status' => 'ready',
                     'minimum_order' => '10 kg',
                     'is_halal_certified' => true,
-                    'image_url' => 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?auto=format&fit=crop&q=80&w=200',
+                    'quality_grade' => 'Grade A Super',
+                    'description' => 'Ayam potong segar harian potong subuh. Bersih tanpa jeroan, es batu pengawet alami.',
+                    'image_url' => 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?auto=format&fit=crop&q=80&w=600',
                 ]
             );
         }
 
-        if ($bawang) {
-            SupplierProduct::firstOrCreate(
-                ['supplier_id' => $supplier->id, 'commodity_id' => $bawang->id],
+        if ($telur) {
+            SupplierProduct::updateOrCreate(
+                ['supplier_id' => $supplier->id, 'commodity_id' => $telur->id],
                 [
                     'price' => 28000.00,
                     'unit' => 'kg',
@@ -110,39 +144,55 @@ class DemoSeeder extends Seeder
                     'stock_status' => 'ready',
                     'minimum_order' => '10 kg',
                     'is_halal_certified' => true,
-                    'image_url' => 'https://images.unsplash.com/photo-1518977822534-7049a61ee0c2?auto=format&fit=crop&q=80&w=200',
+                    'quality_grade' => 'Grade A Segar',
+                    'description' => 'Telur ayam ras segar harian dari farm ternak bersertifikat.',
+                    'image_url' => 'https://images.unsplash.com/photo-1518569656558-1f25e69d2d2d?auto=format&fit=crop&q=80&w=600',
                 ]
             );
         }
 
-        if ($telur) {
-            SupplierProduct::firstOrCreate(
-                ['supplier_id' => $supplier->id, 'commodity_id' => $telur->id],
+        if ($bawang) {
+            SupplierProduct::updateOrCreate(
+                ['supplier_id' => $supplier->id, 'commodity_id' => $bawang->id],
                 [
-                    'price' => 26500.00,
-                    'unit' => 'kg',
-                    'weekly_capacity' => 2000,
-                    'stock_capacity' => '2.000 kg/minggu',
-                    'stock_status' => 'ready',
+                    'price' => 28000.00,
+                    'stock_capacity' => '1.200 kg / minggu',
+                    'stock_status' => 'Tersedia',
                     'minimum_order' => '10 kg',
                     'is_halal_certified' => true,
-                    'image_url' => 'https://images.unsplash.com/photo-1516467508483-a7212febe31a?auto=format&fit=crop&q=80&w=200',
+                    'image_url' => 'https://images.unsplash.com/photo-1518977822534-7049a61ee0c2?auto=format&fit=crop&q=80&w=600',
                 ]
             );
         }
 
         if ($cabai) {
-            SupplierProduct::firstOrCreate(
-                ['supplier_id' => $supplier->id, 'commodity_id' => $cabai->id],
+            SupplierProduct::updateOrCreate(
+                ['supplier_id' => $supplier2->id, 'commodity_id' => $cabai->id],
                 [
                     'price' => 42000.00,
-                    'unit' => 'kg',
-                    'weekly_capacity' => 300,
-                    'stock_capacity' => '300 kg/minggu',
-                    'stock_status' => 'limited',
+                    'stock_capacity' => '300 kg / minggu',
+                    'stock_status' => 'Stok Terbatas',
                     'minimum_order' => '5 kg',
                     'is_halal_certified' => true,
-                    'image_url' => 'https://images.unsplash.com/photo-1566378246598-5b11a0d486cc?auto=format&fit=crop&q=80&w=200',
+                    'quality_grade' => 'Lokal Petik Segar',
+                    'description' => 'Cabai rawit merah segar petik pagi hari dari petani lokal Garut.',
+                    'image_url' => 'https://images.unsplash.com/photo-1588252279915-f1b2ab5dc0b0?auto=format&fit=crop&q=80&w=600',
+                ]
+            );
+        }
+
+        if ($beras) {
+            SupplierProduct::updateOrCreate(
+                ['supplier_id' => $supplier->id, 'commodity_id' => $beras->id],
+                [
+                    'price' => 12500.00,
+                    'stock_capacity' => '1.500 kg / minggu',
+                    'stock_status' => 'Tersedia',
+                    'minimum_order' => '25 kg',
+                    'is_halal_certified' => true,
+                    'quality_grade' => 'Premium IR64',
+                    'description' => 'Beras putih medium kualitas premium, pulen dan wangi.',
+                    'image_url' => 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=600',
                 ]
             );
         }
