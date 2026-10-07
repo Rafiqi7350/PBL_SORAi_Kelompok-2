@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\CommodityController;
 use App\Http\Controllers\Admin\CommodityUnitController;
 use App\Http\Controllers\Auth\AdminLoginController;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\Auth\PendingRegistrationController;
 use App\Http\Controllers\Auth\SupplierRegisterController;
 use App\Http\Controllers\Auth\UmkmRegisterController;
 use App\Http\Controllers\Supplier\KatalogSupplierController;
@@ -27,6 +28,9 @@ Route::post('/register/supplier', [SupplierRegisterController::class, 'store'])-
 
 Route::get('/register/umkm', [UmkmRegisterController::class, 'create'])->name('register.umkm');
 Route::post('/register/umkm', [UmkmRegisterController::class, 'store'])->name('register.umkm.store');
+
+Route::get('/register/pending', [PendingRegistrationController::class, 'index'])->name('register.pending');
+Route::get('/api/check-status', [PendingRegistrationController::class, 'checkStatus'])->name('api.check-status');
 
 /* Admin Guest Auth Routes */
 Route::prefix('admin')->name('admin.')->group(function () {

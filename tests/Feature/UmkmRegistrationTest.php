@@ -79,8 +79,12 @@ class UmkmRegistrationTest extends TestCase
             'address' => 'Jl. Pengujian No. 123, Malang',
         ]);
 
-        $response->assertRedirect('/register/umkm');
+        $response->assertRedirect(route('register.pending', ['email' => $testEmail]));
         $response->assertSessionHas('success');
+
+        $pendingResponse = $this->get(route('register.pending', ['email' => $testEmail]));
+        $pendingResponse->assertOk();
+        $pendingResponse->assertSee('STATUS: MENUNGGU ACC ADMIN');
 
         $this->assertDatabaseHas('users', [
             'email' => $testEmail,

@@ -126,7 +126,16 @@
                     <div class="font-bold">Gagal Masuk:</div>
                     <ul class="list-disc list-inside text-[11px] text-rose-700">
                         @foreach ($errors->all() as $error)
-                            <li>{{ $error }}</li>
+                            <li>
+                                {{ $error }}
+                                @if(str_contains(strtolower($error), 'verifikasi'))
+                                    <div class="mt-1">
+                                        <a href="{{ route('register.pending', ['email' => old('email')]) }}" class="text-[#ea580c] underline font-bold">
+                                            Pantau Status Verifikasi di Loading Page →
+                                        </a>
+                                    </div>
+                                @endif
+                            </li>
                         @endforeach
                     </ul>
                 </div>
