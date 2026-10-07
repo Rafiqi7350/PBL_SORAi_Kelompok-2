@@ -13,7 +13,7 @@
         </p>
 
         <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
-            <a href="#" class="inline-flex items-center justify-center px-7 py-4 rounded-full bg-[#F5B800] hover:bg-[#e0a800] text-black font-extrabold text-sm sm:text-base shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all gap-2 group cursor-pointer">
+            <a href="{{ route('register.umkm') }}" class="inline-flex items-center justify-center px-7 py-4 rounded-full bg-[#F5B800] hover:bg-[#e0a800] text-black font-extrabold text-sm sm:text-base shadow-lg hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all gap-2 group cursor-pointer">
                 <span>Daftar Sebagai UMKM Kuliner</span>
                 <svg class="w-5 h-5 transform group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/>

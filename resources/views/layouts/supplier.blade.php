@@ -15,6 +15,7 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
+        [x-cloak] { display: none !important; }
         body { font-family: 'Outfit', sans-serif; }
     </style>
 </head>
@@ -46,12 +47,23 @@
             </nav>
 
             <!-- Profile / Actions -->
-            <div class="flex items-center gap-3">
-                <span class="hidden sm:inline-block text-xs font-mono font-bold text-gray-400 bg-gray-800 px-3 py-1.5 rounded-full border border-gray-700">
-                    🟢 Mode Pemasok
-                </span>
-                <a href="{{ route('register.supplier') }}" class="px-5 py-2 rounded-full font-semibold text-xs bg-[#E07A5F] text-white hover:bg-[#d0694e] transition">
-                    + Pemasok Baru
+            <div class="flex items-center gap-2.5">
+                <div class="hidden sm:flex flex-col text-right">
+                    <span class="text-xs font-bold text-white">
+                        {{ auth()->user()?->supplierProfile?->company_name ?? 'Pemasok' }}
+                    </span>
+                    <span class="text-[10px] font-mono text-emerald-400">
+                        🟢 Sesi Pemasok Aktif
+                    </span>
+                </div>
+
+                <a href="{{ route('logout') }}"
+                   @click.prevent="$dispatch('open-logout-modal')"
+                   onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('open-logout-modal'));"
+                   class="px-4 py-2 rounded-full font-bold text-xs bg-red-600/20 hover:bg-red-600 text-red-200 hover:text-white border border-red-500/30 transition flex items-center gap-1.5 cursor-pointer"
+                   title="Keluar dari akun ini">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    <span>Keluar</span>
                 </a>
             </div>
         </div>
@@ -85,6 +97,9 @@
     <footer class="py-6 text-center text-xs font-semibold text-gray-500">
         SORAI Portal Kemitraan UMKM & Pemasok Bahan Baku Lokal &copy; {{ date('Y') }}
     </footer>
+
+    <!-- Modal Konfirmasi Keluar -->
+    @include('partials.logout-modal')
 
 </body>
 </html>

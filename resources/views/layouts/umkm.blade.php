@@ -15,6 +15,7 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
+        [x-cloak] { display: none !important; }
         body { font-family: 'Outfit', sans-serif; }
     </style>
 </head>
@@ -53,11 +54,44 @@
 
             <!-- Actions -->
             <div class="flex items-center gap-3">
-                <button class="px-6 py-2.5 rounded-full font-semibold text-sm bg-gray-100 text-gray-900 hover:bg-gray-200 transition flex items-center gap-2">
-                    Keluar
-                </button>
+                <div class="hidden sm:flex flex-col text-right">
+                    <span class="text-xs font-bold text-gray-900">
+                        {{ auth()->user()?->umkmProfile?->owner_name ?? auth()->user()?->umkmProfile?->business_name ?? (auth()->user()?->supplierProfile?->company_name ?? 'Mitra') }}
+                    </span>
+                    <span class="text-[10px] font-semibold {{ auth()->user()?->role === 'supplier' ? 'text-[#DC4E00]' : 'text-emerald-700' }}">
+                        {{ auth()->user()?->role === 'supplier' ? 'Akun Pemasok' : 'Akun UMKM' }}
+                    </span>
+                </div>
+
+                <a href="{{ route('logout') }}"
+                   @click.prevent="$dispatch('open-logout-modal')"
+                   onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('open-logout-modal'));"
+                   class="px-5 py-2 rounded-full font-bold text-xs bg-gray-100 hover:bg-red-50 text-gray-800 hover:text-red-600 transition flex items-center gap-1.5 border border-gray-200 shadow-sm cursor-pointer">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    <span>Keluar</span>
+                </a>
             </div>
         </div>
+
+        @if(auth()->check() && auth()->user()->role === 'supplier')
+            <div class="bg-amber-100 border-t border-b border-amber-300 text-amber-900 px-6 py-2 text-xs font-semibold flex flex-col sm:flex-row items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                    <span class="text-base">⚠️</span>
+                    <span>Anda sedang melihat katalog dalam mode <strong>Akun Pemasok</strong> ({{ auth()->user()->supplierProfile?->company_name ?? auth()->user()->email }}).</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <a href="{{ route('supplier.katalog.index') }}" class="text-[#DC4E00] hover:underline font-bold">
+                        Buka Dashboard Pemasok Anda →
+                    </a>
+                    <button type="button"
+                            @click="$dispatch('open-logout-modal')"
+                            onclick="window.dispatchEvent(new CustomEvent('open-logout-modal'));"
+                            class="bg-[#DC4E00] text-white px-3 py-1 rounded-full text-[11px] font-bold hover:bg-[#C83E00] transition cursor-pointer">
+                        Ganti ke Akun UMKM
+                    </button>
+                </div>
+            </div>
+        @endif
     </header>
 
     <!-- Main Content -->
@@ -78,6 +112,8 @@
         @yield('content')
     </main>
 
+    <!-- Modal Konfirmasi Keluar -->
+    @include('partials.logout-modal')
 
 </body>
 </html>
