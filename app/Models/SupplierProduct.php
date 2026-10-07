@@ -39,6 +39,11 @@ class SupplierProduct extends Model
         return $this->belongsTo(Commodity::class, 'commodity_id');
     }
 
+    public function getEffectiveUnitAttribute(): string
+    {
+        return $this->commodity?->unit ?: 'kg';
+    }
+
     public function scopeTersedia($query)
     {
         return $query->where('stock_status', 'Tersedia');
