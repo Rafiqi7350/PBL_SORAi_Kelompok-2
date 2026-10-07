@@ -15,7 +15,9 @@ class SupplierProduct extends Model
         'supplier_id',
         'commodity_id',
         'price',
+        'unit',
         'stock_capacity',
+        'weekly_capacity',
         'stock_status',
         'image_url',
         'description',
@@ -26,6 +28,7 @@ class SupplierProduct extends Model
 
     protected $casts = [
         'price' => 'decimal:2',
+        'weekly_capacity' => 'decimal:2',
         'is_halal_certified' => 'boolean',
     ];
 
@@ -39,9 +42,14 @@ class SupplierProduct extends Model
         return $this->belongsTo(Commodity::class, 'commodity_id');
     }
 
+    public function getEffectiveUnitAttribute(): string
+    {
+        return $this->unit ?: ($this->commodity?->unit ?: 'kg');
+    }
+
     public function scopeTersedia($query)
     {
-        return $query->where('stock_status', 'Tersedia');
+        return $query->whereIn('stock_status', ['ready', 'Tersedia']);
     }
 
     public function scopeHalal($query)
