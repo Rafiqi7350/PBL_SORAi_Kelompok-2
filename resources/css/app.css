@@ -3,6 +3,7 @@
 @import "../../node_modules/preline/variants.css";
 @source "../../node_modules/preline/dist/*.js";
 
+@source '../views/**/*.blade.php';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 @source '../../storage/framework/views/*.php';
 
@@ -24,9 +25,47 @@
     --radius-pill: 1000px;
 }
 
-.border-3 {
-    border-width: 3px;
+:root {
+    --color-voltage-lime: #ffb703;
+    --color-cobalt-signal: #ea580c;
+    --color-bordeaux-maroon: #b45309;
+    --color-midnight-ink: #1e2330;
+    --color-plaster-white: #ffffff;
+    --color-bone-canvas: #fef3c7;
+    --color-sun-orange: #fb8500;
 }
+
+/* Explicit Utilities matching reference prototype */
+.bg-voltage-lime { background-color: #ffb703 !important; }
+.text-voltage-lime { color: #ffb703 !important; }
+.border-voltage-lime { border-color: #ffb703 !important; }
+
+.bg-cobalt-signal { background-color: #ea580c !important; }
+.text-cobalt-signal { color: #ea580c !important; }
+.border-cobalt-signal { border-color: #ea580c !important; }
+
+.bg-bordeaux-maroon { background-color: #b45309 !important; }
+.text-bordeaux-maroon { color: #b45309 !important; }
+
+.bg-midnight-ink { background-color: #1e2330 !important; }
+.text-midnight-ink { color: #1e2330 !important; }
+.border-midnight-ink { border-color: #1e2330 !important; }
+
+.bg-plaster-white { background-color: #ffffff !important; }
+.text-plaster-white { color: #ffffff !important; }
+.border-plaster-white { border-color: #ffffff !important; }
+
+.bg-bone-canvas { background-color: #fef3c7 !important; }
+.text-bone-canvas { color: #fef3c7 !important; }
+.border-bone-canvas { border-color: #fef3c7 !important; }
+
+.bg-sun-orange { background-color: #fb8500 !important; }
+.text-sun-orange { color: #fb8500 !important; }
+.border-sun-orange { border-color: #fb8500 !important; }
+
+.rounded-card { border-radius: 28px !important; }
+.rounded-pill { border-radius: 1000px !important; }
+.border-3 { border-width: 3px !important; }
 
 .display-poster {
     font-family: var(--font-display, 'Space Grotesk', sans-serif);
