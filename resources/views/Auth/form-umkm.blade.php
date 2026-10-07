@@ -249,6 +249,18 @@
                 </p>
             </div>
 
+            @if(session('success'))
+                <div class="mb-8 p-5 rounded-2xl bg-emerald-50 border-2 border-emerald-500 text-emerald-900 shadow-md flex items-start gap-3.5">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-200 text-emerald-800 flex items-center justify-center font-bold text-xl flex-shrink-0">
+                        ✓
+                    </div>
+                    <div>
+                        <h4 class="font-extrabold text-sm sm:text-base text-emerald-950">Pendaftaran Berhasil Diajukan!</h4>
+                        <p class="text-xs sm:text-sm font-semibold mt-0.5 text-emerald-800 leading-relaxed">{{ session('success') }}</p>
+                    </div>
+                </div>
+            @endif
+
             <form action="{{ route('register.umkm.store') }}" method="POST" @submit="submitForm" novalidate class="space-y-6">
                 @csrf
 

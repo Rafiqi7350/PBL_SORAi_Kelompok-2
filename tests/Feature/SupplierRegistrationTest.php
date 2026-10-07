@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\Commodity;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -40,7 +39,7 @@ class SupplierRegistrationTest extends TestCase
             'unit' => 'kg',
         ]);
 
-        $testEmail = 'supplier_' . uniqid() . '@example.com';
+        $testEmail = 'supplier_'.uniqid().'@example.com';
 
         $response = $this->post('/register/supplier', [
             'email' => $testEmail,
@@ -61,7 +60,7 @@ class SupplierRegistrationTest extends TestCase
         $this->assertDatabaseHas('users', [
             'email' => $testEmail,
             'role' => 'supplier',
-            'status' => 'active',
+            'status' => 'pending',
         ]);
 
         $this->assertDatabaseHas('supplier_profiles', [
@@ -69,5 +68,13 @@ class SupplierRegistrationTest extends TestCase
             'phone' => '081234567890',
             'commodity_id' => $commodity->id,
         ]);
+
+        // Pending user cannot log in before admin verification
+        $loginResponse = $this->post('/login', [
+            'email' => $testEmail,
+            'password' => 'password123',
+        ]);
+        $this->assertGuest();
+        $loginResponse->assertSessionHasErrors(['email']);
     }
 }

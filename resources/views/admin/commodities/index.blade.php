@@ -16,7 +16,7 @@
         <div>
             <a href="{{ route('admin.commodities.create') }}" class="inline-flex items-center gap-2 bg-[#FFB703] hover:bg-[#FFB703]/90 text-black border-2 border-black font-extrabold text-sm py-3.5 px-6 rounded-full shadow-[4px_4px_0px_0px_rgba(30,34,45,1)] transition transform hover:-translate-y-0.5">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
-                + Tambah Komoditas Master
+                <span>Tambah Komoditas Master</span>
             </a>
         </div>
     </div>
@@ -148,7 +148,7 @@
                                         </a>
 
                                         <!-- Delete -->
-                                        <form method="POST" action="{{ route('admin.commodities.destroy', $item->id) }}" onsubmit="return confirm('Yakin ingin menghapus komoditas {{ $item->name }}? Tindakan ini tidak dapat dibatalkan.');" class="inline">
+                                        <form method="POST" action="{{ route('admin.commodities.destroy', $item->id) }}" class="inline">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="p-2 bg-rose-50 hover:bg-rose-200 text-rose-700 rounded-xl transition font-bold" title="Hapus">

@@ -33,7 +33,7 @@ class UmkmRegisterController extends Controller
                 'email' => $validated['email'],
                 'password' => Hash::make($validated['password']),
                 'role' => 'umkm',
-                'status' => 'active',
+                'status' => 'pending',
             ]);
 
             UmkmProfile::create([
@@ -46,6 +46,6 @@ class UmkmRegisterController extends Controller
         });
 
         return redirect()->route('register.umkm')
-            ->with('success', 'Pendaftaran UMKM Kuliner berhasil diselesaikan! Akun Anda telah aktif.');
+            ->with('success', 'Pendaftaran UMKM berhasil diajukan! Akun Anda sedang dalam proses verifikasi oleh Administrator sebelum dapat diakses.');
     }
 }

@@ -53,7 +53,7 @@
                                         <button @click="editMode = true; currentUnit = {{ json_encode(['id' => $u->id, 'name' => $u->name, 'symbol' => $u->symbol, 'description' => $u->description]) }}; showModal = true" class="p-2 bg-gray-100 hover:bg-amber-200 text-gray-900 rounded-xl transition font-bold text-xs">
                                             ✏️ Edit
                                         </button>
-                                        <form method="POST" action="{{ route('admin.units.destroy', $u->id) }}" onsubmit="return confirm('Hapus satuan baku ini?');" class="inline">
+                                        <form method="POST" action="{{ route('admin.units.destroy', $u->id) }}" class="inline">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit" class="p-2 bg-rose-50 hover:bg-rose-200 text-rose-700 rounded-xl transition font-bold text-xs">

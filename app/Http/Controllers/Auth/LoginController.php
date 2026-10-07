@@ -39,7 +39,7 @@ class LoginController extends Controller
         $credentials = $request->only('email', 'password');
         $remember = $request->boolean('remember');
 
-        if (!Auth::attempt($credentials, $remember)) {
+        if (! Auth::attempt($credentials, $remember)) {
             $userExists = User::where('email', $request->email)->exists();
 
             $errorMessage = $userExists
@@ -55,7 +55,7 @@ class LoginController extends Controller
 
         $request->session()->regenerate();
 
-        /** @var \App\Models\User $user */
+        /** @var User $user */
         $user = Auth::user();
 
         if ($user->status && $user->status !== 'active') {
@@ -63,8 +63,13 @@ class LoginController extends Controller
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
+            $statusMessage = match (strtolower((string) $user->status)) {
+                'pending', 'pending_verifikasi' => 'Akun Anda sedang dalam proses verifikasi oleh Administrator. Mohon tunggu verifikasi sebelum dapat masuk ke sistem.',
+                default => 'Akun Anda saat ini tidak aktif atau ditangguhkan. Silakan hubungi admin.',
+            };
+
             return redirect()->route('login')->withErrors([
-                'email' => 'Akun Anda saat ini tidak aktif atau ditangguhkan. Silakan hubungi admin.',
+                'email' => $statusMessage,
             ]);
         }
 
@@ -91,12 +96,14 @@ class LoginController extends Controller
     {
         if ($user->role === 'umkm') {
             $displayName = $user->umkmProfile?->owner_name ?? $user->umkmProfile?->business_name ?? 'Mitra UMKM';
+
             return redirect()->intended(route('umkm.katalog.index'))
                 ->with('success', "Selamat datang kembali, {$displayName}!");
         }
 
         if ($user->role === 'supplier') {
             $displayName = $user->supplierProfile?->company_name ?? 'Mitra Pemasok';
+
             return redirect()->intended(route('supplier.katalog.index'))
                 ->with('success', "Selamat datang kembali, {$displayName}!");
         }

@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Models\User;
-use App\Models\UmkmProfile;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -68,7 +67,7 @@ class UmkmRegistrationTest extends TestCase
 
     public function test_new_umkm_can_register(): void
     {
-        $testEmail = 'test_umkm_' . uniqid() . '@example.com';
+        $testEmail = 'test_umkm_'.uniqid().'@example.com';
 
         $response = $this->post('/register/umkm', [
             'email' => $testEmail,
@@ -86,7 +85,7 @@ class UmkmRegistrationTest extends TestCase
         $this->assertDatabaseHas('users', [
             'email' => $testEmail,
             'role' => 'umkm',
-            'status' => 'active',
+            'status' => 'pending',
         ]);
 
         $user = User::where('email', $testEmail)->first();
@@ -99,5 +98,13 @@ class UmkmRegistrationTest extends TestCase
             'phone' => '081234567899',
             'address' => 'Jl. Pengujian No. 123, Malang',
         ]);
+
+        // Pending user cannot log in before admin verification
+        $loginResponse = $this->post('/login', [
+            'email' => $testEmail,
+            'password' => 'password123',
+        ]);
+        $this->assertGuest();
+        $loginResponse->assertSessionHasErrors(['email']);
     }
 }
