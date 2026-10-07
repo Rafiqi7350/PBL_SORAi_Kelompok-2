@@ -2,7 +2,6 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\User;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -15,16 +14,12 @@ class EnsureUserIsAdmin
      */
     public function handle(Request $request, Closure $next): Response
     {
-        // MOCK LOGIN FOR DEMO PURPOSES: 
-        // Automatically login the seeded Admin user if nobody is logged in
-        if (!Auth::check()) {
-            $adminUser = User::where('role', 'admin')->first();
-            if ($adminUser) {
-                Auth::login($adminUser);
-            }
+        if (! Auth::check()) {
+            return redirect()->route('admin.login')
+                ->with('warning', 'Silakan masuk dengan akun Administrator untuk mengakses panel ini.');
         }
 
-        if (!Auth::check() || Auth::user()->role !== 'admin') {
+        if (Auth::user()->role !== 'admin') {
             return redirect()->route('umkm.katalog.index')
                 ->with('error', 'Akses ditolak. Halaman ini hanya dapat diakses oleh Administrator.');
         }

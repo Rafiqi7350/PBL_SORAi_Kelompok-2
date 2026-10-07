@@ -20,10 +20,10 @@ class CommodityController extends Controller
 
         if ($search) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', '%' . $search . '%')
-                  ->orWhere('category', 'like', '%' . $search . '%')
-                  ->orWhere('unit', 'like', '%' . $search . '%')
-                  ->orWhere('description', 'like', '%' . $search . '%');
+                $q->where('name', 'like', '%'.$search.'%')
+                    ->orWhere('category', 'like', '%'.$search.'%')
+                    ->orWhere('unit', 'like', '%'.$search.'%')
+                    ->orWhere('description', 'like', '%'.$search.'%');
             });
         }
 
@@ -88,7 +88,7 @@ class CommodityController extends Controller
         $exists = Commodity::whereRaw('LOWER(name) = ?', [mb_strtolower($normalizedName)])->exists();
         if ($exists) {
             return back()->withInput()->withErrors([
-                'name' => 'Nama komoditas "' . $normalizedName . '" sudah terdaftar dalam sistem (terdeteksi duplikasi case-insensitive).'
+                'name' => 'Nama komoditas "'.$normalizedName.'" sudah terdaftar dalam sistem (terdeteksi duplikasi case-insensitive).',
             ]);
         }
 
@@ -102,7 +102,7 @@ class CommodityController extends Controller
         ]);
 
         return redirect()->route('admin.commodities.index')
-            ->with('success', 'Komoditas master "' . $normalizedName . '" berhasil ditambahkan!');
+            ->with('success', 'Komoditas master "'.$normalizedName.'" berhasil ditambahkan!');
     }
 
     public function edit($id)
@@ -141,7 +141,7 @@ class CommodityController extends Controller
 
         if ($exists) {
             return back()->withInput()->withErrors([
-                'name' => 'Nama komoditas "' . $normalizedName . '" sudah terdaftar pada komoditas lain.'
+                'name' => 'Nama komoditas "'.$normalizedName.'" sudah terdaftar pada komoditas lain.',
             ]);
         }
 
@@ -154,7 +154,7 @@ class CommodityController extends Controller
         ]);
 
         return redirect()->route('admin.commodities.index')
-            ->with('success', 'Data komoditas "' . $normalizedName . '" berhasil diperbarui!');
+            ->with('success', 'Data komoditas "'.$normalizedName.'" berhasil diperbarui!');
     }
 
     public function destroy($id)
@@ -164,6 +164,6 @@ class CommodityController extends Controller
         $commodity->delete();
 
         return redirect()->route('admin.commodities.index')
-            ->with('success', 'Komoditas master "' . $name . '" berhasil dihapus dari sistem.');
+            ->with('success', 'Komoditas master "'.$name.'" berhasil dihapus dari sistem.');
     }
 }

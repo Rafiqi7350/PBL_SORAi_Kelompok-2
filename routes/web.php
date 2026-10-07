@@ -1,8 +1,10 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\CommodityCategoryController;
 use App\Http\Controllers\Admin\CommodityController;
 use App\Http\Controllers\Admin\CommodityUnitController;
+use App\Http\Controllers\Auth\AdminLoginController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\SupplierRegisterController;
 use App\Http\Controllers\Auth\UmkmRegisterController;
@@ -26,6 +28,13 @@ Route::post('/register/supplier', [SupplierRegisterController::class, 'store'])-
 Route::get('/register/umkm', [UmkmRegisterController::class, 'create'])->name('register.umkm');
 Route::post('/register/umkm', [UmkmRegisterController::class, 'store'])->name('register.umkm.store');
 
+/* Admin Guest Auth Routes */
+Route::prefix('admin')->name('admin.')->group(function () {
+    Route::get('/login', [AdminLoginController::class, 'create'])->name('login');
+    Route::post('/login', [AdminLoginController::class, 'store'])->name('login.store');
+    Route::match(['get', 'post'], '/logout', [AdminLoginController::class, 'destroy'])->name('logout');
+});
+
 /* UMKM Routes */
 Route::prefix('umkm')->name('umkm.')->group(function () {
     Route::get('/katalog', [KatalogController::class, 'index'])->name('katalog.index');
@@ -43,8 +52,10 @@ Route::prefix('supplier')->name('supplier.')->group(function () {
     Route::delete('/katalog/{id}', [KatalogSupplierController::class, 'destroy'])->name('katalog.destroy');
 });
 
-/* Admin Routes (Master Data Komoditas, Kategori, Satuan Baku) */
+/* Admin Protected Routes (Master Data Komoditas, Kategori, Satuan Baku, User Moderasi) */
 Route::prefix('admin')->name('admin.')->middleware(EnsureUserIsAdmin::class)->group(function () {
+    Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
+    Route::patch('/users/{id}/status', [AdminDashboardController::class, 'updateUserStatus'])->name('users.update-status');
     Route::resource('commodities', CommodityController::class);
     Route::resource('categories', CommodityCategoryController::class)->except(['create', 'edit']);
     Route::resource('units', CommodityUnitController::class)->except(['create', 'edit']);

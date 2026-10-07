@@ -32,7 +32,6 @@ class User extends Authenticatable
         ];
     }
 
-
     public function umkmProfile(): HasOne
     {
         return $this->hasOne(UmkmProfile::class, 'user_id');

@@ -375,6 +375,13 @@
                     </div>
                 </div>
 
+                <div class="mt-4 pt-3 text-center border-t border-gray-100">
+                    <a href="{{ route('admin.login') }}" class="inline-flex items-center gap-1.5 text-xs font-bold text-gray-500 hover:text-[#DC4E00] transition">
+                        <span>🛡️ Masuk sebagai Administrator Panel</span>
+                        <span>→</span>
+                    </a>
+                </div>
+
             </form>
 
         </div>

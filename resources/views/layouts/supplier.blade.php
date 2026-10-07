@@ -107,7 +107,7 @@
             </a>
 
             <!-- Logout Button -->
-            <form method="POST" action="{{ route('logout') }}" onsubmit="return confirm('Yakin ingin keluar?');">
+            <form method="POST" action="{{ route('logout') }}">
                 @csrf
                 <button type="submit" class="w-full flex items-center justify-center gap-2 bg-[#3A2228] hover:bg-[#4A262E] text-rose-300 font-extrabold text-xs py-2.5 px-4 rounded-full transition border border-rose-900">
                     <span>🚪</span> Keluar
@@ -140,6 +140,8 @@
 
         @yield('content')
     </main>
+
+    @include('partials.action-confirm-modal')
 
 </body>
 </html>

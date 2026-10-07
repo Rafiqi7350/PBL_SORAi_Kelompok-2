@@ -7,5 +7,29 @@
 @source '../../storage/framework/views/*.php';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-sans: 'Plus Jakarta Sans', 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-display: 'Space Grotesk', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+
+    --color-voltage-lime: #ffb703;
+    --color-cobalt-signal: #ea580c;
+    --color-bordeaux-maroon: #b45309;
+    --color-midnight-ink: #1e2330;
+    --color-plaster-white: #ffffff;
+    --color-bone-canvas: #fef3c7;
+    --color-sun-orange: #fb8500;
+    --color-admin-orange: #ea580c;
+
+    --radius-card: 28px;
+    --radius-pill: 1000px;
+}
+
+.border-3 {
+    border-width: 3px;
+}
+
+.display-poster {
+    font-family: var(--font-display, 'Space Grotesk', sans-serif);
+    letter-spacing: -0.03em;
+    line-height: 1.05;
 }

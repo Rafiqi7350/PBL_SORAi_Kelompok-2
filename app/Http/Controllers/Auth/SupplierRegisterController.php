@@ -36,7 +36,7 @@ class SupplierRegisterController extends Controller
                 'email' => $validated['email'],
                 'password' => Hash::make($validated['password']),
                 'role' => 'supplier',
-                'status' => 'active',
+                'status' => 'pending',
             ]);
 
             SupplierProfile::create([
@@ -53,6 +53,6 @@ class SupplierRegisterController extends Controller
         });
 
         return redirect()->route('register.supplier')
-            ->with('success', 'Pendaftaran pemasok berhasil diselesaikan! Akun Anda telah aktif.');
+            ->with('success', 'Pendaftaran pemasok berhasil diajukan! Akun Anda sedang dalam proses verifikasi oleh Administrator sebelum dapat diakses.');
     }
 }
