@@ -26,7 +26,7 @@
                         <option value="{{ $commodity->id }}" {{ old('commodity_id') == $commodity->id ? 'selected' : '' }}>
                             {{ $commodity->name }} ({{ strtoupper($commodity->category) }}) - Satuan: {{ $commodity->unit }}
                             @if($commodity->government_ref_price)
-                                | Ref HET Govt: Rp {{ number_format($commodity->government_ref_price, 0, ',', '.') }}
+                                | Ref HET: Rp {{ number_format($commodity->government_ref_price, 0, ',', '.') }}
                             @endif
                         </option>
                     @endforeach
@@ -60,7 +60,7 @@
                 <div>
                     <label class="block text-xs font-extrabold text-[#1E222D] uppercase tracking-wider mb-2">Status Stok (*)</label>
                     <select name="stock_status" required class="w-full px-4 py-3 bg-[#FFFDF5] border-2 border-black rounded-xl font-bold text-sm focus:outline-none focus:border-[#FFB703]">
-                        <option value="Tersedia" {{ old('stock_status') == 'Tersedia' ? 'selected' : '' }}>🟢 Tersedia (Bisa Dipesan Direct)</option>
+                        <option value="Tersedia" {{ old('stock_status', 'Tersedia') == 'Tersedia' ? 'selected' : '' }}>🟢 Tersedia (Bisa Dipesan)</option>
                         <option value="Stok Terbatas" {{ old('stock_status') == 'Stok Terbatas' ? 'selected' : '' }}>🟡 Stok Terbatas</option>
                         <option value="Stok Habis" {{ old('stock_status') == 'Stok Habis' ? 'selected' : '' }}>🔴 Stok Habis</option>
                         <option value="Pre-Order" {{ old('stock_status') == 'Pre-Order' ? 'selected' : '' }}>🔵 Pre-Order / Inden</option>
@@ -71,7 +71,7 @@
                 </div>
                 <div>
                     <label class="block text-xs font-extrabold text-[#1E222D] uppercase tracking-wider mb-2">Minimal Pemesanan (Min. Order)</label>
-                    <input type="text" name="minimum_order" value="{{ old('minimum_order', '10') }}" placeholder="Contoh: 10 kg" class="w-full px-4 py-3 bg-[#FFFDF5] border-2 border-black rounded-xl font-bold text-sm focus:outline-none focus:border-[#FFB703]">
+                    <input type="text" name="minimum_order" value="{{ old('minimum_order', '10 kg') }}" placeholder="Contoh: 10 kg" class="w-full px-4 py-3 bg-[#FFFDF5] border-2 border-black rounded-xl font-bold text-sm focus:outline-none focus:border-[#FFB703]">
                 </div>
             </div>
 
@@ -111,7 +111,7 @@
                 <a href="{{ route('supplier.katalog.index') }}" class="px-6 py-3 rounded-full font-extrabold text-sm bg-gray-100 text-black hover:bg-gray-200 transition">
                     Batal
                 </a>
-                <button type="submit" class="px-8 py-3.5 rounded-full font-extrabold text-sm bg-[#FFB703] text-black hover:bg-[#FFB703]/90 transition shadow-md">
+                <button type="submit" class="px-8 py-3.5 rounded-full font-extrabold text-sm bg-[#FFB703] border-2 border-black text-black hover:bg-[#FFB703]/90 transition shadow-md">
                     Simpan & Publikasikan ke Katalog &rarr;
                 </button>
             </div>

@@ -7,7 +7,6 @@ use App\Models\CommodityCategory;
 use App\Models\CommodityUnit;
 use App\Models\SupplierProduct;
 use App\Models\SupplierProfile;
-use App\Models\UmkmProfile;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -26,8 +25,6 @@ class DemoSeeder extends Seeder
             ['name' => 'Bumbu & Rempah', 'description' => 'Bawang merah, bawang putih, cabai, jahe, kunyit, dll.'],
             ['name' => 'Sayuran', 'description' => 'Sayuran segar harian, tomat, wortel, kubis, dll.'],
             ['name' => 'Sembako', 'description' => 'Beras, minyak goreng, gula, tepung, dll.'],
-            ['name' => 'Perikanan & Seafood', 'description' => 'Ikan air tawar, ikan laut, udang, cumi.'],
-            ['name' => 'Telur', 'description' => 'Telur ayam ras, telur puyuh, telur bebek.'],
         ];
 
         foreach ($categories as $cat) {
@@ -64,16 +61,6 @@ class DemoSeeder extends Seeder
         }
 
         // 4. Users & Profiles
-        $adminUser = User::firstOrCreate(
-            ['email' => 'admin@sorai.id'],
-            ['password' => Hash::make('password'), 'role' => 'admin', 'status' => 'active']
-        );
-
-        $umkmUser = User::firstOrCreate(
-            ['email' => 'umkm@sorai.id'],
-            ['password' => Hash::make('password'), 'role' => 'umkm', 'status' => 'active']
-        );
-
         $supplierUser = User::firstOrCreate(
             ['email' => 'supplier@sorai.id'],
             ['password' => Hash::make('password'), 'role' => 'supplier', 'status' => 'active']
@@ -132,10 +119,12 @@ class DemoSeeder extends Seeder
             SupplierProduct::updateOrCreate(
                 ['supplier_id' => $supplier->id, 'commodity_id' => $ayam->id],
                 [
-                    'price' => 34500.00,
-                    'stock_capacity' => '1.500 kg / minggu',
-                    'stock_status' => 'Tersedia',
-                    'minimum_order' => '20 kg',
+                    'price' => 34000.00,
+                    'unit' => 'kg',
+                    'weekly_capacity' => 500,
+                    'stock_capacity' => '500 kg/minggu',
+                    'stock_status' => 'ready',
+                    'minimum_order' => '10 kg',
                     'is_halal_certified' => true,
                     'quality_grade' => 'Grade A Super',
                     'description' => 'Ayam potong segar harian potong subuh. Bersih tanpa jeroan, es batu pengawet alami.',
@@ -148,9 +137,11 @@ class DemoSeeder extends Seeder
             SupplierProduct::updateOrCreate(
                 ['supplier_id' => $supplier->id, 'commodity_id' => $telur->id],
                 [
-                    'price' => 27000.00,
-                    'stock_capacity' => '800 kg / minggu',
-                    'stock_status' => 'Tersedia',
+                    'price' => 28000.00,
+                    'unit' => 'kg',
+                    'weekly_capacity' => 1200,
+                    'stock_capacity' => '1.200 kg/minggu',
+                    'stock_status' => 'ready',
                     'minimum_order' => '10 kg',
                     'is_halal_certified' => true,
                     'quality_grade' => 'Grade A Segar',

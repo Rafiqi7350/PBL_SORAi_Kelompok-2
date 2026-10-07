@@ -35,6 +35,7 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 text-sm font-medium text-gray-800">
+                    <tbody class="divide-y divide-gray-100 text-sm font-medium text-gray-800">
                         @foreach($products as $product)
                             <tr class="hover:bg-amber-50/20 transition">
                                 <!-- Gambar -->

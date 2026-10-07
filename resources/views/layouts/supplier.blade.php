@@ -3,12 +3,12 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>SORAI - Portal Pemasok Bahan Baku</title>
+    <title>SORAI - Kelola Stok Komoditas Pemasok</title>
     
-    <!-- Google Fonts Outfit -->
+    <!-- Google Fonts Outfit & Space Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     
     <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
@@ -17,6 +17,7 @@
     <style>
         [x-cloak] { display: none !important; }
         body { font-family: 'Outfit', sans-serif; }
+        .font-mono-code { font-family: 'Space Mono', monospace; }
     </style>
 </head>
 <body class="bg-[#FDF5E6] text-gray-900 antialiased min-h-screen flex">
@@ -102,6 +103,7 @@
                 <span>Keluar</span>
             </a>
         </div>
+    </aside>
     </aside>
 
     <!-- Main Content Area -->
