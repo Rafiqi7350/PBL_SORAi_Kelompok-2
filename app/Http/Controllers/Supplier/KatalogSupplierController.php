@@ -1,171 +1,147 @@
 <?php
 
-namespace App\Http\Controllers\Supplier;
+namespace App\Http\Controllers\Umkm;
 
 use App\Http\Controllers\Controller;
 use App\Models\Commodity;
-use App\Models\CommodityUnit;
+use App\Models\Partnership;
 use App\Models\SupplierProduct;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
-class KatalogSupplierController extends Controller
+class KatalogController extends Controller
 {
-    private function getActiveSupplierProfile()
-    {
-        if (! Auth::check()) {
-            $dummySupplierUser = User::where('role', 'supplier')->first();
-            if ($dummySupplierUser) {
-                Auth::login($dummySupplierUser);
-            }
-        }
-
-        return Auth::user()?->supplierProfile;
-    }
-
     public function index(Request $request)
     {
-        $supplier = $this->getActiveSupplierProfile();
+        $search = trim($request->input('search'));
+        $category = $request->input('category');
+        $maxPrice = $request->input('max_price');
+        $stockStatus = $request->input('stock_status');
+        $isHalal = $request->boolean('is_halal');
+        $sort = $request->input('sort', 'terbaru');
 
-        if (! $supplier) {
-            return redirect()->route('register.supplier')
-                ->with('error', 'Silakan daftarkan profil Pemasok terlebih dahulu.');
-        }
+        $query = SupplierProduct::with(['supplier.user', 'commodity']);
 
-        $search = $request->input('search');
-        $statusFilter = $request->input('status');
+        // Fix & Optimize Search Filter
+        if ($search !== '' && $search !== null) {
+            $searchTerm = strtolower($search);
 
-        $query = SupplierProduct::with('commodity')
-            ->where('supplier_id', $supplier->id);
+            $query->where(function ($q) use ($searchTerm) {
+                // 1. Search berdasarkan relasi Commodity (Nama & Kategori Komoditas)
+                $q->whereHas('commodity', function ($cq) use ($searchTerm) {
+                    $cq->whereRaw('LOWER(name) LIKE ?', ['%' . $searchTerm . '%'])
+                       ->orWhereRaw('LOWER(category) LIKE ?', ['%' . $searchTerm . '%']);
+                })
+                // 2. Search berdasarkan relasi Supplier (Nama Perusahaan & Alamat)
+                ->orWhereHas('supplier', function ($sq) use ($searchTerm) {
+                    $sq->whereRaw('LOWER(company_name) LIKE ?', ['%' . $searchTerm . '%'])
+                       ->orWhereRaw('LOWER(warehouse_address) LIKE ?', ['%' . $searchTerm . '%'])
+                       ->orWhereRaw('LOWER(delivery_area) LIKE ?', ['%' . $searchTerm . '%']);
+                })
+                // 3. Search langsung pada atribut produk
+                ->orWhereRaw('LOWER(description) LIKE ?', ['%' . $searchTerm . '%'])
+                ->orWhereRaw('LOWER(quality_grade) LIKE ?', ['%' . $searchTerm . '%']);
 
-        if ($search) {
-            $query->whereHas('commodity', function ($q) use ($search) {
-                $q->where('name', 'like', '%'.$search.'%')
-                    ->orWhere('category', 'like', '%'.$search.'%');
+                // Jika tabel supplier_products memiliki kolom title atau name
+                if (\Schema::hasColumn('supplier_products', 'title')) {
+                    $q->orWhereRaw('LOWER(title) LIKE ?', ['%' . $searchTerm . '%']);
+                }
+                if (\Schema::hasColumn('supplier_products', 'name')) {
+                    $q->orWhereRaw('LOWER(name) LIKE ?', ['%' . $searchTerm . '%']);
+                }
             });
         }
 
-        if ($statusFilter && $statusFilter !== 'Semua') {
-            $query->where('stock_status', $statusFilter);
+        // Category filter
+        if ($category && $category !== 'Semua Kategori') {
+            $query->whereHas('commodity', function ($q) use ($category) {
+                $q->where('category', $category);
+            });
         }
 
-        $products = $query->latest()->paginate(10)->withQueryString();
+        // Stock Status filter
+        if ($stockStatus && $stockStatus !== 'Semua Status' && $stockStatus !== 'Semua Status Stok') {
+            $query->where('stock_status', $stockStatus);
+        }
 
-        // Statistics
-        $totalProducts = SupplierProduct::where('supplier_id', $supplier->id)->count();
-        $stokTersedia = SupplierProduct::where('supplier_id', $supplier->id)->where('stock_status', 'Tersedia')->count();
-        $stokTerbatas = SupplierProduct::where('supplier_id', $supplier->id)->where('stock_status', 'Stok Terbatas')->count();
-        $stokHabis = SupplierProduct::where('supplier_id', $supplier->id)->where('stock_status', 'Stok Habis')->count();
+        // Halal filter
+        if ($isHalal) {
+            $query->where('is_halal_certified', true);
+        }
 
-        $allCommodities = Commodity::orderBy('name')->get();
+        // Max Price filter
+        if ($maxPrice && is_numeric($maxPrice)) {
+            $query->where('price', '<=', $maxPrice);
+        }
 
-        return view('supplier.katalog.index', compact(
-            'supplier',
+        // Sorting
+        switch ($sort) {
+            case 'harga_terendah':
+                $query->orderBy('price', 'asc');
+                break;
+            case 'harga_tertinggi':
+                $query->orderBy('price', 'desc');
+                break;
+            case 'kapasitas_terbesar':
+                $query->orderBy('stock_capacity', 'desc');
+                break;
+            case 'terbaru':
+            default:
+                $query->latest();
+                break;
+        }
+
+        $products = $query->paginate(12)->withQueryString();
+
+        // Get unique categories for the filter
+        $categories = Commodity::select('category')->distinct()->pluck('category');
+
+        return view('umkm.katalog.index', compact(
             'products',
-            'totalProducts',
-            'stokTersedia',
-            'stokTerbatas',
-            'stokHabis',
-            'allCommodities',
+            'categories',
             'search',
-            'statusFilter'
+            'category',
+            'maxPrice',
+            'stockStatus',
+            'isHalal',
+            'sort'
         ));
     }
 
-    public function create()
+    public function ajukanKemitraan(Request $request)
     {
-        $supplier = $this->getActiveSupplierProfile();
-        $commodities = Commodity::orderBy('name')->get();
+        $request->validate([
+            'supplier_id' => 'required|exists:supplier_profiles,id',
+            'volume' => 'required|numeric|min:1',
+            'unit' => 'required|string',
+            'frekuensi' => 'required|string',
+            'submission_details' => 'nullable|string',
+        ]);
 
-        return view('supplier.katalog.create', compact('supplier', 'commodities'));
-    }
-
-    public function store(Request $request)
-    {
-        $supplier = $this->getActiveSupplierProfile();
-
-        if (! $supplier) {
-            return redirect()->back()->with('error', 'Profil Pemasok tidak ditemukan.');
+        if (! Auth::check()) {
+            $dummyUmkmUser = User::where('role', 'umkm')->first();
+            if ($dummyUmkmUser) {
+                Auth::login($dummyUmkmUser);
+            }
         }
 
-        $validated = $request->validate([
-            'commodity_id' => 'required|exists:commodities,id',
-            'price' => 'required|numeric|min:0',
-            'stock_capacity' => 'required|string|max:255',
-            'stock_status' => 'required|string|in:Tersedia,Stok Terbatas,Stok Habis,Pre-Order',
-            'minimum_order' => 'nullable|string|max:100',
-            'quality_grade' => 'nullable|string|max:100',
-            'is_halal_certified' => 'nullable|boolean',
-            'description' => 'nullable|string',
-            'image_url' => 'nullable|url',
+        $umkm = Auth::user()?->umkmProfile;
+
+        if (! $umkm) {
+            return redirect()->back()->with('error', 'Anda harus memiliki profil UMKM untuk mengajukan kemitraan.');
+        }
+
+        $deliveryNotes = $request->input('volume').' '.$request->input('unit').' | Frekuensi: '.$request->input('frekuensi');
+
+        Partnership::create([
+            'umkm_id' => $umkm->id,
+            'supplier_id' => $request->input('supplier_id'),
+            'submission_details' => $request->input('submission_details'),
+            'delivery_schedule_notes' => $deliveryNotes,
+            'status' => 'pending',
         ]);
 
-        $validated['supplier_id'] = $supplier->id;
-        $validated['is_halal_certified'] = $request->has('is_halal_certified');
-
-        SupplierProduct::create($validated);
-
-        return redirect()->route('supplier.katalog.index')
-            ->with('success', 'Komoditas baru berhasil ditambahkan ke katalog Anda!');
-    }
-
-    public function edit($id)
-    {
-        $supplier = $this->getActiveSupplierProfile();
-        $product = SupplierProduct::where('supplier_id', $supplier->id)->findOrFail($id);
-        $commodities = Commodity::orderBy('name')->get();
-
-        return view('supplier.katalog.edit', compact('supplier', 'product', 'commodities'));
-    }
-
-    public function update(Request $request, $id)
-    {
-        $supplier = $this->getActiveSupplierProfile();
-        $product = SupplierProduct::where('supplier_id', $supplier->id)->findOrFail($id);
-
-        $validated = $request->validate([
-            'commodity_id' => 'required|exists:commodities,id',
-            'price' => 'required|numeric|min:0',
-            'stock_capacity' => 'required|string|max:255',
-            'stock_status' => 'required|string|in:Tersedia,Stok Terbatas,Stok Habis,Pre-Order',
-            'minimum_order' => 'nullable|string|max:100',
-            'quality_grade' => 'nullable|string|max:100',
-            'is_halal_certified' => 'nullable|boolean',
-            'description' => 'nullable|string',
-            'image_url' => 'nullable|url',
-        ]);
-
-        $validated['is_halal_certified'] = $request->has('is_halal_certified');
-
-        $product->update($validated);
-
-        return redirect()->route('supplier.katalog.index')
-            ->with('success', 'Informasi produk dan stok berhasil diperbarui!');
-    }
-
-    public function updateStockStatus(Request $request, $id)
-    {
-        $supplier = $this->getActiveSupplierProfile();
-        $product = SupplierProduct::where('supplier_id', $supplier->id)->findOrFail($id);
-
-        $validated = $request->validate([
-            'stock_status' => 'required|string|in:Tersedia,Stok Terbatas,Stok Habis,Pre-Order',
-            'stock_capacity' => 'nullable|string|max:255',
-        ]);
-
-        $product->update($validated);
-
-        return redirect()->back()->with('success', 'Status stok komoditas berhasil diperbarui!');
-    }
-
-    public function destroy($id)
-    {
-        $supplier = $this->getActiveSupplierProfile();
-        $product = SupplierProduct::where('supplier_id', $supplier->id)->findOrFail($id);
-        $product->delete();
-
-        return redirect()->route('supplier.katalog.index')
-            ->with('success', 'Komoditas berhasil dihapus dari katalog.');
+        return redirect()->route('umkm.katalog.index')->with('success', 'Pengajuan kemitraan pasokan berhasil dikirim ke pemasok!');
     }
 }
