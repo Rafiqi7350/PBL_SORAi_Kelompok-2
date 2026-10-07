@@ -164,21 +164,11 @@
                                     </span>
                                 </td>
 
-<<<<<<< HEAD
                                 <!-- Price -->
-=======
-                                <!-- Satuan -->
-                                <td class="py-4 px-6 font-mono font-bold text-gray-900">
-                                    {{ $product->effective_unit }}
-                                </td>
-
-                                <!-- Harga Grosir -->
->>>>>>> 886da98b5b50ea650d3b97d2b27ee989f31d1da7
                                 <td class="py-4 px-6">
                                     <p class="font-black text-[#F4511E] text-base">
                                         Rp {{ number_format($product->price, 0, ',', '.') }}
                                     </p>
-<<<<<<< HEAD
                                     <p class="text-[11px] font-bold text-gray-400 uppercase">per {{ $product->commodity->unit }}</p>
                                 </td>
 
@@ -235,57 +225,18 @@
                                         <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-sky-100 text-sky-800 border border-sky-300">
                                             <span class="w-2 h-2 rounded-full bg-sky-500"></span>
                                             {{ $product->stock_status }}
-=======
-                                    <p class="text-[10px] font-bold text-gray-400 uppercase">per {{ $product->effective_unit }}</p>
-                                    @if($product->commodity->government_ref_price)
-                                        <p class="text-[10px] text-gray-500 font-semibold mt-0.5">
-                                            Acuan Govt: Rp {{ number_format($product->commodity->government_ref_price, 0, ',', '.') }}
-                                        </p>
-                                    @endif
-                                </td>
-
-                                <!-- Kapasitas Pasok -->
-                                <td class="py-4 px-6 font-bold text-gray-900">
-                                    {{ $product->weekly_capacity ? number_format($product->weekly_capacity, 0, ',', '.') . ' ' . $product->effective_unit . ' / minggu' : ($product->stock_capacity ?? '-') }}
-                                </td>
-
-                                <!-- Status Stok -->
-                                <td class="py-4 px-6">
-                                    @if(in_array($product->stock_status, ['ready', 'Tersedia']))
-                                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-800 border border-emerald-400">
-                                            <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                            🟢 Ready (Pasokan Rutin)
-                                        </span>
-                                    @elseif(in_array($product->stock_status, ['limited', 'Stok Terbatas']))
-                                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-amber-100 text-amber-800 border border-amber-400">
-                                            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-                                            🟡 Limited (Terbatas)
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-rose-100 text-rose-800 border border-rose-400">
-                                            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-                                            🔴 {{ $product->stock_status }}
->>>>>>> 886da98b5b50ea650d3b97d2b27ee989f31d1da7
                                         </span>
                                     @endif
                                 </td>
 
-<<<<<<< HEAD
                                 <!-- Actions -->
                                 <td class="py-4 px-6 text-right">
                                     <div class="flex items-center justify-end gap-2">
                                         <!-- Quick Stock Update Trigger -->
-=======
-                                <!-- Aksi -->
-                                <td class="py-4 px-6 text-right">
-                                    <div class="flex items-center justify-end gap-2">
-                                        <!-- Quick Stock Update Button -->
->>>>>>> 886da98b5b50ea650d3b97d2b27ee989f31d1da7
                                         <button 
                                             @click="selectedProduct = {{ json_encode([
                                                 'id' => $product->id,
                                                 'name' => $product->commodity->name,
-<<<<<<< HEAD
                                                 'status' => $product->stock_status,
                                                 'capacity' => $product->stock_capacity
                                             ]) }}; showQuickModal = true"
@@ -305,27 +256,6 @@
                                             @method('DELETE')
                                             <button type="submit" class="p-2 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-xl transition" title="Hapus">
                                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-=======
-                                                'status' => in_array($product->stock_status, ['ready', 'Tersedia']) ? 'ready' : 'limited',
-                                                'capacity' => $product->weekly_capacity ?? ''
-                                            ]) }}; showQuickModal = true"
-                                            title="Update Stok Cepat"
-                                            class="p-2 bg-amber-100 text-amber-900 hover:bg-amber-200 rounded-xl transition text-xs font-extrabold flex items-center gap-1">
-                                            ⚡ Quick Status
-                                        </button>
-
-                                        <!-- Edit -->
-                                        <a href="{{ route('supplier.katalog.edit', $product->id) }}" class="p-2 bg-gray-100 text-gray-900 hover:bg-gray-200 rounded-xl transition font-bold text-xs" title="Edit Product">
-                                            ✏️ Edit
-                                        </a>
-
-                                        <!-- Delete -->
-                                        <form method="POST" action="{{ route('supplier.katalog.destroy', $product->id) }}" onsubmit="return confirm('Yakin ingin menghapus produk komoditas {{ $product->commodity->name }} dari katalog Anda?');" class="inline">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="p-2 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-xl transition font-bold text-xs" title="Hapus">
-                                                🗑️ Hapus
->>>>>>> 886da98b5b50ea650d3b97d2b27ee989f31d1da7
                                             </button>
                                         </form>
                                     </div>
@@ -337,34 +267,22 @@
             </div>
 
             <!-- Pagination -->
-<<<<<<< HEAD
             <div class="p-6 border-t border-gray-100">
-=======
-            <div class="p-6 border-t-2 border-gray-100">
->>>>>>> 886da98b5b50ea650d3b97d2b27ee989f31d1da7
                 {{ $products->links() }}
             </div>
         @endif
     </div>
 
     <!-- Quick Stock Update Modal (Alpine.js) -->
-<<<<<<< HEAD
     <div x-show="showQuickModal" 
          class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
-=======
-    <div x-show="showQuickModal" class="fixed inset-0 z-50 overflow-y-auto" style="display: none;">
->>>>>>> 886da98b5b50ea650d3b97d2b27ee989f31d1da7
         <div x-show="showQuickModal" x-transition.opacity class="fixed inset-0 bg-gray-900/70 backdrop-blur-sm"></div>
 
         <div class="flex min-h-screen items-center justify-center p-4">
             <div x-show="showQuickModal" @click.away="showQuickModal = false" x-transition class="relative w-full max-w-lg rounded-3xl bg-[#FFFDF5] p-8 shadow-2xl border-2 border-black">
                 <div class="flex justify-between items-center mb-4">
                     <div>
-<<<<<<< HEAD
                         <span class="text-xs font-black text-[#E07A5F] tracking-widest uppercase">Pembaruan Cepat Stok</span>
-=======
-                        <span class="text-xs font-black text-[#E07A5F] tracking-widest uppercase">Quick Update Status Stok</span>
->>>>>>> 886da98b5b50ea650d3b97d2b27ee989f31d1da7
                         <h3 class="text-2xl font-extrabold text-[#1E222D] uppercase" x-text="selectedProduct?.name"></h3>
                     </div>
                     <button @click="showQuickModal = false" class="text-gray-400 hover:text-black font-extrabold text-xl">&times;</button>
@@ -375,25 +293,16 @@
                     @method('PATCH')
 
                     <div>
-<<<<<<< HEAD
                         <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Status Ketersediaan Stok</label>
                         <select name="stock_status" x-model="selectedProduct.status" required class="w-full px-4 py-3 bg-white border-2 border-black rounded-xl font-bold text-sm">
                             <option value="Tersedia">🟢 Tersedia (Bisa Dipesan)</option>
                             <option value="Stok Terbatas">🟡 Stok Terbatas (Peringatan Kuota)</option>
                             <option value="Stok Habis">🔴 Stok Habis (Sementara Kosong)</option>
                             <option value="Pre-Order">🔵 Pre-Order (Pemesanan Awal)</option>
-=======
-                        <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Status Ketersediaan Stok (*)</label>
-                        <select name="stock_status" x-model="selectedProduct.status" required class="w-full px-4 py-3 bg-white border-2 border-black rounded-xl font-bold text-sm">
-                            <option value="ready">🟢 Ready (Ready Pasokan Rutin)</option>
-                            <option value="limited">🟡 Limited (Terbatas)</option>
-                            <option value="Stok Habis">🔴 Stok Habis</option>
->>>>>>> 886da98b5b50ea650d3b97d2b27ee989f31d1da7
                         </select>
                     </div>
 
                     <div>
-<<<<<<< HEAD
                         <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Kapasitas Stok Pasokan</label>
                         <input type="text" name="stock_capacity" x-model="selectedProduct.capacity" placeholder="Contoh: 800 kg/minggu" class="w-full px-4 py-3 bg-white border-2 border-black rounded-xl font-bold text-sm">
                     </div>
@@ -401,15 +310,6 @@
                     <div class="flex gap-3 pt-4">
                         <button type="button" @click="showQuickModal = false" class="w-1/2 py-3 bg-gray-100 rounded-full font-bold text-sm hover:bg-gray-200">Batal</button>
                         <button type="submit" class="w-1/2 py-3 bg-[#FFB703] rounded-full font-extrabold text-sm hover:bg-[#FFB703]/90">Simpan Stok &rarr;</button>
-=======
-                        <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Kapasitas Pasok Mingguan</label>
-                        <input type="number" step="0.1" min="0.1" name="weekly_capacity" x-model="selectedProduct.capacity" placeholder="Contoh: 500" class="w-full px-4 py-3 bg-white border-2 border-black rounded-xl font-bold text-sm">
-                    </div>
-
-                    <div class="flex gap-3 pt-4">
-                        <button type="button" @click="showQuickModal = false" class="w-1/2 py-3 bg-gray-100 rounded-full font-bold text-xs hover:bg-gray-200">Batal</button>
-                        <button type="submit" class="w-1/2 py-3 bg-[#FFB703] border-2 border-black rounded-full font-extrabold text-xs hover:bg-[#FFB703]/90">Simpan Stok &rarr;</button>
->>>>>>> 886da98b5b50ea650d3b97d2b27ee989f31d1da7
                     </div>
                 </form>
             </div>
