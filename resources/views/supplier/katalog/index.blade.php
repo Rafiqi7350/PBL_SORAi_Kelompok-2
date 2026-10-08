@@ -35,21 +35,23 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 text-sm font-medium text-gray-800">
-                    <tbody class="divide-y divide-gray-100 text-sm font-medium text-gray-800">
                         @foreach($products as $product)
                             <tr class="hover:bg-amber-50/20 transition">
                                 <!-- Gambar -->
                                 <td class="py-4 px-6">
-                                    <div class="w-12 h-12 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0">
+                                    <div class="w-14 h-14 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0">
                                         @if($product->image_url)
-                                            <img src="{{ $product->image_url }}" alt="{{ $product->commodity->name }}" class="w-full h-full object-cover">
+                                            <img src="{{ str_starts_with($product->image_url, 'http') ? $product->image_url : asset($product->image_url) }}"
+                                                 alt="{{ $product->commodity->name }}"
+                                                 class="w-full h-full object-cover">
                                         @else
                                             <div class="w-full h-full flex items-center justify-center font-bold text-gray-400 text-[10px] bg-gray-200">
-                                                No Image
+                                                No Img
                                             </div>
                                         @endif
                                     </div>
                                 </td>
+
 
                                 <!-- Komoditas & Kategori -->
                                 <td class="py-4 px-6">
