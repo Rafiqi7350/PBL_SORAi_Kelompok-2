@@ -61,7 +61,6 @@
                     <label class="block text-xs font-extrabold text-[#1E222D] uppercase tracking-wider mb-2">Status Stok (*)</label>
                     <select name="stock_status" required class="w-full px-4 py-3 bg-[#FFFDF5] border-2 border-black rounded-xl font-bold text-sm focus:outline-none focus:border-[#FFB703]">
                         <option value="Tersedia" {{ old('stock_status', $product->stock_status) == 'Tersedia' ? 'selected' : '' }}>🟢 Tersedia (Bisa Dipesan)</option>
-                        <option value="Tersedia" {{ old('stock_status', $product->stock_status) == 'Tersedia' ? 'selected' : '' }}>🟢 Tersedia (Bisa Dipesan)</option>
                         <option value="Stok Terbatas" {{ old('stock_status', $product->stock_status) == 'Stok Terbatas' ? 'selected' : '' }}>🟡 Stok Terbatas</option>
                         <option value="Stok Habis" {{ old('stock_status', $product->stock_status) == 'Stok Habis' ? 'selected' : '' }}>🔴 Stok Habis</option>
                         <option value="Pre-Order" {{ old('stock_status', $product->stock_status) == 'Pre-Order' ? 'selected' : '' }}>🔵 Pre-Order / Inden</option>
@@ -70,11 +69,9 @@
                         <p class="text-xs text-rose-600 font-bold mt-1">{{ $message }}</p>
                     @enderror
                 </div>
-                </div>
 
                 <div>
                     <label class="block text-xs font-extrabold text-[#1E222D] uppercase tracking-wider mb-2">Minimal Pemesanan (Min. Order)</label>
-                    <input type="text" name="minimum_order" value="{{ old('minimum_order', $product->minimum_order) }}" placeholder="Contoh: 10 kg" class="w-full px-4 py-3 bg-[#FFFDF5] border-2 border-black rounded-xl font-bold text-sm focus:outline-none focus:border-[#FFB703]">
                     <input type="text" name="minimum_order" value="{{ old('minimum_order', $product->minimum_order) }}" placeholder="Contoh: 10 kg" class="w-full px-4 py-3 bg-[#FFFDF5] border-2 border-black rounded-xl font-bold text-sm focus:outline-none focus:border-[#FFB703]">
                 </div>
             </div>
@@ -100,10 +97,10 @@
             <!-- Image URL -->
             <div>
                 <label class="block text-xs font-extrabold text-[#1E222D] uppercase tracking-wider mb-2">URL Foto Produk Komoditas</label>
-                <input type="url" name="image_url" value="{{ old('image_url', $product->image_url) }}" class="w-full px-4 py-3 bg-[#FFFDF5] border-2 border-black rounded-xl font-bold text-sm focus:outline-none focus:border-[#FFB703]">
-                <p class="text-[11px] font-medium text-gray-500 mt-1">Gunakan URL gambar komoditas yang jernih agar menarik minat mitra UMKM.</p>
+                <input type="text" name="image_url" value="{{ old('image_url', $product->image_url) }}" placeholder="https://images.unsplash.com/... atau /images/commodities/nama.png" class="w-full px-4 py-3 bg-[#FFFDF5] border-2 border-black rounded-xl font-bold text-sm focus:outline-none focus:border-[#FFB703]">
                 <p class="text-[11px] font-medium text-gray-500 mt-1">Gunakan URL gambar komoditas yang jernih agar menarik minat mitra UMKM.</p>
             </div>
+
 
             <!-- Description -->
             <div>
