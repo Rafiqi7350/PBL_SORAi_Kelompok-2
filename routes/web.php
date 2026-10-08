@@ -12,6 +12,8 @@ use App\Http\Controllers\Auth\UmkmRegisterController;
 use App\Http\Controllers\Supplier\KatalogSupplierController;
 use App\Http\Controllers\Umkm\KatalogController;
 use App\Http\Middleware\EnsureUserIsAdmin;
+use App\Http\Middleware\EnsureUserIsSupplier;
+use App\Http\Middleware\EnsureUserIsUmkm;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -41,13 +43,13 @@ Route::prefix('admin')->name('admin.')->group(function () {
 });
 
 /* UMKM Routes */
-Route::prefix('umkm')->name('umkm.')->group(function () {
+Route::prefix('umkm')->name('umkm.')->middleware(EnsureUserIsUmkm::class)->group(function () {
     Route::get('/katalog', [KatalogController::class, 'index'])->name('katalog.index');
     Route::post('/katalog/ajukan-kemitraan', [KatalogController::class, 'ajukanKemitraan'])->name('katalog.ajukan');
 });
 
 /* Supplier Routes */
-Route::prefix('supplier')->name('supplier.')->group(function () {
+Route::prefix('supplier')->name('supplier.')->middleware(EnsureUserIsSupplier::class)->group(function () {
     Route::get('/katalog', [KatalogSupplierController::class, 'index'])->name('katalog.index');
     Route::get('/katalog/create', [KatalogSupplierController::class, 'create'])->name('katalog.create');
     Route::post('/katalog', [KatalogSupplierController::class, 'store'])->name('katalog.store');
