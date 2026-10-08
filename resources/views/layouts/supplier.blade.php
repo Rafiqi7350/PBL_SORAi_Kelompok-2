@@ -91,9 +91,6 @@
                 </div>
             </div>
 
-            <a href="{{ route('umkm.katalog.index') }}" class="w-full py-2.5 px-4 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition">
-                <span>Switch Ke Sisi UMKM</span>
-            </a>
 
             <a href="{{ route('logout') }}"
                @click.prevent="$dispatch('open-logout-modal')"
@@ -103,7 +100,6 @@
                 <span>Keluar</span>
             </a>
         </div>
-    </aside>
     </aside>
 
     <!-- Main Content Area -->
