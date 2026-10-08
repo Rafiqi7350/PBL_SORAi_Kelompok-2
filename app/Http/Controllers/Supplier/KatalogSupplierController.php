@@ -112,6 +112,12 @@ class KatalogSupplierController extends Controller
     public function edit($id)
     {
         $supplier = $this->getActiveSupplierProfile();
+
+        if (! $supplier) {
+            return redirect()->route('register.supplier')
+                ->with('error', 'Silakan daftarkan profil Pemasok terlebih dahulu.');
+        }
+
         $product = SupplierProduct::where('supplier_id', $supplier->id)->findOrFail($id);
         $commodities = Commodity::orderBy('name')->get();
 
@@ -121,6 +127,11 @@ class KatalogSupplierController extends Controller
     public function update(Request $request, $id)
     {
         $supplier = $this->getActiveSupplierProfile();
+
+        if (! $supplier) {
+            return redirect()->back()->with('error', 'Profil Pemasok tidak ditemukan.');
+        }
+
         $product = SupplierProduct::where('supplier_id', $supplier->id)->findOrFail($id);
 
         $validated = $request->validate([
@@ -146,6 +157,11 @@ class KatalogSupplierController extends Controller
     public function updateStockStatus(Request $request, $id)
     {
         $supplier = $this->getActiveSupplierProfile();
+
+        if (! $supplier) {
+            return redirect()->back()->with('error', 'Profil Pemasok tidak ditemukan.');
+        }
+
         $product = SupplierProduct::where('supplier_id', $supplier->id)->findOrFail($id);
 
         $validated = $request->validate([
@@ -161,6 +177,11 @@ class KatalogSupplierController extends Controller
     public function destroy($id)
     {
         $supplier = $this->getActiveSupplierProfile();
+
+        if (! $supplier) {
+            return redirect()->back()->with('error', 'Profil Pemasok tidak ditemukan.');
+        }
+
         $product = SupplierProduct::where('supplier_id', $supplier->id)->findOrFail($id);
         $product->delete();
 
