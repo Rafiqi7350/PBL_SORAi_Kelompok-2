@@ -84,7 +84,7 @@ class UmkmRegistrationTest extends TestCase
 
         $pendingResponse = $this->get(route('register.pending', ['email' => $testEmail]));
         $pendingResponse->assertOk();
-        $pendingResponse->assertSee('STATUS: MENUNGGU ACC ADMIN');
+        $pendingResponse->assertSee('STATUS: MENUNGGU PERSETUJUAN ADMIN');
 
         $this->assertDatabaseHas('users', [
             'email' => $testEmail,
