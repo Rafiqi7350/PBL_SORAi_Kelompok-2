@@ -13,7 +13,8 @@ class KatalogSupplierController extends Controller
 {
     private function getActiveSupplierProfile()
     {
-        if (! Auth::check()) {
+        // Jika belum login ATAU login sebagai non-supplier, auto-login ke demo supplier
+        if (! Auth::check() || Auth::user()->role !== 'supplier') {
             $dummySupplierUser = User::where('role', 'supplier')->first();
             if ($dummySupplierUser) {
                 Auth::login($dummySupplierUser);

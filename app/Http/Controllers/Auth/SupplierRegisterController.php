@@ -8,6 +8,7 @@ use App\Models\Commodity;
 use App\Models\SupplierProfile;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
@@ -31,8 +32,10 @@ class SupplierRegisterController extends Controller
     {
         $validated = $request->validated();
 
-        DB::transaction(function () use ($validated) {
-            $user = User::create([
+        $newUser = null;
+
+        DB::transaction(function () use ($validated, &$newUser) {
+            $newUser = User::create([
                 'email' => $validated['email'],
                 'password' => Hash::make($validated['password']),
                 'role' => 'supplier',
@@ -40,7 +43,7 @@ class SupplierRegisterController extends Controller
             ]);
 
             SupplierProfile::create([
-                'user_id' => $user->id,
+                'user_id' => $newUser->id,
                 'commodity_id' => $validated['commodity_id'],
                 'company_name' => $validated['company_name'],
                 'owner_name' => $validated['owner_name'] ?? $validated['company_name'],
@@ -52,7 +55,11 @@ class SupplierRegisterController extends Controller
             ]);
         });
 
-        return redirect()->route('register.supplier')
-            ->with('success', 'Pendaftaran pemasok berhasil diselesaikan! Akun Anda telah aktif.');
+        // Auto-login setelah registrasi berhasil
+        Auth::login($newUser);
+        $request->session()->regenerate();
+
+        return redirect()->route('supplier.katalog.index')
+            ->with('success', 'Pendaftaran berhasil! Selamat datang di portal pemasok SORAi.');
     }
 }
