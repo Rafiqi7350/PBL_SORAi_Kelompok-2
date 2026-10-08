@@ -58,26 +58,43 @@
 
     <!-- SISI UMKM KULINER: HEADER NAVIGASI FLOATING PILL -->
     <header class="sticky top-4 z-40 px-4 sm:px-6 max-w-7xl mx-auto w-full my-3">
-        <div class="bg-white rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.06)] px-6 py-2.5 flex items-center justify-between gap-4">
+        <div class="bg-white rounded-[2rem] shadow-[0_4px_20px_rgba(0,0,0,0.06)] p-3 sm:px-6 sm:py-2.5 flex flex-col lg:flex-row items-center justify-between gap-3 lg:gap-4">
 
-            <!-- BRAND LOGO -->
-            <a href="{{ route('umkm.katalog.index') }}" class="flex items-center gap-2.5 cursor-pointer shrink-0 group">
-                <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#ea580c] flex items-center justify-center font-bold text-white text-sm shadow-sm group-hover:scale-105 transition-transform">
-                    S
+            <!-- LOGO & LOGOUT (MOBILE VIEW HEADER) -->
+            <div class="flex items-center justify-between w-full lg:w-auto shrink-0 px-2 lg:px-0">
+                <!-- BRAND LOGO -->
+                <a href="{{ route('umkm.katalog.index') }}" class="flex items-center gap-2.5 cursor-pointer group">
+                    <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#ea580c] flex items-center justify-center font-bold text-white text-sm shadow-sm group-hover:scale-105 transition-transform">
+                        S
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="font-bold text-lg text-black tracking-tight leading-none">SORAI</span>
+                        <span class="text-[9px] font-mono text-gray-500 font-semibold tracking-wider uppercase mt-0.5">PORTAL DAPUR UMKM</span>
+                    </div>
+                </a>
+
+                <!-- MOBILE ACTION BUTTONS (Logout) -->
+                <div class="flex lg:hidden items-center gap-2">
+                    <a href="{{ route('logout') }}"
+                       @click.prevent="$dispatch('open-logout-modal')"
+                       onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('open-logout-modal'));"
+                       class="bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-600 px-3.5 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                       title="Keluar dari Akun">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                        </svg>
+                        <span class="hidden sm:inline">Keluar</span>
+                    </a>
                 </div>
-                <div class="flex flex-col">
-                    <span class="font-bold text-lg text-black tracking-tight leading-none">SORAI</span>
-                    <span class="text-[9px] font-mono text-gray-500 font-semibold tracking-wider uppercase mt-0.5">PORTAL DAPUR UMKM</span>
-                </div>
-            </a>
+            </div>
 
             <!-- NAVIGASI MENU UMKM DI DALAM HEADER PILL -->
-            <nav class="hidden lg:flex items-center gap-1 font-semibold text-xs">
+            <nav class="flex flex-wrap lg:flex-nowrap justify-center lg:justify-start items-center gap-1.5 font-semibold text-[11px] sm:text-xs w-full lg:w-auto">
                 <button 
                     type="button"
                     @click="setTab('katalog')" 
                     :class="activeTab === 'katalog' ? 'bg-[#ea580c] text-white font-bold shadow-sm' : 'hover:bg-gray-100 text-gray-600 hover:text-black'"
-                    class="px-4 py-2 rounded-full transition flex items-center gap-1.5 cursor-pointer">
+                    class="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full transition flex items-center gap-1.5 cursor-pointer shrink-0">
                     <span>Katalog Bahan Baku</span>
                 </button>
 
@@ -85,7 +102,7 @@
                     type="button"
                     @click="setTab('pemesanan')" 
                     :class="activeTab === 'pemesanan' ? 'bg-[#ea580c] text-white font-bold shadow-sm' : 'hover:bg-gray-100 text-gray-600 hover:text-black'"
-                    class="px-4 py-2 rounded-full transition flex items-center gap-1.5 relative cursor-pointer">
+                    class="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full transition flex items-center gap-1.5 relative cursor-pointer shrink-0">
                     <span>Pemesanan & Supply Planning</span>
                     <span :class="activeTab === 'pemesanan' ? 'bg-white text-[#ea580c]' : 'bg-[#ea580c] text-white'" class="font-mono text-[9px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
                         2
@@ -96,7 +113,7 @@
                     type="button"
                     @click="setTab('dashboard')" 
                     :class="activeTab === 'dashboard' ? 'bg-[#ea580c] text-white font-bold shadow-sm' : 'hover:bg-gray-100 text-gray-600 hover:text-black'"
-                    class="px-4 py-2 rounded-full transition flex items-center gap-1.5 cursor-pointer">
+                    class="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full transition flex items-center gap-1.5 cursor-pointer shrink-0">
                     <span>Dashboard Analisis</span>
                 </button>
 
@@ -104,18 +121,13 @@
                     type="button"
                     @click="setTab('monitoring')" 
                     :class="activeTab === 'monitoring' ? 'bg-[#ea580c] text-white font-bold shadow-sm' : 'hover:bg-gray-100 text-gray-600 hover:text-black'"
-                    class="px-4 py-2 rounded-full transition flex items-center gap-1.5 cursor-pointer">
+                    class="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full transition flex items-center gap-1.5 cursor-pointer shrink-0">
                     <span>Contract Monitoring</span>
                 </button>
             </nav>
 
-            <!-- ACTION BUTTONS -->
-            <div class="flex items-center gap-2 shrink-0">
-                <a href="{{ route('supplier.katalog.index') }}" 
-                   class="bg-[#18181b] hover:bg-black text-white px-4 py-2 rounded-full text-xs font-bold transition shadow-sm hidden sm:inline-flex items-center gap-1.5">
-                    <span>Switch Ke Pemasok</span>
-                </a>
-
+            <!-- DESKTOP ACTION BUTTONS -->
+            <div class="hidden lg:flex items-center gap-2 shrink-0">
                 <a href="{{ route('logout') }}"
                    @click.prevent="$dispatch('open-logout-modal')"
                    onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('open-logout-modal'));"
@@ -129,14 +141,7 @@
             </div>
         </div>
 
-        <!-- MOBILE MENU TABS FALLBACK -->
-        <div class="flex lg:hidden overflow-x-auto gap-1.5 pt-2.5 pb-1 font-semibold text-xs no-scrollbar">
-            <button type="button" @click="setTab('katalog')" :class="activeTab === 'katalog' ? 'bg-[#ea580c] text-white font-bold' : 'bg-white text-gray-600'" class="px-3.5 py-1.5 rounded-full shadow-sm whitespace-nowrap">Katalog</button>
-            <button type="button" @click="setTab('pemesanan')" :class="activeTab === 'pemesanan' ? 'bg-[#ea580c] text-white font-bold' : 'bg-white text-gray-600'" class="px-3.5 py-1.5 rounded-full shadow-sm whitespace-nowrap">Pemesanan & Planning</button>
-            <button type="button" @click="setTab('dashboard')" :class="activeTab === 'dashboard' ? 'bg-[#ea580c] text-white font-bold' : 'bg-white text-gray-600'" class="px-3.5 py-1.5 rounded-full shadow-sm whitespace-nowrap">Dashboard Analisis</button>
-            <button type="button" @click="setTab('monitoring')" :class="activeTab === 'monitoring' ? 'bg-[#ea580c] text-white font-bold' : 'bg-white text-gray-600'" class="px-3.5 py-1.5 rounded-full shadow-sm whitespace-nowrap">Monitoring Kontrak</button>
-            <a href="{{ route('supplier.katalog.index') }}" class="px-3.5 py-1.5 rounded-full bg-black text-white font-bold whitespace-nowrap">Switch Pemasok</a>
-        </div>
+
 
         @if(auth()->check() && auth()->user()->role === 'supplier')
             <div class="mt-2.5 bg-amber-50 border border-amber-200 rounded-2xl p-3 text-xs font-semibold text-gray-800 flex flex-col sm:flex-row items-center justify-between gap-2 shadow-sm">
@@ -156,11 +161,7 @@
         @yield('content')
     </main>
 
-    <!-- Footer Clean -->
-    <footer class="w-full bg-white border-t border-gray-200/60 py-6 px-6 text-center text-xs font-semibold text-gray-500 mt-auto">
-        <p class="font-bold text-gray-800 text-sm">SORAI — Portal Kemitraan UMKM & Pemasok Bahan Baku Lokal</p>
-        <p class="font-mono text-[10px] mt-1 text-gray-400">Project Based Learning Kelompok 2 (SIB-3F) Politeknik Negeri Malang 2026</p>
-    </footer>
+
 
     <!-- Modal Logout -->
     @include('partials.logout-modal')

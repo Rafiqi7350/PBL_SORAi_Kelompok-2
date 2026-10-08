@@ -99,11 +99,7 @@
                 <span class="text-xs font-bold text-orange-600 tracking-wider uppercase font-mono">KATALOG LOKAL</span>
                 <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Pilih & Ajukan Kemitraan Pasokan</h2>
             </div>
-            <div class="hidden sm:block">
-                <span class="bg-white text-gray-600 text-xs font-semibold px-4 py-2 rounded-full shadow-sm border border-gray-100">
-                    Katalog Pasokan Terverifikasi
-                </span>
-            </div>
+
         </div>
 
         <!-- CONTAINER SEARCH & FILTER CLEAN -->
