@@ -49,31 +49,18 @@
     <!-- Hidden accessibility text to ensure test compatibility -->
     <div class="sr-only">MASUK KE PORTAL SORAi</div>
 
-    <!-- Header Navigasi Floating Pill (Persis Seperti Mockup) -->
-    <header class="w-full max-w-6xl mx-auto my-5 px-4 sm:px-6">
-        <div class="bg-white rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.06)] px-6 py-2.5 flex items-center justify-between">
-            <!-- Brand Logo -->
-            <a href="{{ url('/') }}" class="flex items-center gap-2.5 group">
-                <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#ea580c] flex items-center justify-center font-bold text-white text-sm shadow-sm group-hover:scale-105 transition-transform">
-                    S
-                </div>
-                <span class="font-bold text-lg text-black tracking-tight leading-none">SORAI</span>
-            </a>
-
-            <!-- Right Actions -->
-            <div class="flex items-center gap-3 sm:gap-4 text-xs font-semibold">
-                <a href="{{ route('login') }}" class="text-gray-700 hover:text-black font-semibold transition">
-                    Masuk
-                </a>
-                <a href="{{ route('register.umkm') }}" class="bg-[#18181b] hover:bg-black text-white px-5 py-2 rounded-full font-bold transition shadow-sm">
-                    Daftar Akun
-                </a>
-            </div>
-        </div>
-    </header>
-
     <!-- Main Content: Login Card -->
-    <main class="w-full max-w-md mx-auto px-4 my-auto flex-grow flex items-center justify-center" x-data="{ showPassword: false }">
+    <main class="w-full max-w-md mx-auto px-4 py-8 my-auto flex-grow flex flex-col justify-center" x-data="{ showPassword: false }">
+
+        <!-- CTA Kembali ke Landing Page -->
+        <div class="w-full mb-4 flex items-center justify-start px-1">
+            <a href="{{ url('/') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 hover:text-[#ea580c] hover:bg-orange-50 font-bold text-xs rounded-full shadow-sm border border-gray-200/80 transition group">
+                <svg class="w-4 h-4 transition-transform group-hover:-translate-x-1 text-[#ea580c]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                <span>Kembali ke Halaman Utama</span>
+            </a>
+        </div>
 
         <div class="w-full bg-white rounded-[2rem] p-8 sm:p-10 shadow-[0_10px_35px_rgba(0,0,0,0.06)]">
 
@@ -155,9 +142,6 @@
                            autocomplete="email"
                            placeholder="Masukkan Email Anda"
                            class="w-full px-4 py-3 rounded-xl bg-[#f1f2f4] text-gray-900 text-xs font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ea580c] border-0 transition">
-                    <p class="text-[11px] font-mono text-gray-500 mt-1.5">
-                        *Gunakan kata 'pemasok' untuk masuk Sisi Pemasok.
-                    </p>
                 </div>
 
                 <!-- Password Input -->

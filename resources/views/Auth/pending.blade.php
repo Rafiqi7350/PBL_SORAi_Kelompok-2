@@ -113,27 +113,8 @@
 </head>
 <body class="min-h-screen bg-[#f3f4f6] text-gray-900 font-sans flex flex-col justify-between antialiased selection:bg-[#ea580c] selection:text-white">
 
-    <!-- Header Navigasi Floating Pill -->
-    <header class="w-full max-w-5xl mx-auto my-5 px-4 sm:px-6">
-        <div class="bg-white rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.06)] px-6 py-2.5 flex items-center justify-between">
-            <a href="{{ url('/') }}" class="flex items-center gap-2.5 group">
-                <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#ea580c] flex items-center justify-center font-bold text-white text-sm shadow-sm group-hover:scale-105 transition-transform">
-                    S
-                </div>
-                <span class="font-bold text-lg text-black tracking-tight leading-none">SORAI</span>
-            </a>
-
-            <div class="flex items-center gap-2 text-xs font-semibold">
-                <span class="text-gray-500 hidden sm:inline">Sudah memiliki akses?</span>
-                <a href="{{ route('login') }}" class="bg-[#18181b] hover:bg-black text-white px-5 py-2 rounded-full font-bold transition shadow-sm">
-                    Masuk (Log in)
-                </a>
-            </div>
-        </div>
-    </header>
-
     <!-- Main Content: Loading & Pending Card -->
-    <main class="w-full max-w-xl mx-auto px-4 my-auto flex-grow flex items-center justify-center py-6"
+    <main class="w-full max-w-xl mx-auto px-4 py-8 my-auto flex-grow flex flex-col justify-center"
           x-data="pendingStatusPage('{{ $email }}', '{{ $status }}')">
 
         <div class="w-full bg-white rounded-[2.5rem] p-8 sm:p-12 shadow-[0_10px_35px_rgba(0,0,0,0.06)] text-center space-y-6 transition-all duration-300">

@@ -23,7 +23,7 @@ class PendingRegistrationTest extends TestCase
         $response = $this->get(route('register.pending', ['email' => $user->email]));
 
         $response->assertOk();
-        $response->assertSee('STATUS: PENDING');
+        $response->assertSee('STATUS: MENUNGGU PERSETUJUAN ADMIN');
         $response->assertSee('Mohon ditunggu, data Anda sedang diproses');
         $response->assertSee('Kembali');
         $response->assertSee('menunggu_acc@test.com');

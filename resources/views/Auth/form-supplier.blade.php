@@ -115,27 +115,18 @@
 </head>
 <body class="min-h-screen bg-[#f3f4f6] text-gray-900 font-sans flex flex-col justify-between antialiased selection:bg-[#ea580c] selection:text-white">
 
-    <!-- Header Navigasi Floating Pill -->
-    <header class="w-full max-w-5xl mx-auto my-5 px-4 sm:px-6">
-        <div class="bg-white rounded-full shadow-[0_4px_20px_rgba(0,0,0,0.06)] px-6 py-2.5 flex items-center justify-between">
-            <a href="{{ url('/') }}" class="flex items-center gap-2.5 group">
-                <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#ea580c] flex items-center justify-center font-bold text-white text-sm shadow-sm group-hover:scale-105 transition-transform">
-                    S
-                </div>
-                <span class="font-bold text-lg text-black tracking-tight leading-none">SORAI</span>
-            </a>
-
-            <div class="flex items-center gap-2 text-xs font-semibold">
-                <span class="text-gray-500 hidden sm:inline">Sudah punya akun?</span>
-                <a href="{{ route('login') }}" class="bg-[#18181b] hover:bg-black text-white px-5 py-2 rounded-full font-bold transition shadow-sm">
-                    Masuk (Log in)
-                </a>
-            </div>
-        </div>
-    </header>
-
     <!-- Main Content: Registration Card -->
-    <main class="w-full max-w-2xl mx-auto px-4 my-auto flex-grow flex items-center justify-center" x-data="registerSupplierForm()">
+    <main class="w-full max-w-2xl mx-auto px-4 py-8 my-auto flex-grow flex flex-col justify-center" x-data="registerSupplierForm()">
+
+        <!-- CTA Kembali ke Landing Page -->
+        <div class="w-full mb-4 flex items-center justify-start px-1">
+            <a href="{{ url('/') }}" class="inline-flex items-center gap-2 px-4 py-2 bg-white text-gray-700 hover:text-[#ea580c] hover:bg-orange-50 font-bold text-xs rounded-full shadow-sm border border-gray-200/80 transition group">
+                <svg class="w-4 h-4 transition-transform group-hover:-translate-x-1 text-[#ea580c]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
+                </svg>
+                <span>Kembali ke Halaman Utama</span>
+            </a>
+        </div>
 
         <div class="w-full bg-white rounded-[2rem] p-8 sm:p-12 shadow-[0_10px_35px_rgba(0,0,0,0.06)] space-y-6">
 
@@ -150,16 +141,6 @@
                 <p class="text-xs text-gray-500 max-w-md mx-auto">
                     Hubungkan pasokan komoditas segar Anda langsung ke ratusan ekosistem dapur UMKM kuliner di wilayah operasional Anda.
                 </p>
-            </div>
-
-            <!-- Role Switcher Pill -->
-            <div class="grid grid-cols-2 p-1 bg-[#f1f2f4] rounded-full max-w-sm mx-auto">
-                <a href="{{ route('register.umkm') }}" class="py-2 text-xs font-bold rounded-full text-center transition text-gray-500 hover:text-black">
-                    UMKM Kuliner
-                </a>
-                <a href="{{ route('register.supplier') }}" class="py-2 text-xs font-bold rounded-full text-center transition bg-white text-black shadow-sm">
-                    Pemasok Bahan Baku
-                </a>
             </div>
 
             @if(session('success'))
@@ -358,7 +339,11 @@
                     <span>Selesaikan Pendaftaran Pemasok Lokal →</span>
                 </button>
 
-                <p class="text-[11px] text-gray-400 text-center font-normal pt-2">
+                <p class="text-center text-xs text-gray-600 font-medium pt-3">
+                    Sudah punya akun? <a href="{{ route('login') }}" class="font-bold text-[#ea580c] hover:underline">Masuk di sini</a>
+                </p>
+
+                <p class="text-[11px] text-gray-400 text-center font-normal pt-1">
                     Dengan mendaftar, Anda menyetujui Ketentuan Layanan & Kebijakan Privasi SORAI.
                 </p>
             </form>
