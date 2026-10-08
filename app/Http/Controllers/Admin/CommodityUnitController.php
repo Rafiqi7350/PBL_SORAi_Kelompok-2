@@ -11,6 +11,7 @@ class CommodityUnitController extends Controller
     public function index()
     {
         $units = CommodityUnit::latest()->paginate(10);
+
         return view('admin.units.index', compact('units'));
     }
 
@@ -37,7 +38,7 @@ class CommodityUnitController extends Controller
         $unit = CommodityUnit::findOrFail($id);
 
         $request->validate([
-            'name' => 'required|string|max:50|unique:commodity_units,name,' . $id,
+            'name' => 'required|string|max:50|unique:commodity_units,name,'.$id,
             'symbol' => 'nullable|string|max:20',
             'description' => 'nullable|string',
         ]);

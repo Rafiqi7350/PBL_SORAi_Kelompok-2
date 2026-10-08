@@ -12,6 +12,7 @@ class CommodityCategoryController extends Controller
     public function index()
     {
         $categories = CommodityCategory::latest()->paginate(10);
+
         return view('admin.categories.index', compact('categories'));
     }
 
@@ -37,7 +38,7 @@ class CommodityCategoryController extends Controller
         $category = CommodityCategory::findOrFail($id);
 
         $request->validate([
-            'name' => 'required|string|max:100|unique:commodity_categories,name,' . $id,
+            'name' => 'required|string|max:100|unique:commodity_categories,name,'.$id,
             'description' => 'nullable|string',
         ]);
 

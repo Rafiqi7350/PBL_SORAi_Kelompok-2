@@ -4,8 +4,10 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
-    public function up(): void {
+return new class extends Migration
+{
+    public function up(): void
+    {
         Schema::create('supply_plans', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('partnership_id')->constrained('partnerships')->onDelete('cascade');
@@ -17,7 +19,8 @@ return new class extends Migration {
         });
     }
 
-    public function down(): void {
+    public function down(): void
+    {
         Schema::dropIfExists('supply_plans');
     }
 };

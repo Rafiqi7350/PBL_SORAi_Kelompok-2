@@ -39,7 +39,7 @@ class SupplierRegisterController extends Controller
                 'email' => $validated['email'],
                 'password' => Hash::make($validated['password']),
                 'role' => 'supplier',
-                'status' => 'active',
+                'status' => 'pending',
             ]);
 
             SupplierProfile::create([
