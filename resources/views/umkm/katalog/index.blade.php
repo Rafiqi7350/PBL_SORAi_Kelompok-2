@@ -278,24 +278,33 @@
                                     </span>
                                 </div>
 
-                                <button 
-                                    type="button"
-                                    @click="selectedCommodity = {{ json_encode([
-                                        'id' => $product->id,
-                                        'supplier_id' => $product->supplier->id,
-                                        'company_name' => $product->supplier->company_name,
-                                        'commodity_name' => $product->commodity->name,
-                                        'unit' => $product->commodity->unit,
-                                        'price' => 'Rp ' . number_format($product->price, 0, ',', '.') . ' / ' . $product->commodity->unit,
-                                        'numeric_price' => $product->price,
-                                        'stock_status' => $product->stock_status,
-                                        'stock_capacity' => $product->stock_capacity,
-                                        'is_halal' => $product->is_halal_certified,
-                                        'gov_ref_price' => $product->commodity->government_ref_price ? 'Rp ' . number_format($product->commodity->government_ref_price, 0, ',', '.') : null
-                                    ]) }}; inputVolume = 100;" 
-                                    class="w-full bg-[#ea580c] hover:bg-[#c2410c] text-white font-bold py-2.5 rounded-full text-xs transition shadow-sm active:scale-95 cursor-pointer">
-                                    Ajukan Permintaan →
-                                </button>
+                                @if($product->stock_status === 'Tersedia' || $product->stock_status === 'Stok Terbatas')
+                                    <button 
+                                        type="button"
+                                        @click="selectedCommodity = {{ json_encode([
+                                            'id' => $product->id,
+                                            'supplier_id' => $product->supplier->id,
+                                            'company_name' => $product->supplier->company_name,
+                                            'commodity_name' => $product->commodity->name,
+                                            'unit' => $product->commodity->unit,
+                                            'price' => 'Rp ' . number_format($product->price, 0, ',', '.') . ' / ' . $product->commodity->unit,
+                                            'numeric_price' => $product->price,
+                                            'stock_status' => $product->stock_status,
+                                            'stock_capacity' => $product->stock_capacity,
+                                            'is_halal' => $product->is_halal_certified,
+                                            'gov_ref_price' => $product->commodity->government_ref_price ? 'Rp ' . number_format($product->commodity->government_ref_price, 0, ',', '.') : null
+                                        ]) }}; inputVolume = 100;" 
+                                        class="w-full bg-[#ea580c] hover:bg-[#c2410c] text-white font-bold py-2.5 rounded-full text-xs transition shadow-sm active:scale-95 cursor-pointer">
+                                        Ajukan Permintaan →
+                                    </button>
+                                @else
+                                    <button 
+                                        type="button"
+                                        disabled
+                                        class="w-full bg-gray-200 text-gray-500 font-bold py-2.5 rounded-full text-xs cursor-not-allowed">
+                                        Stok Tidak Tersedia
+                                    </button>
+                                @endif
                             </div>
                         </div>
 
@@ -605,6 +614,7 @@
 
             <form method="POST" action="{{ route('umkm.katalog.ajukan') }}" class="space-y-4 text-xs font-semibold">
                 @csrf
+                <input type="hidden" name="supplier_product_id" :value="selectedCommodity?.id">
                 <input type="hidden" name="supplier_id" :value="selectedCommodity?.supplier_id">
                 <input type="hidden" name="unit" :value="selectedCommodity?.unit">
 
