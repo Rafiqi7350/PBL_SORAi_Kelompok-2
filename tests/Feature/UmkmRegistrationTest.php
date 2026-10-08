@@ -65,6 +65,23 @@ class UmkmRegistrationTest extends TestCase
         $response->assertSessionHasErrors(['password']);
     }
 
+    public function test_umkm_validation_fails_when_owner_name_contains_numbers_or_invalid_characters(): void
+    {
+        $response = $this->post('/register/umkm', [
+            'email' => 'valid_user@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'business_name' => 'Dapur Uji',
+            'owner_name' => 'Irlangsa Eka 2',
+            'phone' => '081234567899',
+            'address' => 'Jl. Pengujian No. 123, Malang',
+        ]);
+
+        $response->assertSessionHasErrors([
+            'owner_name' => 'Nama pemilik hanya boleh berisi huruf dan spasi.',
+        ]);
+    }
+
     public function test_new_umkm_can_register(): void
     {
         $testEmail = 'test_umkm_'.uniqid().'@example.com';

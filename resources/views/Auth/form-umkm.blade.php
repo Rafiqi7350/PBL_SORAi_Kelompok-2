@@ -79,7 +79,13 @@
                         if (!this.form.business_name.trim()) this.errors.business_name = 'Nama usaha wajib diisi.';
                     }
                     if (field === 'owner_name') {
-                        if (!this.form.owner_name.trim()) this.errors.owner_name = 'Nama pemilik wajib diisi.';
+                        var val = (this.form.owner_name || '').trim();
+                        var nameRegex = /^[a-zA-Z\s]+$/;
+                        if (!val) {
+                            this.errors.owner_name = 'Nama pemilik wajib diisi.';
+                        } else if (!nameRegex.test(val)) {
+                            this.errors.owner_name = 'Nama pemilik hanya boleh berisi huruf dan spasi.';
+                        }
                     }
                     if (field === 'phone') {
                         if (!this.form.phone.trim()) this.errors.phone = 'Nomor telepon/WhatsApp wajib diisi.';
