@@ -118,11 +118,11 @@
                         name="search"
                         value="{{ $search }}"
                         placeholder="Cari komoditas bahan baku (misal: Ayam, Bawang, Cabai, Telur) atau nama pemasok..."
-                        class="w-full pl-11 pr-28 py-3 text-xs font-medium bg-[#f1f2f4] rounded-full text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ea580c] border-0 transition"
+                        class="w-full pl-11 pr-6 py-3 text-xs font-medium bg-[#f1f2f4] rounded-full text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ea580c] border-0 transition"
+                        @input.debounce.700ms="$event.target.form.submit()"
+                        {{ request()->has('search') ? 'autofocus' : '' }}
+                        onfocus="var val = this.value; this.value = ''; this.value = val;"
                     />
-                    <button type="submit" class="absolute right-1.5 top-1.5 bottom-1.5 px-5 bg-[#ea580c] hover:bg-[#c2410c] text-white font-bold text-xs rounded-full transition shadow-sm cursor-pointer">
-                        Cari Pasokan
-                    </button>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-4 gap-4 pt-3 border-t border-gray-100 text-xs font-semibold">
@@ -146,8 +146,7 @@
                             name="max_price"
                             placeholder="Contoh: 35000" 
                             value="{{ $maxPrice }}"
-                            onblur="this.form.submit()"
-                            onkeydown="if(event.key === 'Enter'){this.form.submit();}"
+                            @input.debounce.700ms="$event.target.form.submit()"
                             class="w-full px-3 py-2.5 rounded-xl bg-[#f1f2f4] text-gray-800 font-medium focus:outline-none focus:ring-2 focus:ring-[#ea580c] border-0"
                         />
                     </div>
@@ -162,6 +161,7 @@
                             <option value="Tersedia" {{ ($stockStatus ?? '') == 'Tersedia' ? 'selected' : '' }}>🟢 Stok Tersedia</option>
                             <option value="Stok Terbatas" {{ ($stockStatus ?? '') == 'Stok Terbatas' ? 'selected' : '' }}>🟡 Stok Terbatas</option>
                             <option value="Stok Habis" {{ ($stockStatus ?? '') == 'Stok Habis' ? 'selected' : '' }}>🔴 Stok Habis</option>
+                            <option value="Pre-Order" {{ ($stockStatus ?? '') == 'Pre-Order' ? 'selected' : '' }}>⏳ Pre-Order</option>
                         </select>
                     </div>
 
@@ -179,7 +179,7 @@
                         </label>
 
                         @if($search || ($category && $category !== 'Semua Kategori') || $maxPrice || !empty($isHalal) || ($stockStatus && $stockStatus !== 'Semua Status'))
-                            <a href="{{ route('umkm.katalog.index') }}" class="text-xs font-bold text-rose-600 hover:underline">
+                            <a href="{{ route('umkm.katalog.index', ['tab' => 'katalog']) }}" class="text-xs font-bold text-rose-600 hover:underline">
                                 Reset Filter
                             </a>
                         @endif
@@ -220,6 +220,10 @@
                                 @elseif($product->stock_status === 'Stok Terbatas')
                                     <span class="bg-amber-100 text-amber-800 text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
                                         ⚠️ Terbatas
+                                    </span>
+                                @elseif($product->stock_status === 'Pre-Order')
+                                    <span class="bg-blue-100 text-blue-800 text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
+                                        ⏳ Pre-Order
                                     </span>
                                 @else
                                     <span class="bg-rose-100 text-rose-800 text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm">
@@ -278,7 +282,7 @@
                                     </span>
                                 </div>
 
-                                @if($product->stock_status === 'Tersedia' || $product->stock_status === 'Stok Terbatas')
+                                @if($product->stock_status !== 'Stok Habis')
                                     <button 
                                         type="button"
                                         @click="selectedCommodity = {{ json_encode([

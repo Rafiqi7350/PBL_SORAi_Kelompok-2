@@ -23,18 +23,17 @@ class KatalogController extends Controller
 
         $query = SupplierProduct::with(['supplier.user', 'commodity']);
 
-        // Search filter
         if ($search) {
             $query->where(function ($q) use ($search) {
                 $q->whereHas('commodity', function ($cq) use ($search) {
-                    $cq->where('name', 'like', '%'.$search.'%')
-                        ->orWhere('category', 'like', '%'.$search.'%');
+                    $cq->where('name', 'ilike', '%'.$search.'%')
+                        ->orWhere('category', 'ilike', '%'.$search.'%');
                 })->orWhereHas('supplier', function ($sq) use ($search) {
-                    $sq->where('company_name', 'like', '%'.$search.'%')
-                        ->orWhere('warehouse_address', 'like', '%'.$search.'%')
-                        ->orWhere('delivery_area', 'like', '%'.$search.'%');
-                })->orWhere('description', 'like', '%'.$search.'%')
-                    ->orWhere('quality_grade', 'like', '%'.$search.'%');
+                    $sq->where('company_name', 'ilike', '%'.$search.'%')
+                        ->orWhere('warehouse_address', 'ilike', '%'.$search.'%')
+                        ->orWhere('delivery_area', 'ilike', '%'.$search.'%');
+                })->orWhere('description', 'ilike', '%'.$search.'%')
+                    ->orWhere('quality_grade', 'ilike', '%'.$search.'%');
             });
         }
 
