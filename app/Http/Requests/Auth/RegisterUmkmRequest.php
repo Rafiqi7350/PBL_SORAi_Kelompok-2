@@ -25,7 +25,12 @@ class RegisterUmkmRequest extends FormRequest
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'password_confirmation' => ['required', 'string'],
             'business_name' => ['required', 'string', 'max:255'],
-            'owner_name' => ['required', 'string', 'max:255'],
+            'owner_name' => [
+                'required',
+                'string',
+                'max:255',
+                'regex:/^[a-zA-Z\s]+$/',
+            ],
             'phone' => ['required', 'string', 'max:20'],
             'address' => ['required', 'string'],
         ];
@@ -44,6 +49,7 @@ class RegisterUmkmRequest extends FormRequest
             'password_confirmation.required' => 'Konfirmasi password wajib diisi.',
             'business_name.required' => 'Nama Usaha / Bisnis Kuliner wajib diisi.',
             'owner_name.required' => 'Nama Pemilik / Penanggung Jawab wajib diisi.',
+            'owner_name.regex' => 'Nama pemilik hanya boleh berisi huruf dan spasi.',
             'phone.required' => 'Nomor WhatsApp Operasional wajib diisi.',
             'address.required' => 'Alamat Dapur / Lokasi Operasional wajib diisi.',
         ];
