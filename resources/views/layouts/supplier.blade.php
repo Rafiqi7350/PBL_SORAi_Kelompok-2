@@ -20,14 +20,14 @@
         .font-mono-code { font-family: 'Space Mono', monospace; }
     </style>
 </head>
-<body class="bg-[#FDF5E6] text-gray-900 antialiased min-h-screen flex">
+<body class="bg-[#f3f4f6] text-gray-900 antialiased min-h-screen flex">
 
     <!-- Sidebar Kiri (Dark Theme) -->
     <aside class="w-64 bg-[#1E222D] text-white flex flex-col justify-between min-h-screen p-6 shrink-0">
         <div class="space-y-6">
             <!-- Brand / Logo -->
             <div class="flex items-center gap-3">
-                <div class="bg-[#FFB703] text-black rounded-full w-10 h-10 flex items-center justify-center font-bold text-xl">
+                <div class="bg-[#ea580c] text-white rounded-full w-10 h-10 flex items-center justify-center font-bold text-xl shadow-xs">
                     S
                 </div>
                 <div>
@@ -37,7 +37,7 @@
             </div>
 
             <!-- Panel Tag -->
-            <div class="text-[10px] font-black uppercase text-[#E07A5F] tracking-widest px-1">
+            <div class="text-[10px] font-black uppercase text-[#ea580c] tracking-widest px-1">
                 PANEL PEMASOK
             </div>
 
@@ -53,7 +53,7 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                         Pengajuan Masuk
                     </div>
-                    <span class="bg-orange-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full">2</span>
+                    <span class="bg-[#ea580c] text-white text-[10px] font-black px-2 py-0.5 rounded-full">2</span>
                 </a>
 
                 <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
@@ -62,9 +62,9 @@
                 </a>
 
                 <!-- Active Link: Kelola Stok -->
-                <a href="{{ route('supplier.katalog.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-black bg-[#FFB703] text-black shadow-md transition">
-                    <svg class="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                    Kelola Stok (CRUD)
+                <a href="{{ route('supplier.katalog.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-black bg-[#ea580c] text-white shadow-md transition">
+                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    Kelola Stok
                 </a>
 
                 <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
@@ -82,12 +82,12 @@
         <!-- Sidebar Bottom Actions -->
         <div class="space-y-3 pt-6">
             <div class="bg-gray-800/60 p-3 rounded-2xl flex items-center gap-3 border border-gray-700/50">
-                <div class="w-8 h-8 rounded-full bg-amber-500 text-black flex items-center justify-center font-extrabold text-xs">
+                <div class="w-8 h-8 rounded-full bg-[#ea580c] text-white flex items-center justify-center font-extrabold text-xs">
                     {{ substr(auth()->user()?->supplierProfile?->company_name ?? 'P', 0, 1) }}
                 </div>
                 <div class="overflow-hidden">
                     <p class="text-xs font-bold text-white truncate">{{ auth()->user()?->supplierProfile?->company_name ?? 'Pemasok' }}</p>
-                    <p class="text-[10px] text-amber-400 font-medium">Pemasok Terverifikasi</p>
+                    <p class="text-[10px] text-orange-400 font-medium">Pemasok Terverifikasi</p>
                 </div>
             </div>
 
