@@ -82,7 +82,9 @@
                         if (!this.form.company_name.trim()) this.errors.company_name = 'Nama kelompok/distributor wajib diisi.';
                     }
                     if (field === 'phone') {
+                        this.form.phone = (this.form.phone || '').replace(/[^0-9]/g, '');
                         if (!this.form.phone.trim()) this.errors.phone = 'Nomor WhatsApp wajib diisi.';
+                        else if (!/^[0-9]+$/.test(this.form.phone)) this.errors.phone = 'Nomor WhatsApp hanya boleh berisi angka.';
                     }
                     if (field === 'commodity_id') {
                         if (!this.form.commodity_id) this.errors.commodity_id = 'Pilih kategori komoditas utama.';
@@ -92,6 +94,12 @@
                     }
                     if (field === 'delivery_area') {
                         if (!this.form.delivery_area.trim()) this.errors.delivery_area = 'Area pengiriman wajib diisi.';
+                    }
+                    if (field === 'nib_number') {
+                        this.form.nib_number = (this.form.nib_number || '').replace(/[^0-9]/g, '');
+                        if (this.form.nib_number && !/^[0-9]+$/.test(this.form.nib_number)) {
+                            this.errors.nib_number = 'Nomor NIB hanya boleh berisi angka.';
+                        }
                     }
                     if (field === 'warehouse_address') {
                         if (!this.form.warehouse_address.trim()) this.errors.warehouse_address = 'Alamat gudang wajib diisi.';
@@ -233,11 +241,13 @@
 
                         <div>
                             <label for="phone" class="block text-gray-700 mb-1.5">Nomor WhatsApp Operasional</label>
-                            <input type="tel"
+                            <input type="text"
+                                   inputmode="numeric"
+                                   pattern="[0-9]*"
                                    id="phone"
                                    name="phone"
                                    x-model="form.phone"
-                                   @input="validateField('phone')"
+                                   @input="form.phone = form.phone.replace(/[^0-9]/g, ''); validateField('phone')"
                                    required
                                    placeholder="contoh: 081234567890"
                                    class="w-full px-4 py-3 rounded-xl bg-[#f1f2f4] text-gray-900 text-xs font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ea580c] border-0 transition">
@@ -308,11 +318,17 @@
                         <div>
                             <label for="nib_number" class="block text-gray-700 mb-1.5">Nomor NIB / Legalitas Usaha (Opsional)</label>
                             <input type="text"
+                                   inputmode="numeric"
+                                   pattern="[0-9]*"
                                    id="nib_number"
                                    name="nib_number"
                                    x-model="form.nib_number"
-                                   placeholder="contoh: NIB-9120003810"
+                                   @input="form.nib_number = form.nib_number.replace(/[^0-9]/g, ''); validateField('nib_number')"
+                                   placeholder="contoh: 9120003810"
                                    class="w-full px-4 py-3 rounded-xl bg-white text-gray-900 text-xs font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ea580c] border-0 shadow-sm transition">
+                            <template x-if="errors.nib_number">
+                                <p class="text-[11px] text-rose-600 mt-1 font-medium" x-text="errors.nib_number"></p>
+                            </template>
                         </div>
                     </div>
                 </div>
