@@ -74,7 +74,7 @@ class LoginTest extends TestCase
             'warehouse_address' => 'Jl. Kebun No. 5, Batu',
             'max_capacity' => '1000 kg',
             'delivery_area' => 'Malang',
-            'nib_number' => 'NIB-123',
+            'nib_number' => '9120003810',
         ]);
 
         $response = $this->post('/login', [

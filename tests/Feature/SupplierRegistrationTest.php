@@ -50,7 +50,7 @@ class SupplierRegistrationTest extends TestCase
             'commodity_id' => $commodity->id,
             'max_capacity' => '500 kg / Minggu',
             'delivery_area' => 'Malang Raya',
-            'nib_number' => 'NIB-1234567890',
+            'nib_number' => '9120003810',
             'warehouse_address' => 'Jl. Kebun Raya No. 1, Batu',
         ]);
 

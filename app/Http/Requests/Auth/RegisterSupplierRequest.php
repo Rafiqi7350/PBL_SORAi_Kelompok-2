@@ -25,11 +25,11 @@ class RegisterSupplierRequest extends FormRequest
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'password_confirmation' => ['required', 'string'],
             'company_name' => ['required', 'string', 'max:255'],
-            'phone' => ['required', 'string', 'max:20'],
+            'phone' => ['required', 'string', 'regex:/^[0-9]+$/', 'max:20'],
             'commodity_id' => ['required', 'uuid', 'exists:commodities,id'],
             'max_capacity' => ['required', 'string', 'max:255'],
             'delivery_area' => ['required', 'string', 'max:255'],
-            'nib_number' => ['required', 'string', 'max:255'],
+            'nib_number' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:255'],
             'warehouse_address' => ['required', 'string'],
             'owner_name' => ['nullable', 'string', 'max:255'],
         ];
@@ -48,11 +48,12 @@ class RegisterSupplierRequest extends FormRequest
             'password_confirmation.required' => 'Konfirmasi password wajib diisi.',
             'company_name.required' => 'Nama Kelompok Tani / Distributor wajib diisi.',
             'phone.required' => 'Nomor WhatsApp Operasional wajib diisi.',
+            'phone.regex' => 'Nomor WhatsApp Operasional hanya boleh berisi angka.',
             'commodity_id.required' => 'Kategori Komoditas Utama wajib dipilih.',
             'commodity_id.exists' => 'Kategori komoditas yang dipilih tidak valid.',
             'max_capacity.required' => 'Kapasitas Pasok Maksimal wajib diisi.',
             'delivery_area.required' => 'Jangkauan Area Pengiriman Armada wajib diisi.',
-            'nib_number.required' => 'Nomor NIB / Legalitas Usaha wajib diisi.',
+            'nib_number.regex' => 'Nomor NIB / Legalitas Usaha hanya boleh berisi angka.',
             'warehouse_address.required' => 'Alamat Gudang / Lokasi Dapur Utama wajib diisi.',
         ];
     }

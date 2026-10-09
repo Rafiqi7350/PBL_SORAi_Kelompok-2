@@ -8,7 +8,6 @@ use App\Models\Commodity;
 use App\Models\SupplierProfile;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
@@ -55,11 +54,8 @@ class SupplierRegisterController extends Controller
             ]);
         });
 
-        // Auto-login setelah registrasi berhasil
-        Auth::login($newUser);
-        $request->session()->regenerate();
-
-        return redirect()->route('supplier.katalog.index')
-            ->with('success', 'Pendaftaran berhasil! Selamat datang di portal pemasok SORAi.');
+        return redirect()->route('register.pending', ['email' => $validated['email']])
+            ->with('registered_email', $validated['email'])
+            ->with('success', 'Pendaftaran Pemasok berhasil diajukan! Akun Anda sedang dalam proses verifikasi oleh Administrator sebelum dapat diakses.');
     }
 }
