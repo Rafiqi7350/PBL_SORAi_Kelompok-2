@@ -24,7 +24,7 @@ Route::get('/', function () {
 Route::get('/login', [LoginController::class, 'create'])->name('login');
 Route::post('/login', [LoginController::class, 'store'])->name('login.store');
 Route::match(['get', 'post'], '/logout', [LoginController::class, 'destroy'])->name('logout');
-Route::get('/admin/login', fn() => redirect('/login'))->name('admin.login');
+Route::get('/admin/login', fn () => redirect('/login'))->name('admin.login');
 
 Route::get('/register/supplier', [SupplierRegisterController::class, 'create'])->name('register.supplier');
 Route::post('/register/supplier', [SupplierRegisterController::class, 'store'])->name('register.supplier.store');

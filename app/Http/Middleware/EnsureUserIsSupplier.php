@@ -16,7 +16,7 @@ class EnsureUserIsSupplier
         }
 
         if (Auth::user()->role !== 'supplier') {
-            return abort(403, 'Akses Ditolak: Halaman ini khusus untuk Pemasok. Anda saat ini masuk dengan peran ' . strtoupper(Auth::user()->role) . '.');
+            return abort(403, 'Akses Ditolak: Halaman ini khusus untuk Pemasok. Anda saat ini masuk dengan peran '.strtoupper(Auth::user()->role).'.');
         }
 
         return $next($request);

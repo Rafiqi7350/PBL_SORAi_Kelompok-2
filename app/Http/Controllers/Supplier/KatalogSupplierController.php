@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Supplier;
 
 use App\Http\Controllers\Controller;
 use App\Models\Commodity;
+use App\Models\CommodityCategory;
+use App\Models\CommodityUnit;
 use App\Models\SupplierProduct;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Storage;
 
 class KatalogSupplierController extends Controller
 {
@@ -76,9 +79,10 @@ class KatalogSupplierController extends Controller
     public function create()
     {
         $supplier = $this->getActiveSupplierProfile();
-        $commodities = Commodity::orderBy('name')->get();
+        $categories = CommodityCategory::orderBy('name')->get();
+        $units = CommodityUnit::orderBy('name')->get();
 
-        return view('supplier.katalog.create', compact('supplier', 'commodities'));
+        return view('supplier.katalog.create', compact('supplier', 'categories', 'units'));
     }
 
     public function store(Request $request)
@@ -90,21 +94,64 @@ class KatalogSupplierController extends Controller
         }
 
         $validated = $request->validate([
-            'commodity_id'      => 'required|exists:commodities,id',
-            'price'             => 'required|numeric|min:0',
-            'stock_capacity'    => 'required|string|max:255',
-            'stock_status'      => 'required|string|in:Tersedia,Stok Terbatas,Stok Habis,Pre-Order',
-            'minimum_order'     => 'nullable|string|max:100',
-            'quality_grade'     => 'nullable|string|max:100',
-            'is_halal_certified'=> 'nullable|boolean',
-            'description'       => 'nullable|string',
-            'image_url'         => 'nullable|url',
+            'category_id' => 'required|string',
+            'commodity_name' => 'required|string|max:255',
+            'unit' => 'required|string|max:50',
+            'government_ref_price' => 'nullable|numeric|min:0',
+            'price' => 'required|numeric|min:0',
+            'stock_capacity' => 'required|string|max:255',
+            'stock_status' => 'required|string|in:Tersedia,Stok Terbatas,Stok Habis,Pre-Order',
+            'minimum_order' => 'nullable|string|max:100',
+            'quality_grade' => 'nullable|string|max:100',
+            'is_halal_certified' => 'nullable|boolean',
+            'description' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
-        $validated['supplier_id'] = $supplier->id;
-        $validated['is_halal_certified'] = $request->has('is_halal_certified');
+        $category = CommodityCategory::find($request->input('category_id'));
+        $categoryName = $category ? $category->name : $request->input('category_id');
 
-        SupplierProduct::create($validated);
+        $commodityName = trim($request->input('commodity_name'));
+        $unitName = trim($request->input('unit'));
+
+        // Hubungkan atau buat komoditas baru di tabel commodities
+        $commodity = Commodity::firstOrCreate(
+            [
+                'name' => $commodityName,
+            ],
+            [
+                'category' => $categoryName,
+                'unit' => $unitName,
+                'government_ref_price' => $request->input('government_ref_price'),
+                'description' => $request->input('description'),
+            ]
+        );
+
+        if ($commodity->category !== $categoryName || $commodity->unit !== $unitName) {
+            $commodity->update([
+                'category' => $categoryName,
+                'unit' => $unitName,
+            ]);
+        }
+
+        $productData = [
+            'supplier_id' => $supplier->id,
+            'commodity_id' => $commodity->id,
+            'price' => $validated['price'],
+            'stock_capacity' => $validated['stock_capacity'],
+            'stock_status' => $validated['stock_status'],
+            'minimum_order' => $validated['minimum_order'] ?? null,
+            'quality_grade' => $validated['quality_grade'] ?? null,
+            'is_halal_certified' => $request->has('is_halal_certified'),
+            'description' => $validated['description'] ?? null,
+        ];
+
+        if ($request->hasFile('image')) {
+            $path = $request->file('image')->store('commodities', 'public');
+            $productData['image_url'] = '/storage/'.$path;
+        }
+
+        SupplierProduct::create($productData);
 
         return redirect()->route('supplier.katalog.index')
             ->with('success', 'Komoditas baru berhasil ditambahkan ke katalog Anda!');
@@ -119,10 +166,11 @@ class KatalogSupplierController extends Controller
                 ->with('error', 'Silakan daftarkan profil Pemasok terlebih dahulu.');
         }
 
-        $product = SupplierProduct::where('supplier_id', $supplier->id)->findOrFail($id);
-        $commodities = Commodity::orderBy('name')->get();
+        $product = SupplierProduct::with('commodity')->where('supplier_id', $supplier->id)->findOrFail($id);
+        $categories = CommodityCategory::orderBy('name')->get();
+        $units = CommodityUnit::orderBy('name')->get();
 
-        return view('supplier.katalog.edit', compact('supplier', 'product', 'commodities'));
+        return view('supplier.katalog.edit', compact('supplier', 'product', 'categories', 'units'));
     }
 
     public function update(Request $request, $id)
@@ -136,20 +184,66 @@ class KatalogSupplierController extends Controller
         $product = SupplierProduct::where('supplier_id', $supplier->id)->findOrFail($id);
 
         $validated = $request->validate([
-            'commodity_id'      => 'required|exists:commodities,id',
-            'price'             => 'required|numeric|min:0',
-            'stock_capacity'    => 'required|string|max:255',
-            'stock_status'      => 'required|string|in:Tersedia,Stok Terbatas,Stok Habis,Pre-Order',
-            'minimum_order'     => 'nullable|string|max:100',
-            'quality_grade'     => 'nullable|string|max:100',
-            'is_halal_certified'=> 'nullable|boolean',
-            'description'       => 'nullable|string',
-            'image_url'         => 'nullable|url',
+            'category_id' => 'required|string',
+            'commodity_name' => 'required|string|max:255',
+            'unit' => 'required|string|max:50',
+            'government_ref_price' => 'nullable|numeric|min:0',
+            'price' => 'required|numeric|min:0',
+            'stock_capacity' => 'required|string|max:255',
+            'stock_status' => 'required|string|in:Tersedia,Stok Terbatas,Stok Habis,Pre-Order',
+            'minimum_order' => 'nullable|string|max:100',
+            'quality_grade' => 'nullable|string|max:100',
+            'is_halal_certified' => 'nullable|boolean',
+            'description' => 'nullable|string',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
         ]);
 
-        $validated['is_halal_certified'] = $request->has('is_halal_certified');
+        $category = CommodityCategory::find($request->input('category_id'));
+        $categoryName = $category ? $category->name : $request->input('category_id');
 
-        $product->update($validated);
+        $commodityName = trim($request->input('commodity_name'));
+        $unitName = trim($request->input('unit'));
+
+        if ($product->commodity) {
+            $product->commodity->update([
+                'name' => $commodityName,
+                'category' => $categoryName,
+                'unit' => $unitName,
+                'government_ref_price' => $request->input('government_ref_price'),
+            ]);
+        } else {
+            $commodity = Commodity::firstOrCreate(
+                ['name' => $commodityName],
+                [
+                    'category' => $categoryName,
+                    'unit' => $unitName,
+                    'government_ref_price' => $request->input('government_ref_price'),
+                ]
+            );
+            $product->commodity_id = $commodity->id;
+        }
+
+        $productData = [
+            'price' => $validated['price'],
+            'stock_capacity' => $validated['stock_capacity'],
+            'stock_status' => $validated['stock_status'],
+            'minimum_order' => $validated['minimum_order'] ?? null,
+            'quality_grade' => $validated['quality_grade'] ?? null,
+            'is_halal_certified' => $request->has('is_halal_certified'),
+            'description' => $validated['description'] ?? null,
+        ];
+
+        if ($request->hasFile('image')) {
+            if ($product->image_url && str_starts_with($product->image_url, '/storage/')) {
+                $oldPath = str_replace('/storage/', '', $product->image_url);
+                Storage::disk('public')->delete($oldPath);
+            }
+
+            $path = $request->file('image')->store('commodities', 'public');
+            $productData['image_url'] = '/storage/'.$path;
+        }
+
+        $product->update($productData);
 
         return redirect()->route('supplier.katalog.index')
             ->with('success', 'Informasi produk dan stok berhasil diperbarui!');
@@ -166,7 +260,7 @@ class KatalogSupplierController extends Controller
         $product = SupplierProduct::where('supplier_id', $supplier->id)->findOrFail($id);
 
         $validated = $request->validate([
-            'stock_status'   => 'required|string|in:Tersedia,Stok Terbatas,Stok Habis,Pre-Order',
+            'stock_status' => 'required|string|in:Tersedia,Stok Terbatas,Stok Habis,Pre-Order',
             'stock_capacity' => 'nullable|string|max:255',
         ]);
 
