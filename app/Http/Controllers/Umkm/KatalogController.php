@@ -192,6 +192,12 @@ class KatalogController extends Controller
             }
         }
 
+        // Ambil daftar ID supplier_products yang sudah diajukan oleh UMKM ini (yang belum ditolak)
+        $appliedProductIds = $umkm ? PartnershipDeliverySchedule::whereHas('partnership', function ($q) use ($umkm) {
+            $q->where('umkm_id', $umkm->id)
+                ->whereNotIn('status', ['rejected', 'ditolak']);
+        })->pluck('supplier_product_id')->toArray() : [];
+
         return view('umkm.katalog.index', compact(
             'products',
             'categories',
@@ -202,7 +208,8 @@ class KatalogController extends Controller
             'isHalal',
             'sort',
             'autoOrdersList',
-            'supplyPlans'
+            'supplyPlans',
+            'appliedProductIds'
         ));
     }
 
@@ -242,6 +249,18 @@ class KatalogController extends Controller
 
         if (! $umkm) {
             return redirect()->back()->with('error', 'Anda harus memiliki profil UMKM untuk mengajukan kemitraan.');
+        }
+
+        // Validasi: Cek apakah UMKM sudah pernah mengajukan permintaan untuk bahan baku ini (belum ditolak)
+        $existingPartnership = Partnership::where('umkm_id', $umkm->id)
+            ->whereHas('deliverySchedules', function ($query) use ($request) {
+                $query->where('supplier_product_id', $request->input('supplier_product_id'));
+            })
+            ->whereNotIn('status', ['rejected', 'ditolak'])
+            ->first();
+
+        if ($existingPartnership) {
+            return redirect()->back()->with('error', 'Anda sudah mengajukan permintaan kemitraan untuk bahan baku ini sebelumnya.');
         }
 
         $volumePerDelivery = (float) ($request->input('volume_per_delivery') ?? $request->input('volume', 100));

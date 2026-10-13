@@ -261,9 +261,18 @@
     <div x-cloak x-show="notificationMsg" x-transition class="fixed top-20 right-4 sm:right-8 z-50 max-w-md w-full">
         <div class="bg-emerald-600 text-white p-4 rounded-2xl font-medium text-xs flex justify-between items-center shadow-xl">
             <span x-text="notificationMsg"></span>
-            <button type="button" @click="notificationMsg = ''" class="font-bold text-base ml-2 hover:opacity-75">✕</button>
+            <button type="button" @click="notificationMsg = ''" class="font-bold text-base ml-2 hover:opacity-75 cursor-pointer">✕</button>
         </div>
     </div>
+
+    @if(session('error'))
+        <div x-data="{ showError: true }" x-cloak x-show="showError" x-transition class="fixed top-20 right-4 sm:right-8 z-50 max-w-md w-full">
+            <div class="bg-rose-600 text-white p-4 rounded-2xl font-medium text-xs flex justify-between items-center shadow-xl">
+                <span>{{ session('error') }}</span>
+                <button type="button" @click="showError = false" class="font-bold text-base ml-2 hover:opacity-75 cursor-pointer">✕</button>
+            </div>
+        </div>
+    @endif
 
     <!-- ========================================================= -->
     <!-- TAB 1: KATALOG BAHAN BAKU                                -->
@@ -384,9 +393,15 @@
                                 <img src="https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=500&auto=format&fit=crop&q=60" alt="{{ $product->commodity->name }}" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
                             @endif
 
-                            <span class="absolute top-3 left-3 bg-white/95 text-gray-800 text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm uppercase">
-                                {{ $product->commodity->category }}
-                            </span>
+                            @if(in_array($product->id, $appliedProductIds ?? []))
+                                <span class="absolute top-3 left-3 bg-emerald-600 text-white text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm flex items-center gap-1">
+                                    <span>✓ Sudah Diajukan</span>
+                                </span>
+                            @else
+                                <span class="absolute top-3 left-3 bg-white/95 text-gray-800 text-[10px] font-bold px-2.5 py-1 rounded-full shadow-sm uppercase">
+                                    {{ $product->commodity->category }}
+                                </span>
+                            @endif
 
                             <div class="absolute top-3 right-3">
                                 @if($product->stock_status === 'Tersedia')
@@ -440,7 +455,21 @@
                                     </span>
                                 </div>
 
-                                @if($product->stock_status !== 'Stok Habis')
+                                @php
+                                    $isAlreadyApplied = in_array($product->id, $appliedProductIds ?? []);
+                                @endphp
+
+                                @if($isAlreadyApplied)
+                                    <button 
+                                        type="button"
+                                        disabled
+                                        class="w-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-bold py-2.5 rounded-full text-xs cursor-not-allowed flex items-center justify-center gap-1.5 shadow-2xs">
+                                        <svg class="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                        </svg>
+                                        <span>Sudah Diajukan Kemitraan</span>
+                                    </button>
+                                @elseif($product->stock_status !== 'Stok Habis')
                                     <button 
                                         type="button"
                                         @click="openAjukanModal({{ json_encode([
