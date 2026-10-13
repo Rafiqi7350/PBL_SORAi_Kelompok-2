@@ -16,7 +16,7 @@ class EnsureUserIsUmkm
         }
 
         if (Auth::user()->role !== 'umkm') {
-            return abort(403, 'Akses Ditolak: Halaman ini khusus untuk UMKM. Anda saat ini masuk dengan peran ' . strtoupper(Auth::user()->role) . '.');
+            return abort(403, 'Akses Ditolak: Halaman ini khusus untuk UMKM. Anda saat ini masuk dengan peran '.strtoupper(Auth::user()->role).'.');
         }
 
         return $next($request);

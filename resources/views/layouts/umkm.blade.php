@@ -57,7 +57,7 @@
       }">
 
     <!-- SISI UMKM KULINER: HEADER NAVIGASI FLOATING PILL -->
-    <header class="sticky top-4 z-40 px-4 sm:px-6 max-w-7xl mx-auto w-full my-3">
+    <header class="sticky top-2 z-40 px-4 sm:px-6 max-w-7xl mx-auto w-full mt-2.5 mb-1">
         <div class="bg-white rounded-[2rem] shadow-[0_4px_20px_rgba(0,0,0,0.06)] p-3 sm:px-6 sm:py-2.5 flex flex-col lg:flex-row items-center justify-between gap-3 lg:gap-4">
 
             <!-- LOGO & LOGOUT (MOBILE VIEW HEADER) -->
@@ -100,13 +100,18 @@
 
                 <button 
                     type="button"
+                    @click="setTab('supply-planning')" 
+                    :class="activeTab === 'supply-planning' ? 'bg-[#ea580c] text-white font-bold shadow-sm' : 'hover:bg-gray-100 text-gray-600 hover:text-black'"
+                    class="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full transition flex items-center gap-1.5 cursor-pointer shrink-0">
+                    <span>Supply Planning</span>
+                </button>
+
+                <button 
+                    type="button"
                     @click="setTab('pemesanan')" 
                     :class="activeTab === 'pemesanan' ? 'bg-[#ea580c] text-white font-bold shadow-sm' : 'hover:bg-gray-100 text-gray-600 hover:text-black'"
-                    class="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full transition flex items-center gap-1.5 relative cursor-pointer shrink-0">
-                    <span>Pemesanan & Supply Planning</span>
-                    <span :class="activeTab === 'pemesanan' ? 'bg-white text-[#ea580c]' : 'bg-[#ea580c] text-white'" class="font-mono text-[9px] px-1.5 py-0.5 rounded-full font-bold animate-pulse">
-                        2
-                    </span>
+                    class="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full transition flex items-center gap-1.5 cursor-pointer shrink-0">
+                    <span>Pesanan & Pengiriman</span>
                 </button>
 
                 <button 
@@ -157,7 +162,7 @@
     </header>
 
     <!-- Main Content Area -->
-    <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
+    <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 pt-0 pb-8">
         @yield('content')
     </main>
 
