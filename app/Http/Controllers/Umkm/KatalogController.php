@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Umkm;
 
 use App\Http\Controllers\Controller;
 use App\Models\Commodity;
+use App\Models\Order;
 use App\Models\Partnership;
 use App\Models\PartnershipDeliverySchedule;
 use App\Models\SupplierProduct;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -182,7 +184,7 @@ class KatalogController extends Controller
                     'commodity' => $commodityName,
                     'volume' => $totalContractVolume,
                     'unit' => $schedule->unit,
-                    'targetMonth' => \Carbon\Carbon::parse($schedule->start_date ?? $partnership->created_at)->translatedFormat('F Y'),
+                    'targetMonth' => Carbon::parse($schedule->start_date ?? $partnership->created_at)->translatedFormat('F Y'),
                     'supplier' => $supplierName,
                     'status' => $collabStatus,
                     'note' => $isApproved
@@ -198,6 +200,19 @@ class KatalogController extends Controller
                 ->whereNotIn('status', ['rejected', 'ditolak']);
         })->pluck('supplier_product_id')->toArray() : [];
 
+        // Hitung jumlah pesanan yang belum divalidasi/dikonfirmasi oleh UMKM
+        $pendingValidationCount = $umkm ? Order::whereHas('partnership', function ($q) use ($umkm) {
+            $q->where('umkm_id', $umkm->id);
+        })->whereIn('order_status', ['MENUNGGU_KONFIRMASI_BARANG', 'DIKIRIM'])->count() : 0;
+
+        // Hitung jumlah tagihan pesanan yang belum dibayar oleh UMKM
+        $pendingPaymentCount = $umkm ? Order::whereHas('partnership', function ($q) use ($umkm) {
+            $q->where('umkm_id', $umkm->id);
+        })->where('order_status', 'BARANG_DITERIMA')
+            ->whereDoesntHave('payment', function ($q) {
+                $q->whereIn('payment_status', ['PAID', 'settlement', 'capture', 'success']);
+            })->count() : 0;
+
         return view('umkm.katalog.index', compact(
             'products',
             'categories',
@@ -209,7 +224,9 @@ class KatalogController extends Controller
             'sort',
             'autoOrdersList',
             'supplyPlans',
-            'appliedProductIds'
+            'appliedProductIds',
+            'pendingValidationCount',
+            'pendingPaymentCount'
         ));
     }
 
