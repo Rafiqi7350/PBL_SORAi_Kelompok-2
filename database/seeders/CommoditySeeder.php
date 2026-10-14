@@ -59,6 +59,42 @@ class CommoditySeeder extends Seeder
                 'unit' => 'Liter',
                 'government_ref_price' => 15700.00,
             ],
+            [
+                'name' => 'Daging Sapi Lokal Super',
+                'category' => 'Daging & Unggas',
+                'unit' => 'kg',
+                'government_ref_price' => 135000.00,
+            ],
+            [
+                'name' => 'Bawang Putih Honan',
+                'category' => 'Bumbu & Rempah',
+                'unit' => 'kg',
+                'government_ref_price' => 38000.00,
+            ],
+            [
+                'name' => 'Jahe Segar',
+                'category' => 'Bumbu & Rempah',
+                'unit' => 'kg',
+                'government_ref_price' => 25000.00,
+            ],
+            [
+                'name' => 'Tomat Segar',
+                'category' => 'Sayuran',
+                'unit' => 'kg',
+                'government_ref_price' => 8000.00,
+            ],
+            [
+                'name' => 'Wortel Segar',
+                'category' => 'Sayuran',
+                'unit' => 'kg',
+                'government_ref_price' => 9000.00,
+            ],
+            [
+                'name' => 'Gula Pasir Premium',
+                'category' => 'Sembako',
+                'unit' => 'kg',
+                'government_ref_price' => 14000.00,
+            ],
         ];
 
         foreach ($commodities as $data) {

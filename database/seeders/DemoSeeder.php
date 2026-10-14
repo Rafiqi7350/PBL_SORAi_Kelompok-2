@@ -7,6 +7,7 @@ use App\Models\CommodityCategory;
 use App\Models\CommodityUnit;
 use App\Models\SupplierProduct;
 use App\Models\SupplierProfile;
+use App\Models\UmkmProfile;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -71,6 +72,11 @@ class DemoSeeder extends Seeder
             ['password' => Hash::make('password'), 'role' => 'supplier', 'status' => 'active']
         );
 
+        $umkmUser = User::firstOrCreate(
+            ['email' => 'umkm@sorai.id'],
+            ['password' => Hash::make('password'), 'role' => 'umkm', 'status' => 'active']
+        );
+
         $umkm = UmkmProfile::firstOrCreate(
             ['user_id' => $umkmUser->id],
             [
@@ -113,6 +119,13 @@ class DemoSeeder extends Seeder
         $telur = Commodity::where('name', 'like', '%Telur Ayam%')->first();
         $cabai = Commodity::where('name', 'like', '%Cabai%')->first();
         $beras = Commodity::where('name', 'like', '%Beras%')->first();
+        $minyak = Commodity::where('name', 'like', '%Minyak Goreng%')->first();
+        $sapiCom = Commodity::where('name', 'like', '%Daging Sapi%')->first();
+        $bawangPutih = Commodity::where('name', 'like', '%Bawang Putih%')->first();
+        $jahe = Commodity::where('name', 'like', '%Jahe%')->first();
+        $tomat = Commodity::where('name', 'like', '%Tomat%')->first();
+        $wortel = Commodity::where('name', 'like', '%Wortel%')->first();
+        $gula = Commodity::where('name', 'like', '%Gula Pasir%')->first();
 
         // 5. Seed / Update Supplier Products with high quality clear images
         if ($ayam) {
@@ -123,7 +136,7 @@ class DemoSeeder extends Seeder
                     'unit' => 'kg',
                     'weekly_capacity' => 500,
                     'stock_capacity' => '500 kg/minggu',
-                    'stock_status' => 'ready',
+                    'stock_status' => 'Tersedia',
                     'minimum_order' => '10 kg',
                     'is_halal_certified' => true,
                     'quality_grade' => 'Grade A Super',
@@ -141,7 +154,7 @@ class DemoSeeder extends Seeder
                     'unit' => 'kg',
                     'weekly_capacity' => 1200,
                     'stock_capacity' => '1.200 kg/minggu',
-                    'stock_status' => 'ready',
+                    'stock_status' => 'Tersedia',
                     'minimum_order' => '10 kg',
                     'is_halal_certified' => true,
                     'quality_grade' => 'Grade A Segar',
@@ -156,10 +169,13 @@ class DemoSeeder extends Seeder
                 ['supplier_id' => $supplier->id, 'commodity_id' => $bawang->id],
                 [
                     'price' => 28000.00,
+                    'unit' => 'kg',
                     'stock_capacity' => '1.200 kg / minggu',
                     'stock_status' => 'Tersedia',
                     'minimum_order' => '10 kg',
                     'is_halal_certified' => true,
+                    'quality_grade' => 'Grade A Probolinggo',
+                    'description' => 'Bawang merah biru Probolinggo kering, merah segar, ukuran seragam.',
                     'image_url' => 'https://images.unsplash.com/photo-1518977822534-7049a61ee0c2?auto=format&fit=crop&q=80&w=600',
                 ]
             );
@@ -167,9 +183,10 @@ class DemoSeeder extends Seeder
 
         if ($cabai) {
             SupplierProduct::updateOrCreate(
-                ['supplier_id' => $supplier2->id, 'commodity_id' => $cabai->id],
+                ['supplier_id' => $supplier->id, 'commodity_id' => $cabai->id],
                 [
                     'price' => 42000.00,
+                    'unit' => 'kg',
                     'stock_capacity' => '300 kg / minggu',
                     'stock_status' => 'Stok Terbatas',
                     'minimum_order' => '5 kg',
@@ -186,6 +203,7 @@ class DemoSeeder extends Seeder
                 ['supplier_id' => $supplier->id, 'commodity_id' => $beras->id],
                 [
                     'price' => 12500.00,
+                    'unit' => 'kg',
                     'stock_capacity' => '1.500 kg / minggu',
                     'stock_status' => 'Tersedia',
                     'minimum_order' => '25 kg',
@@ -193,6 +211,125 @@ class DemoSeeder extends Seeder
                     'quality_grade' => 'Premium IR64',
                     'description' => 'Beras putih medium kualitas premium, pulen dan wangi.',
                     'image_url' => 'https://images.unsplash.com/photo-1586201375761-83865001e31c?auto=format&fit=crop&q=80&w=600',
+                ]
+            );
+        }
+
+        if ($minyak) {
+            SupplierProduct::updateOrCreate(
+                ['supplier_id' => $supplier->id, 'commodity_id' => $minyak->id],
+                [
+                    'price' => 15700.00,
+                    'unit' => 'Liter',
+                    'stock_capacity' => '800 Liter / minggu',
+                    'stock_status' => 'Tersedia',
+                    'minimum_order' => '20 Liter',
+                    'is_halal_certified' => true,
+                    'quality_grade' => 'Refined Bleached Deodorized',
+                    'description' => 'Minyak goreng sawit berkualitas, jernih, bebas kotoran, kemasan standar grosir.',
+                    'image_url' => 'https://images.unsplash.com/photo-1474979266404-7eaacbcd87c5?auto=format&fit=crop&q=80&w=600',
+                ]
+            );
+        }
+
+        if ($sapiCom) {
+            SupplierProduct::updateOrCreate(
+                ['supplier_id' => $supplier->id, 'commodity_id' => $sapiCom->id],
+                [
+                    'price' => 135000.00,
+                    'unit' => 'kg',
+                    'stock_capacity' => '200 kg / minggu',
+                    'stock_status' => 'Tersedia',
+                    'minimum_order' => '5 kg',
+                    'is_halal_certified' => true,
+                    'quality_grade' => 'Super Lokal',
+                    'description' => 'Daging sapi lokal segar potong pagi, tanpa lemak berlebih, cocok untuk restoran.',
+                    'image_url' => 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?auto=format&fit=crop&q=80&w=600',
+                ]
+            );
+        }
+
+        if ($bawangPutih) {
+            SupplierProduct::updateOrCreate(
+                ['supplier_id' => $supplier->id, 'commodity_id' => $bawangPutih->id],
+                [
+                    'price' => 38000.00,
+                    'unit' => 'kg',
+                    'stock_capacity' => '500 kg / minggu',
+                    'stock_status' => 'Tersedia',
+                    'minimum_order' => '10 kg',
+                    'is_halal_certified' => true,
+                    'quality_grade' => 'Impor Honan',
+                    'description' => 'Bawang putih Honan impor, umbi besar, aroma tajam, cocok untuk bumbu masakan profesional.',
+                    'image_url' => 'https://images.unsplash.com/photo-1501420193069-ede7e68cbf8a?auto=format&fit=crop&q=80&w=600',
+                ]
+            );
+        }
+
+        if ($jahe) {
+            SupplierProduct::updateOrCreate(
+                ['supplier_id' => $supplier->id, 'commodity_id' => $jahe->id],
+                [
+                    'price' => 25000.00,
+                    'unit' => 'kg',
+                    'stock_capacity' => '400 kg / minggu',
+                    'stock_status' => 'Tersedia',
+                    'minimum_order' => '5 kg',
+                    'is_halal_certified' => true,
+                    'quality_grade' => 'Jahe Emprit Segar',
+                    'description' => 'Jahe segar bersih, aroma kuat, cocok untuk kebutuhan dapur restoran dan minuman tradisional.',
+                    'image_url' => 'https://images.unsplash.com/photo-1615485500704-8e990f9900f7?auto=format&fit=crop&q=80&w=600',
+                ]
+            );
+        }
+
+        if ($tomat) {
+            SupplierProduct::updateOrCreate(
+                ['supplier_id' => $supplier->id, 'commodity_id' => $tomat->id],
+                [
+                    'price' => 8000.00,
+                    'unit' => 'kg',
+                    'stock_capacity' => '600 kg / minggu',
+                    'stock_status' => 'Tersedia',
+                    'minimum_order' => '10 kg',
+                    'is_halal_certified' => true,
+                    'quality_grade' => 'Grade A Merah Segar',
+                    'description' => 'Tomat segar merah matang pohon, tidak cacat, segar dan berair untuk sambal dan masakan.',
+                    'image_url' => 'https://images.unsplash.com/photo-1546094096-0df4bcaaa337?auto=format&fit=crop&q=80&w=600',
+                ]
+            );
+        }
+
+        if ($wortel) {
+            SupplierProduct::updateOrCreate(
+                ['supplier_id' => $supplier->id, 'commodity_id' => $wortel->id],
+                [
+                    'price' => 9000.00,
+                    'unit' => 'kg',
+                    'stock_capacity' => '700 kg / minggu',
+                    'stock_status' => 'Tersedia',
+                    'minimum_order' => '10 kg',
+                    'is_halal_certified' => true,
+                    'quality_grade' => 'Grade A Lokal',
+                    'description' => 'Wortel segar lokal, warna oranye cerah, besar dan mulus, langsung dari kebun Lembang.',
+                    'image_url' => 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?auto=format&fit=crop&q=80&w=600',
+                ]
+            );
+        }
+
+        if ($gula) {
+            SupplierProduct::updateOrCreate(
+                ['supplier_id' => $supplier->id, 'commodity_id' => $gula->id],
+                [
+                    'price' => 14000.00,
+                    'unit' => 'kg',
+                    'stock_capacity' => '2.000 kg / minggu',
+                    'stock_status' => 'Tersedia',
+                    'minimum_order' => '25 kg',
+                    'is_halal_certified' => true,
+                    'quality_grade' => 'Gula Kristal Putih Premium',
+                    'description' => 'Gula pasir kristal putih premium, bersih dan bebas kotoran, kemasan karung 50kg.',
+                    'image_url' => 'https://images.unsplash.com/photo-1559742811-822873691df8?auto=format&fit=crop&q=80&w=600',
                 ]
             );
         }
