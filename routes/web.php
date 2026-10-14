@@ -10,6 +10,7 @@ use App\Http\Controllers\Auth\PendingRegistrationController;
 use App\Http\Controllers\Auth\SupplierRegisterController;
 use App\Http\Controllers\Auth\UmkmRegisterController;
 use App\Http\Controllers\Supplier\KatalogSupplierController;
+use App\Http\Controllers\Supplier\PengajuanMasukController;
 use App\Http\Controllers\Umkm\KatalogController;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\EnsureUserIsSupplier;
@@ -57,6 +58,10 @@ Route::prefix('supplier')->name('supplier.')->middleware(EnsureUserIsSupplier::c
     Route::put('/katalog/{id}', [KatalogSupplierController::class, 'update'])->name('katalog.update');
     Route::patch('/katalog/{id}/quick-stock', [KatalogSupplierController::class, 'updateStockStatus'])->name('katalog.quick-stock');
     Route::delete('/katalog/{id}', [KatalogSupplierController::class, 'destroy'])->name('katalog.destroy');
+
+    Route::get('/pengajuan-masuk', [PengajuanMasukController::class, 'index'])->name('pengajuan-masuk.index');
+    Route::patch('/pengajuan-masuk/{id}/terima', [PengajuanMasukController::class, 'terima'])->name('pengajuan-masuk.terima');
+    Route::patch('/pengajuan-masuk/{id}/tolak', [PengajuanMasukController::class, 'tolak'])->name('pengajuan-masuk.tolak');
 });
 
 /* Admin Protected Routes (Master Data Komoditas, Kategori, Satuan Baku, User Moderasi) */
