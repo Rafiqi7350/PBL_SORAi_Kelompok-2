@@ -49,7 +49,7 @@
                             <th class="py-4 px-6">KOMODITAS & KATEGORI</th>
                             <th class="py-4 px-6">HARGA GROSIR</th>
                             <th class="py-4 px-6">KAPASITAS PASOK</th>
-                            <th class="py-4 px-6 text-center">AKSI</th>
+                            <th class="py-4 px-6 text-center">AKSI (CRUD)</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 text-sm font-medium text-gray-800">

@@ -102,6 +102,12 @@
             </div>
 
 
+            <a href="{{ route('umkm.katalog.index') }}"
+               class="w-full py-2.5 px-4 bg-[#ea580c]/10 hover:bg-[#ea580c]/20 text-[#ea580c] rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition border border-[#ea580c]/30">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                <span>Switch Ke Sisi UMKM</span>
+            </a>
+
             <a href="{{ route('logout') }}"
                @click.prevent="$dispatch('open-logout-modal')"
                onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('open-logout-modal'));"
