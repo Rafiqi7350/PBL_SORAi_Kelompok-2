@@ -53,7 +53,7 @@ class KatalogSupplierController extends Controller
             $query->where('stock_status', $statusFilter);
         }
 
-        $products = $query->latest()->paginate(10)->withQueryString();
+        $products = $query->latest()->paginate(8)->withQueryString();
 
         // Statistics
         $totalProducts = SupplierProduct::where('supplier_id', $supplier->id)->count();

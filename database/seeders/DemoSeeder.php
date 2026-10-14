@@ -7,6 +7,7 @@ use App\Models\CommodityCategory;
 use App\Models\CommodityUnit;
 use App\Models\SupplierProduct;
 use App\Models\SupplierProfile;
+use App\Models\UmkmProfile;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
@@ -71,6 +72,11 @@ class DemoSeeder extends Seeder
             ['password' => Hash::make('password'), 'role' => 'supplier', 'status' => 'active']
         );
 
+        $umkmUser = User::firstOrCreate(
+            ['email' => 'umkm@sorai.id'],
+            ['password' => Hash::make('password'), 'role' => 'umkm', 'status' => 'active']
+        );
+
         $umkm = UmkmProfile::firstOrCreate(
             ['user_id' => $umkmUser->id],
             [
@@ -120,10 +126,8 @@ class DemoSeeder extends Seeder
                 ['supplier_id' => $supplier->id, 'commodity_id' => $ayam->id],
                 [
                     'price' => 34000.00,
-                    'unit' => 'kg',
-                    'weekly_capacity' => 500,
                     'stock_capacity' => '500 kg/minggu',
-                    'stock_status' => 'ready',
+                    'stock_status' => 'Tersedia',
                     'minimum_order' => '10 kg',
                     'is_halal_certified' => true,
                     'quality_grade' => 'Grade A Super',
@@ -137,11 +141,9 @@ class DemoSeeder extends Seeder
             SupplierProduct::updateOrCreate(
                 ['supplier_id' => $supplier->id, 'commodity_id' => $telur->id],
                 [
-                    'price' => 28000.00,
-                    'unit' => 'kg',
-                    'weekly_capacity' => 1200,
-                    'stock_capacity' => '1.200 kg/minggu',
-                    'stock_status' => 'ready',
+                    'price' => 26500.00,
+                    'stock_capacity' => '2.000 kg/minggu',
+                    'stock_status' => 'Tersedia',
                     'minimum_order' => '10 kg',
                     'is_halal_certified' => true,
                     'quality_grade' => 'Grade A Segar',
