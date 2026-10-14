@@ -5,13 +5,16 @@ namespace App\Http\Controllers\Supplier;
 use App\Http\Controllers\Controller;
 use App\Models\Partnership;
 use App\Models\User;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class PengajuanMasukController extends Controller
 {
     private function getActiveSupplierProfile()
     {
-        if (! Auth::check() || Auth::user()->role !== 'supplier') {
+        // Mengikuti pola KatalogSupplierController (auto-login demo bila belum login).
+        if (! Auth::check()) {
             $dummySupplierUser = User::where('role', 'supplier')->first();
             if ($dummySupplierUser) {
                 Auth::login($dummySupplierUser);
@@ -30,57 +33,83 @@ class PengajuanMasukController extends Controller
                 ->with('error', 'Silakan daftarkan profil Pemasok terlebih dahulu.');
         }
 
-        $pendingPartnerships = Partnership::with([
-            'umkm',
-            'activeDeliverySchedule.supplierProduct.commodity',
-        ])
+        $pendingPartnerships = Partnership::with(['umkm', 'commodity'])
             ->where('supplier_id', $supplier->id)
-            ->where('status', 'pending')
-            ->latest()
+            ->pending()
+            ->oldest()
             ->get();
 
-        $totalPending = $pendingPartnerships->count();
+        $historyPartnerships = Partnership::with(['umkm', 'commodity'])
+            ->where('supplier_id', $supplier->id)
+            ->whereIn('status', [Partnership::STATUS_ACCEPTED, Partnership::STATUS_REJECTED])
+            ->latest('responded_at')
+            ->limit(10)
+            ->get();
 
-        return view('supplier.pengajuan-masuk.index', compact(
+        return view('supplier.pengajuan.index', compact(
             'supplier',
             'pendingPartnerships',
-            'totalPending'
+            'historyPartnerships'
         ));
     }
 
-    public function terima(string $id)
+    public function accept(string $id): RedirectResponse
     {
         $supplier = $this->getActiveSupplierProfile();
 
         if (! $supplier) {
-            return redirect()->back()->with('error', 'Profil Pemasok tidak ditemukan.');
+            return redirect()->route('register.supplier')
+                ->with('error', 'Profil Pemasok tidak ditemukan.');
         }
 
-        $partnership = Partnership::where('supplier_id', $supplier->id)
-            ->where('status', 'pending')
+        $partnership = Partnership::with('umkm')
+            ->where('supplier_id', $supplier->id)
             ->findOrFail($id);
 
-        $partnership->update(['status' => 'active']);
+        if (! $partnership->isPending()) {
+            return redirect()->route('supplier.pengajuan.index')
+                ->with('error', 'Pengajuan ini sudah diproses sebelumnya.');
+        }
 
-        return redirect()->route('supplier.pengajuan-masuk.index')
-            ->with('success', 'Kemitraan berhasil diterima! UMKM telah diberitahu.');
+        $partnership->update([
+            'status' => Partnership::STATUS_ACCEPTED,
+            'rejection_reason' => null,
+            'responded_at' => now(),
+        ]);
+
+        return redirect()->route('supplier.pengajuan.index')
+            ->with('success', 'Kemitraan dengan '.($partnership->umkm?->business_name ?? 'UMKM').' berhasil diterima!');
     }
 
-    public function tolak(string $id)
+    public function reject(Request $request, string $id): RedirectResponse
     {
         $supplier = $this->getActiveSupplierProfile();
 
         if (! $supplier) {
-            return redirect()->back()->with('error', 'Profil Pemasok tidak ditemukan.');
+            return redirect()->route('register.supplier')
+                ->with('error', 'Profil Pemasok tidak ditemukan.');
         }
 
-        $partnership = Partnership::where('supplier_id', $supplier->id)
-            ->where('status', 'pending')
+        $validated = $request->validate([
+            'rejection_reason' => 'nullable|string|max:500',
+        ]);
+
+        $partnership = Partnership::with('umkm')
+            ->where('supplier_id', $supplier->id)
             ->findOrFail($id);
 
-        $partnership->update(['status' => 'rejected']);
+        if (! $partnership->isPending()) {
+            return redirect()->route('supplier.pengajuan.index')
+                ->with('error', 'Pengajuan ini sudah diproses sebelumnya.');
+        }
 
-        return redirect()->route('supplier.pengajuan-masuk.index')
-            ->with('success', 'Pengajuan kemitraan telah ditolak.');
+        $partnership->update([
+            'status' => Partnership::STATUS_REJECTED,
+            'rejection_reason' => $validated['rejection_reason'] ?? null,
+            'responded_at' => now(),
+        ]);
+
+        return redirect()->route('supplier.pengajuan.index')
+            ->with('success', 'Pengajuan dari '.($partnership->umkm?->business_name ?? 'UMKM').' telah ditolak.');
     }
 }
