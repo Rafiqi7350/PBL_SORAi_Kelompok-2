@@ -13,6 +13,8 @@
             stars: 5,
             reviewText: '',
             notificationMsg: @json(session('success') ?? ''),
+            pendingValidationCount: {{ $pendingValidationCount ?? 0 }},
+            pendingPaymentCount: {{ $pendingPaymentCount ?? 0 }},
 
             planningForm: {
                 commodity: 'Daging Ayam Broiler Segar',
@@ -112,9 +114,9 @@
             },
 
             orders: [
-                { id: 'ORD-2026-001', umkmName: 'Dapur Sambal Malang', supplierName: 'Kelompok Tani Poultry Malang', commodity: 'Daging Ayam Broiler Segar', requestedQty: 100, approvedQty: 100, unit: 'kg', pricePerUnit: 34000, total: 3400000, date: '01/10/2026', status: 'MENUNGGU_KONFIRMASI_BARANG', stockNote: 'Barang Tiba Di Dapur Subuh Tadi', paymentStatus: 'UNPAID', rating: null, review: '' },
-                { id: 'ORD-2026-002', umkmName: 'Dapur Sambal Malang', supplierName: 'Kelompok Tani Poultry Malang', commodity: 'Daging Ayam Broiler Segar', requestedQty: 200, approvedQty: 120, unit: 'kg', pricePerUnit: 34000, total: 4080000, date: '28/09/2026', status: 'PENYESUAIAN_STOK', stockNote: 'Stok Terbatas (Dikirim 120kg dari 200kg)', paymentStatus: 'UNPAID', rating: null, review: '' },
-                { id: 'ORD-2026-003', umkmName: 'Dapur Sambal Malang', supplierName: 'Distributor Rempah Nusantara', commodity: 'Bawang Merah Biru Probolinggo', requestedQty: 50, approvedQty: 50, unit: 'kg', pricePerUnit: 28000, total: 1400000, date: '22/09/2026', status: 'BARANG_DITERIMA', stockNote: 'Pengiriman Subuh Dalam Perjalanan', paymentStatus: 'UNPAID', rating: null, review: '' },
+                { id: 'ORD-2026-001', umkmName: 'Dapur Sambal Malang', supplierName: 'Kelompok Tani Poultry Malang', commodity: 'Daging Ayam Broiler Segar', requestedQty: 100, approvedQty: 100, unit: 'kg', pricePerUnit: 34000, total: 3400000, date: '01/10/2026', status: 'BARANG_DITERIMA', stockNote: 'Barang Tiba Di Dapur Subuh Tadi', paymentStatus: 'PAID', rating: null, review: '' },
+                { id: 'ORD-2026-002', umkmName: 'Dapur Sambal Malang', supplierName: 'Kelompok Tani Poultry Malang', commodity: 'Daging Ayam Broiler Segar', requestedQty: 200, approvedQty: 120, unit: 'kg', pricePerUnit: 34000, total: 4080000, date: '28/09/2026', status: 'PENYESUAIAN_STOK', stockNote: 'Stok Terbatas (Dikirim 120kg dari 200kg)', paymentStatus: 'PAID', rating: null, review: '' },
+                { id: 'ORD-2026-003', umkmName: 'Dapur Sambal Malang', supplierName: 'Distributor Rempah Nusantara', commodity: 'Bawang Merah Biru Probolinggo', requestedQty: 50, approvedQty: 50, unit: 'kg', pricePerUnit: 28000, total: 1400000, date: '22/09/2026', status: 'BARANG_DITERIMA', stockNote: 'Pengiriman Subuh Dalam Perjalanan', paymentStatus: 'PAID', rating: null, review: '' },
                 { id: 'ORD-2026-004', umkmName: 'Dapur Sambal Malang', supplierName: 'Kelompok Tani Poultry Malang', commodity: 'Daging Ayam Broiler Segar', requestedQty: 150, approvedQty: 150, unit: 'kg', pricePerUnit: 34000, total: 5100000, date: '15/09/2026', status: 'SELESAI', stockNote: 'Selesai & Diterima Dapur', paymentStatus: 'PAID', rating: 5, review: 'Kualitas daging sangat segar dan datang tepat waktu.' }
             ],
 
@@ -185,10 +187,21 @@
             },
 
             confirmGoodsReceived: function(orderId) {
-                this.orders = this.orders.map(function(o) {
-                    return o.id === orderId ? Object.assign({}, o, { status: 'BARANG_DITERIMA', stockNote: 'Kesesuaian Barang Telah Dikonfirmasi UMKM' }) : o;
-                });
-                this.notify('✓ Barang berhasil dikonfirmasi sesuai! Silakan lanjutkan ke Pembayaran.');
+                // Buka modal konfirmasi dengan upload foto (terhubung ke DB)
+                this.confirmingOrderId = orderId;
+                this.confirmPhotoPreview = null;
+                this.confirmNotes = '';
+            },
+
+            confirmingOrderId: null,
+            confirmPhotoPreview: null,
+            confirmNotes: '',
+
+            onConfirmPhotoChange: function(event) {
+                var file = event.target.files[0];
+                if (file) {
+                    this.confirmPhotoPreview = URL.createObjectURL(file);
+                }
             },
 
             openMidtransPayment: function(order) {
@@ -708,9 +721,9 @@
                 class="pb-3 relative transition flex items-center gap-2 cursor-pointer"
                 :class="orderSubTab === 'confirm' ? 'text-gray-900 font-extrabold' : 'text-gray-500 hover:text-gray-900'">
                 <span>Konfirmasi Penerimaan</span>
-                <template x-if="orders.filter(o => o.status === 'MENUNGGU_KONFIRMASI_BARANG').length > 0">
+                <template x-if="pendingValidationCount > 0">
                     <span class="bg-[#ea580c] text-white text-[10px] px-2 py-0.5 rounded-full font-mono font-bold"
-                          x-text="orders.filter(o => o.status === 'MENUNGGU_KONFIRMASI_BARANG').length">
+                          x-text="pendingValidationCount">
                     </span>
                 </template>
                 <template x-if="orderSubTab === 'confirm'">
@@ -724,9 +737,9 @@
                 class="pb-3 relative transition flex items-center gap-2 cursor-pointer"
                 :class="orderSubTab === 'payment' ? 'text-gray-900 font-extrabold' : 'text-gray-500 hover:text-gray-900'">
                 <span>Pembayaran Midtrans</span>
-                <template x-if="orders.filter(o => o.status === 'BARANG_DITERIMA' && o.paymentStatus === 'UNPAID').length > 0">
+                <template x-if="pendingPaymentCount > 0">
                     <span class="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-full font-mono font-bold"
-                          x-text="orders.filter(o => o.status === 'BARANG_DITERIMA' && o.paymentStatus === 'UNPAID').length">
+                          x-text="pendingPaymentCount">
                     </span>
                 </template>
                 <template x-if="orderSubTab === 'payment'">
@@ -852,64 +865,179 @@
             </div>
         </div>
 
-        <!-- SUB-TAB 2: KONFIRMASI PENERIMAAN BARANG -->
+        <!-- SUB-TAB 2: KONFIRMASI PENERIMAAN BARANG (TERHUBUNG DATABASE) -->
         <div x-show="orderSubTab === 'confirm'" class="bg-white rounded-3xl border border-gray-100 overflow-hidden p-6 space-y-4 shadow-sm">
             <div class="flex justify-between items-center border-b border-gray-100 pb-3">
                 <div>
                     <h3 class="font-bold text-lg text-gray-900">Validasi & Konfirmasi Barang Tiba di Dapur</h3>
-                    <p class="text-xs text-gray-500">Periksa kuantitas dan mutu bahan baku saat tiba. Klik validasi untuk menyelesaikan status penerimaan.</p>
+                    <p class="text-xs text-gray-500">Periksa kuantitas dan mutu bahan baku saat tiba. Upload foto bukti penerimaan untuk mengkonfirmasi.</p>
                 </div>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-xs text-left">
-                    <thead class="bg-gray-50 font-mono text-gray-500 uppercase border-b border-gray-100">
-                        <tr>
-                            <th class="p-3.5">ID Pesanan</th>
-                            <th class="p-3.5">Pemasok Mitra</th>
-                            <th class="p-3.5">Detail Komoditas</th>
-                            <th class="p-3.5">Total Tagihan</th>
-                            <th class="p-3.5">Status</th>
-                            <th class="p-3.5 text-center">Aksi Konfirmasi</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 font-medium">
-                        <template x-for="ord in orders" :key="'confirm-' + ord.id">
-                            <tr class="hover:bg-gray-50/50 transition">
-                                <td class="p-3.5 font-mono font-bold text-[#ea580c]" x-text="ord.id"></td>
-                                <td class="p-3.5 font-bold text-gray-900" x-text="ord.supplierName"></td>
-                                <td class="p-3.5">
-                                    <span class="font-semibold text-gray-900" x-text="ord.commodity"></span>
-                                    <span class="text-gray-500 block text-[11px]" x-text="'(' + ord.approvedQty + ' ' + ord.unit + ')'"></span>
-                                </td>
-                                <td class="p-3.5 font-bold text-gray-900" x-text="'Rp ' + ord.total.toLocaleString('id-ID')"></td>
-                                <td class="p-3.5">
-                                    <span class="px-2.5 py-1 rounded-full text-[10px] font-bold"
-                                          :class="ord.status === 'MENUNGGU_KONFIRMASI_BARANG' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'"
-                                          x-text="ord.status === 'MENUNGGU_KONFIRMASI_BARANG' ? 'Menunggu Validasi' : 'Barang Diterima'">
-                                    </span>
-                                </td>
-                                <td class="p-3.5 text-center">
-                                    <template x-if="ord.status === 'MENUNGGU_KONFIRMASI_BARANG'">
-                                        <button 
-                                            type="button"
-                                            @click="confirmGoodsReceived(ord.id)" 
-                                            class="bg-[#ea580c] hover:bg-[#c2410c] text-white px-4 py-1.5 rounded-full font-bold text-[11px] shadow-sm transition cursor-pointer">
-                                            ✓ Validasi Barang Sesuai
-                                        </button>
-                                    </template>
-                                    <template x-if="ord.status !== 'MENUNGGU_KONFIRMASI_BARANG'">
-                                        <span class="text-emerald-700 font-bold text-[11px] inline-flex items-center gap-1">
-                                            ✓ Telah Dikonfirmasi
-                                        </span>
-                                    </template>
-                                </td>
+            @php
+                $umkmProfile = auth()->user()?->umkmProfile;
+                $dbOrders = $umkmProfile
+                    ? \App\Models\Order::with(['partnership.supplier', 'items.supplierProduct.commodity', 'shipmentConfirmation'])
+                        ->whereHas('partnership', fn($q) => $q->where('umkm_id', $umkmProfile->id))
+                        ->whereIn('order_status', ['MENUNGGU_KONFIRMASI_BARANG', 'BARANG_DITERIMA', 'DIKIRIM'])
+                        ->latest()->get()
+                    : collect();
+            @endphp
+
+            @if($dbOrders->isEmpty())
+                <div class="py-14 text-center space-y-3">
+                    <div class="w-14 h-14 mx-auto rounded-2xl bg-orange-50 border border-orange-100/80 flex items-center justify-center text-[#ea580c] shadow-xs">
+                        <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                    </div>
+                    <div class="space-y-1">
+                        <p class="font-bold text-gray-800 text-sm">Belum ada pesanan yang perlu dikonfirmasi</p>
+                        <p class="text-xs text-gray-400">Pesanan yang sudah dikirim pemasok akan muncul di sini.</p>
+                    </div>
+                </div>
+            @else
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-gray-50 font-mono text-gray-500 uppercase border-b border-gray-100">
+                            <tr>
+                                <th class="p-3.5">ID Pesanan</th>
+                                <th class="p-3.5">Pemasok Mitra</th>
+                                <th class="p-3.5">Detail Komoditas</th>
+                                <th class="p-3.5">Total Tagihan</th>
+                                <th class="p-3.5">Status</th>
+                                <th class="p-3.5">Bukti Foto</th>
+                                <th class="p-3.5 text-center">Aksi Konfirmasi</th>
                             </tr>
-                        </template>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 font-medium">
+                            @foreach($dbOrders as $dbOrder)
+                                <tr class="hover:bg-gray-50/50 transition">
+                                    <td class="p-3.5 font-mono font-bold text-[#ea580c]">{{ strtoupper(substr($dbOrder->id, 0, 8)) }}</td>
+                                    <td class="p-3.5 font-bold text-gray-900">{{ $dbOrder->partnership->supplier->company_name }}</td>
+                                    <td class="p-3.5">
+                                        @foreach($dbOrder->items as $item)
+                                            <span class="font-semibold text-gray-900 block">{{ $item->supplierProduct->commodity->name }}</span>
+                                            <span class="text-gray-500 text-[11px]">{{ number_format($item->quantity, 0) }} {{ $item->supplierProduct->commodity->unit }}</span>
+                                        @endforeach
+                                    </td>
+                                    <td class="p-3.5 font-bold text-gray-900">Rp {{ number_format($dbOrder->total_amount, 0, ',', '.') }}</td>
+                                    <td class="p-3.5">
+                                        @if($dbOrder->order_status === 'MENUNGGU_KONFIRMASI_BARANG')
+                                            <span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full text-[10px] font-bold">⏳ Menunggu Validasi</span>
+                                        @elseif($dbOrder->order_status === 'DIKIRIM')
+                                            <span class="bg-sky-100 text-sky-800 px-2.5 py-1 rounded-full text-[10px] font-bold">🚚 Dikirim</span>
+                                        @else
+                                            <span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-[10px] font-bold">✓ Barang Diterima</span>
+                                        @endif
+                                    </td>
+                                    <td class="p-3.5">
+                                        @if($dbOrder->shipmentConfirmation?->proof_photo_url)
+                                            <a href="{{ $dbOrder->shipmentConfirmation->proof_photo_url }}" target="_blank">
+                                                <img src="{{ $dbOrder->shipmentConfirmation->proof_photo_url }}"
+                                                     alt="Bukti"
+                                                     class="w-14 h-14 object-cover rounded-xl border border-gray-200 hover:scale-110 transition cursor-pointer">
+                                            </a>
+                                        @else
+                                            <span class="text-gray-300 text-[11px]">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="p-3.5 text-center">
+                                        @if(in_array($dbOrder->order_status, ['MENUNGGU_KONFIRMASI_BARANG', 'DIKIRIM']))
+                                            <button
+                                                type="button"
+                                                @click="confirmingOrderId = '{{ $dbOrder->id }}'; confirmPhotoPreview = null; confirmNotes = '';"
+                                                class="bg-[#ea580c] hover:bg-[#c2410c] text-white px-4 py-1.5 rounded-full font-bold text-[11px] shadow-sm transition cursor-pointer">
+                                                📷 Konfirmasi & Upload Foto
+                                            </button>
+                                        @else
+                                            <span class="text-emerald-700 font-bold text-[11px] inline-flex items-center gap-1">
+                                                ✓ Telah Dikonfirmasi
+                                            </span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
+
+        <!-- MODAL KONFIRMASI PENERIMAAN + UPLOAD FOTO (TERHUBUNG DATABASE) -->
+        <div x-cloak x-show="confirmingOrderId" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div @click.away="confirmingOrderId = null" class="bg-white max-w-lg w-full rounded-[2rem] p-6 space-y-5 shadow-2xl border border-gray-100">
+                <div class="flex justify-between items-start border-b border-gray-100 pb-4">
+                    <div>
+                        <span class="text-xs font-bold text-[#ea580c] uppercase font-mono tracking-wider">KONFIRMASI PENERIMAAN BARANG</span>
+                        <h3 class="text-xl font-bold text-gray-900 mt-1">Upload Bukti Penerimaan</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Foto barang yang sudah tiba di dapur Anda sebagai bukti konfirmasi resmi.</p>
+                    </div>
+                    <button type="button" @click="confirmingOrderId = null" class="text-gray-400 hover:text-gray-700 font-bold text-lg cursor-pointer">✕</button>
+                </div>
+
+                <template x-if="confirmingOrderId">
+                    <form :action="`/umkm/pemesanan/${confirmingOrderId}/konfirmasi`" method="POST" enctype="multipart/form-data" class="space-y-4">
+                        @csrf
+
+                        <!-- Preview Foto -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-2">Foto Bukti Penerimaan Barang <span class="text-rose-500">*</span></label>
+                            <div class="border-2 border-dashed border-gray-200 rounded-2xl p-4 text-center cursor-pointer hover:border-[#ea580c] transition"
+                                 @click="$refs.photoInput.click()">
+                                <template x-if="!confirmPhotoPreview">
+                                    <div class="space-y-2 py-3">
+                                        <div class="w-11 h-11 mx-auto rounded-xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#ea580c]">
+                                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                        </div>
+                                        <p class="text-xs text-gray-600 font-bold">Klik untuk pilih foto atau seret ke sini</p>
+                                        <p class="text-[11px] text-gray-400">JPG, PNG, WEBP — Maks. 5MB</p>
+                                    </div>
+                                </template>
+                                <template x-if="confirmPhotoPreview">
+                                    <img :src="confirmPhotoPreview" class="max-h-48 mx-auto rounded-xl object-contain" alt="Preview">
+                                </template>
+                            </div>
+                            <input
+                                type="file"
+                                name="proof_photo"
+                                required
+                                accept="image/*"
+                                x-ref="photoInput"
+                                class="hidden"
+                                @change="onConfirmPhotoChange($event)">
+                        </div>
+
+                        <!-- Catatan Konfirmasi -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5">Catatan Penerimaan (Opsional)</label>
+                            <textarea
+                                name="confirmation_notes"
+                                rows="3"
+                                x-model="confirmNotes"
+                                placeholder="Contoh: Semua barang sesuai pesanan, kondisi segar dan tidak ada yang rusak."
+                                class="w-full px-4 py-2.5 rounded-xl bg-[#f1f2f4] text-gray-900 text-xs font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ea580c] border-0">
+                            </textarea>
+                        </div>
+
+                        <div class="flex gap-3 pt-2">
+                            <button type="button" @click="confirmingOrderId = null"
+                                class="w-1/2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-full font-bold text-xs transition cursor-pointer">
+                                Batal
+                            </button>
+                            <button type="submit"
+                                class="w-1/2 bg-[#ea580c] hover:bg-[#c2410c] text-white py-3 rounded-full font-bold text-xs shadow-sm transition cursor-pointer">
+                                ✓ Konfirmasi & Simpan
+                            </button>
+                        </div>
+                    </form>
+                </template>
             </div>
         </div>
+
 
         <!-- SUB-TAB 3: PEMBAYARAN MIDTRANS -->
         <div x-show="orderSubTab === 'payment'" class="bg-white rounded-3xl border border-gray-100 overflow-hidden p-6 space-y-4 shadow-sm">

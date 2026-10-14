@@ -12,6 +12,7 @@ use App\Http\Controllers\Auth\UmkmRegisterController;
 use App\Http\Controllers\Supplier\KatalogSupplierController;
 use App\Http\Controllers\Supplier\PengajuanMasukController;
 use App\Http\Controllers\Umkm\KatalogController;
+use App\Http\Controllers\Umkm\PemesananController;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\EnsureUserIsSupplier;
 use App\Http\Middleware\EnsureUserIsUmkm;
@@ -47,6 +48,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
 Route::prefix('umkm')->name('umkm.')->middleware(EnsureUserIsUmkm::class)->group(function () {
     Route::get('/katalog', [KatalogController::class, 'index'])->name('katalog.index');
     Route::post('/katalog/ajukan-kemitraan', [KatalogController::class, 'ajukanKemitraan'])->name('katalog.ajukan');
+
+    Route::get('/pemesanan', [PemesananController::class, 'index'])->name('pemesanan.index');
+    Route::get('/pemesanan/{order}/konfirmasi', [PemesananController::class, 'showKonfirmasi'])->name('pemesanan.konfirmasi.show');
+    Route::post('/pemesanan/{order}/konfirmasi', [PemesananController::class, 'konfirmasi'])->name('pemesanan.konfirmasi');
 });
 
 /* Supplier Routes */
