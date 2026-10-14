@@ -48,12 +48,21 @@
                     Dashboard & Analisis
                 </a>
 
-                <a href="#" class="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                <a href="{{ route('supplier.pengajuan-masuk.index') }}" class="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition
+                    {{ request()->routeIs('supplier.pengajuan-masuk.*') ? 'bg-[#ea580c] text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
                     <div class="flex items-center gap-3">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                         Pengajuan Masuk
                     </div>
-                    <span class="bg-[#ea580c] text-white text-[10px] font-black px-2 py-0.5 rounded-full">2</span>
+                    @php
+                        $pendingCount = auth()->user()?->supplierProfile?->partnerships()
+                            ->where('status', 'pending')->count() ?? 0;
+                    @endphp
+                    @if($pendingCount > 0)
+                        <span class="{{ request()->routeIs('supplier.pengajuan-masuk.*') ? 'bg-white text-[#ea580c]' : 'bg-[#ea580c] text-white' }} text-[10px] font-black px-2 py-0.5 rounded-full">
+                            {{ $pendingCount }}
+                        </span>
+                    @endif
                 </a>
 
                 <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
@@ -62,9 +71,10 @@
                 </a>
 
                 <!-- Active Link: Kelola Stok -->
-                <a href="{{ route('supplier.katalog.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-black bg-[#ea580c] text-white shadow-md transition">
-                    <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                    Kelola Stok
+                <a href="{{ route('supplier.katalog.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition
+                    {{ request()->routeIs('supplier.katalog.*') ? 'bg-[#ea580c] text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+                    Kelola Stok (CRUD)
                 </a>
 
                 <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
