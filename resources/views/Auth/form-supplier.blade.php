@@ -82,9 +82,9 @@
                         if (!this.form.company_name.trim()) this.errors.company_name = 'Nama kelompok/distributor wajib diisi.';
                     }
                     if (field === 'phone') {
-                        this.form.phone = (this.form.phone || '').replace(/[^0-9]/g, '');
-                        if (!this.form.phone.trim()) this.errors.phone = 'Nomor WhatsApp wajib diisi.';
-                        else if (!/^[0-9]+$/.test(this.form.phone)) this.errors.phone = 'Nomor WhatsApp hanya boleh berisi angka.';
+                        var val = (this.form.phone || '').trim();
+                        if (!val) this.errors.phone = 'Nomor WhatsApp wajib diisi.';
+                        else if (!/^[0-9]+$/.test(val)) this.errors.phone = 'Nomor WhatsApp hanya boleh berisi angka.';
                     }
                     if (field === 'commodity_id') {
                         if (!this.form.commodity_id) this.errors.commodity_id = 'Pilih kategori komoditas utama.';
@@ -169,7 +169,7 @@
                 </div>
             @endif
 
-            <form action="{{ route('register.supplier.store') }}" method="POST" @submit="submitForm" class="space-y-4 text-xs font-semibold">
+            <form novalidate action="{{ route('register.supplier.store') }}" method="POST" @submit="submitForm" class="space-y-4 text-xs font-semibold">
                 @csrf
 
                 <!-- Informasi Akun: Email -->
@@ -242,12 +242,10 @@
                         <div>
                             <label for="phone" class="block text-gray-700 mb-1.5">Nomor WhatsApp Operasional</label>
                             <input type="text"
-                                   inputmode="numeric"
-                                   pattern="[0-9]*"
                                    id="phone"
                                    name="phone"
                                    x-model="form.phone"
-                                   @input="form.phone = form.phone.replace(/[^0-9]/g, ''); validateField('phone')"
+                                   @input="validateField('phone')"
                                    required
                                    placeholder="contoh: 081234567890"
                                    class="w-full px-4 py-3 rounded-xl bg-[#f1f2f4] text-gray-900 text-xs font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ea580c] border-0 transition">
