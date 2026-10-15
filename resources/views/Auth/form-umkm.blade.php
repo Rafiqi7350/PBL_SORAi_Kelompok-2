@@ -158,7 +158,7 @@
                 </div>
             @endif
 
-            <form action="{{ route('register.umkm.store') }}" method="POST" @submit="submitForm" class="space-y-4 text-xs font-semibold">
+            <form novalidate action="{{ route('register.umkm.store') }}" method="POST" @submit="submitForm" class="space-y-4 text-xs font-semibold">
                 @csrf
 
                 <!-- Informasi Akun: Email -->

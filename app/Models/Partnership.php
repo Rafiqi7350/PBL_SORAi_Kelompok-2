@@ -37,6 +37,6 @@ class Partnership extends Model
 
     public function activeDeliverySchedule(): HasOne
     {
-        return $this->hasOne(PartnershipDeliverySchedule::class, 'partnership_id')->latestOfMany();
+        return $this->hasOne(PartnershipDeliverySchedule::class, 'partnership_id')->latest('created_at');
     }
 }
