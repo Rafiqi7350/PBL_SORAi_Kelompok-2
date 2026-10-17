@@ -150,9 +150,11 @@
 
                 <!-- Remember Me -->
                 <div class="flex items-center justify-between pt-0.5">
-                    <label class="inline-flex items-center gap-2 cursor-pointer font-medium text-xs text-gray-600">
+                    <label for="remember" class="inline-flex items-center gap-2 cursor-pointer font-medium text-xs text-gray-600 select-none">
                         <input type="checkbox"
+                               id="remember"
                                name="remember"
+                               value="1"
                                {{ old('remember') ? 'checked' : '' }}
                                class="accent-[#ea580c] w-4 h-4 rounded cursor-pointer border-gray-300">
                         <span>Ingat saya di perangkat ini</span>

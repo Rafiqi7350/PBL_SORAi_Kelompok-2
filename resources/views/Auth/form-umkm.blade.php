@@ -41,35 +41,49 @@
                     delete this.errors[field];
                     if (field === 'email') {
                         var val = (this.form.email || '').trim();
-                        var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                        var emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
                         if (!val) this.errors.email = 'Email wajib diisi.';
-                        else if (!emailRegex.test(val)) this.errors.email = 'Format email tidak valid.';
+                        else if (!emailRegex.test(val)) this.errors.email = 'Format email tidak valid (contoh: nama@domain.com).';
                     }
                     if (field === 'password') {
                         if (!this.form.password) this.errors.password = 'Kata sandi wajib diisi.';
                         else if (this.form.password.length < 8) this.errors.password = 'Kata sandi minimal 8 karakter.';
+                        if (this.form.password_confirmation) this.validateField('password_confirmation');
                     }
                     if (field === 'password_confirmation') {
                         if (!this.form.password_confirmation) this.errors.password_confirmation = 'Konfirmasi kata sandi wajib diisi.';
                         else if (this.form.password !== this.form.password_confirmation) this.errors.password_confirmation = 'Konfirmasi kata sandi tidak cocok.';
                     }
                     if (field === 'business_name') {
-                        if (!this.form.business_name.trim()) this.errors.business_name = 'Nama usaha wajib diisi.';
+                        var val = (this.form.business_name || '').trim();
+                        if (!val) this.errors.business_name = 'Nama usaha wajib diisi.';
+                        else if (val.length < 3) this.errors.business_name = 'Nama usaha minimal 3 karakter.';
                     }
                     if (field === 'owner_name') {
                         var val = (this.form.owner_name || '').trim();
-                        var nameRegex = /^[a-zA-Z\s]+$/;
+                        var nameRegex = /^[a-zA-Z\s'.]+$/;
                         if (!val) {
                             this.errors.owner_name = 'Nama pemilik wajib diisi.';
+                        } else if (val.length < 2) {
+                            this.errors.owner_name = 'Nama pemilik minimal 2 karakter.';
                         } else if (!nameRegex.test(val)) {
                             this.errors.owner_name = 'Nama pemilik hanya boleh berisi huruf dan spasi.';
                         }
                     }
                     if (field === 'phone') {
-                        if (!this.form.phone.trim()) this.errors.phone = 'Nomor telepon/WhatsApp wajib diisi.';
+                        this.form.phone = (this.form.phone || '').replace(/[^0-9]/g, '');
+                        if (!this.form.phone) {
+                            this.errors.phone = 'Nomor WhatsApp wajib diisi.';
+                        } else if (this.form.phone.length < 10) {
+                            this.errors.phone = 'Nomor WhatsApp minimal 10 digit angka.';
+                        } else if (this.form.phone.length > 15) {
+                            this.errors.phone = 'Nomor WhatsApp maksimal 15 digit angka.';
+                        }
                     }
                     if (field === 'address') {
-                        if (!this.form.address.trim()) this.errors.address = 'Alamat dapur wajib diisi.';
+                        var val = (this.form.address || '').trim();
+                        if (!val) this.errors.address = 'Alamat operasional dapur wajib diisi.';
+                        else if (val.length < 5) this.errors.address = 'Alamat operasional minimal 5 karakter.';
                     }
                 },
                 validateAll: function() {
@@ -225,12 +239,18 @@
 
                 <!-- Nomor Telepon -->
                 <div>
-                    <label for="phone" class="block text-gray-700 mb-1.5">Nomor WhatsApp Operasional</label>
-                    <input type="text"
+                    <div class="flex items-center justify-between mb-1.5">
+                        <label for="phone" class="block text-gray-700">Nomor WhatsApp Operasional</label>
+                        <span class="text-[10px] text-gray-400 font-normal">Hanya angka (10–15 digit)</span>
+                    </div>
+                    <input type="tel"
                            id="phone"
                            name="phone"
+                           inputmode="numeric"
+                           pattern="[0-9]*"
+                           maxlength="15"
                            x-model="form.phone"
-                           @input="validateField('phone')"
+                           @input="form.phone = form.phone.replace(/[^0-9]/g, ''); validateField('phone')"
                            required
                            placeholder="contoh: 081234567890"
                            class="w-full px-4 py-3 rounded-xl bg-[#f1f2f4] text-gray-900 text-xs font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ea580c] border-0 transition">

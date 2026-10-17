@@ -31,6 +31,23 @@ class SupplierRegistrationTest extends TestCase
         $response->assertSessionHasErrors(['email', 'password']);
     }
 
+    public function test_supplier_validation_fails_with_invalid_phone_or_nib(): void
+    {
+        $response = $this->post('/register/supplier', [
+            'email' => 'supplier_valid@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'company_name' => 'Kelompok Tani Makmur',
+            'phone' => '0812phone_number',
+            'nib_number' => '12345678901234567890123',
+        ]);
+
+        $response->assertSessionHasErrors([
+            'phone' => 'Nomor WhatsApp Operasional hanya boleh berisi angka.',
+            'nib_number' => 'Nomor NIB maksimal 20 digit angka.',
+        ]);
+    }
+
     public function test_new_supplier_can_register(): void
     {
         $commodity = Commodity::create([

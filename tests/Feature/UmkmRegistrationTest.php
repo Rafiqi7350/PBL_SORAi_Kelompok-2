@@ -78,7 +78,38 @@ class UmkmRegistrationTest extends TestCase
         ]);
 
         $response->assertSessionHasErrors([
-            'owner_name' => 'Nama pemilik hanya boleh berisi huruf dan spasi.',
+            'owner_name' => 'Nama pemilik hanya boleh berisi huruf, spasi, atau tanda petik.',
+        ]);
+    }
+
+    public function test_umkm_validation_fails_when_phone_contains_letters_or_invalid_length(): void
+    {
+        $response = $this->post('/register/umkm', [
+            'email' => 'valid_user2@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'business_name' => 'Dapur Uji',
+            'owner_name' => 'Irlangsa Eka',
+            'phone' => '0812abc345',
+            'address' => 'Jl. Pengujian No. 123, Malang',
+        ]);
+
+        $response->assertSessionHasErrors([
+            'phone' => 'Nomor WhatsApp hanya boleh berisi angka.',
+        ]);
+
+        $shortResponse = $this->post('/register/umkm', [
+            'email' => 'valid_user3@example.com',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+            'business_name' => 'Dapur Uji',
+            'owner_name' => 'Irlangsa Eka',
+            'phone' => '08123',
+            'address' => 'Jl. Pengujian No. 123, Malang',
+        ]);
+
+        $shortResponse->assertSessionHasErrors([
+            'phone' => 'Nomor WhatsApp minimal 10 digit angka.',
         ]);
     }
 
