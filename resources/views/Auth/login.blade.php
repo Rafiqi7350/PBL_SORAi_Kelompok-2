@@ -10,30 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 
-    <!-- Tailwind CSS CDN v3 -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              'sorai-orange': '#ea580c',
-              'sorai-orange-hover': '#c2410c',
-              'sorai-bg': '#f3f4f6',
-              'sorai-input': '#f1f2f4',
-            },
-            fontFamily: {
-              sans: ['Plus Jakarta Sans', 'sans-serif'],
-              mono: ['JetBrains Mono', 'monospace'],
-            }
-          }
-        }
-      }
-    </script>
-
-    <!-- Styles & Scripts via Vite & Alpine -->
+    <!-- Styles & Scripts via Vite -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     <style>
         [x-cloak] { display: none !important; }
@@ -49,8 +27,8 @@
     <!-- Hidden accessibility text to ensure test compatibility -->
     <div class="sr-only">MASUK KE PORTAL SORAi</div>
 
-    <!-- Main Content: Login Card -->
-    <main class="w-full max-w-md mx-auto px-4 py-8 my-auto flex-grow flex flex-col justify-center" x-data="{ showPassword: false }">
+    <!-- Main Content: Login Card with Smooth Page Entrance Animation -->
+    <main class="w-full max-w-md mx-auto px-4 py-8 my-auto flex-grow flex flex-col justify-center animate-page-enter" x-data="{ showPassword: false }">
 
         <!-- CTA Kembali ke Landing Page -->
         <div class="w-full mb-4 flex items-center justify-start px-1">

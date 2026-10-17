@@ -2,30 +2,37 @@
     'stepNumber',
     'title',
     'description',
-    'cardBg' => 'bg-white',
-    'titleColor' => 'text-gray-900',
-    'subTextColor' => 'text-gray-600',
-    'iconBg' => 'bg-amber-100',
-    'iconColor' => 'text-[#DC4E00]',
+    'badge' => null,
+    'iconBg' => 'bg-orange-50',
+    'iconColor' => 'text-orange-600',
     'icon' => null
 ])
 
-<div class="{{ $cardBg }} rounded-[2.5rem] p-6 sm:p-8 pt-12 sm:pt-14 text-center shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-2 flex flex-col items-center justify-between relative group overflow-visible border border-black/5">
-    
-    <div class="absolute -top-8 left-1/2 -translate-x-1/2 z-10">
-        <div class="w-16 h-16 rounded-full {{ $iconBg }} {{ $iconColor }} flex items-center justify-center shadow-md border-4 border-[#FAF2DE] group-hover:scale-110 transition-transform duration-300">
-            {!! $icon !!}
+<div class="bg-white rounded-2xl p-7 lg:p-9 border border-slate-200/80 shadow-xs hover:shadow-md hover:border-orange-200 transition-all duration-300 flex flex-col justify-between relative group">
+    <div>
+        <div class="flex items-center justify-between mb-6">
+            <div class="w-12 h-12 rounded-xl {{ $iconBg }} {{ $iconColor }} flex items-center justify-center group-hover:scale-105 transition-transform">
+                {!! $icon !!}
+            </div>
+            <span class="font-mono text-3xl font-black text-slate-200 group-hover:text-orange-200 transition-colors">
+                0{{ $stepNumber }}
+            </span>
         </div>
-    </div>
 
-    <div class="flex flex-col items-center">
-        <h3 class="font-extrabold text-xl sm:text-2xl {{ $titleColor }} mb-3 tracking-tight leading-snug text-center">
+        <h3 class="font-bold text-slate-900 text-lg lg:text-xl tracking-tight mb-3 leading-snug">
             {{ $title }}
         </h3>
 
-        <p class="{{ $subTextColor }} text-sm sm:text-base leading-relaxed text-center font-normal">
+        <p class="text-slate-600 text-sm lg:text-base leading-relaxed">
             {{ $description }}
         </p>
     </div>
 
+    @if(!empty($badge))
+        <div class="mt-8 pt-5 border-t border-slate-100 flex items-center text-xs font-semibold text-slate-500">
+            <span class="text-orange-600 font-medium">{{ $badge }}</span>
+        </div>
+    @endif
 </div>
+
+
