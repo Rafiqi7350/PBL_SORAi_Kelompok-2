@@ -7,6 +7,7 @@ use App\Models\SupplierProfile;
 use App\Models\UmkmProfile;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
 
@@ -169,5 +170,62 @@ class LoginTest extends TestCase
 
         $this->assertAuthenticatedAs($umkm);
         $loginResponse->assertRedirect(route('umkm.katalog.index'));
+    }
+
+    public function test_user_can_login_with_remember_me(): void
+    {
+        $user = User::create([
+            'email' => 'remember_user@test.com',
+            'password' => Hash::make('password123'),
+            'role' => 'umkm',
+            'status' => 'active',
+        ]);
+
+        UmkmProfile::create([
+            'user_id' => $user->id,
+            'business_name' => 'Dapur Ingat Saya',
+            'owner_name' => 'Pak Ingat',
+            'phone' => '081234567890',
+            'address' => 'Jl. Kenangan No. 1',
+        ]);
+
+        $response = $this->post('/login', [
+            'email' => 'remember_user@test.com',
+            'password' => 'password123',
+            'remember' => '1',
+        ]);
+
+        $this->assertAuthenticatedAs($user);
+        $response->assertRedirect(route('umkm.katalog.index'));
+        $this->assertNotNull($user->fresh()->remember_token);
+        $response->assertCookie(Auth::guard()->getRecallerName());
+    }
+
+    public function test_user_can_login_with_remember_me_checkbox_value_on(): void
+    {
+        $user = User::create([
+            'email' => 'remember_on@test.com',
+            'password' => Hash::make('password123'),
+            'role' => 'umkm',
+            'status' => 'active',
+        ]);
+
+        UmkmProfile::create([
+            'user_id' => $user->id,
+            'business_name' => 'Dapur Ingat On',
+            'owner_name' => 'Pak On',
+            'phone' => '081234567890',
+            'address' => 'Jl. Kenangan No. 2',
+        ]);
+
+        $response = $this->post('/login', [
+            'email' => 'remember_on@test.com',
+            'password' => 'password123',
+            'remember' => 'on',
+        ]);
+
+        $this->assertAuthenticatedAs($user);
+        $response->assertRedirect(route('umkm.katalog.index'));
+        $this->assertNotNull($user->fresh()->remember_token);
     }
 }
