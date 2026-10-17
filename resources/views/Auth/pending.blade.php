@@ -10,29 +10,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
 
-    <!-- Tailwind CSS CDN v3 -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        theme: {
-          extend: {
-            colors: {
-              'sorai-orange': '#ea580c',
-              'sorai-orange-hover': '#c2410c',
-              'sorai-bg': '#f3f4f6',
-              'sorai-input': '#f1f2f4',
-            },
-            fontFamily: {
-              sans: ['Plus Jakarta Sans', 'sans-serif'],
-              mono: ['JetBrains Mono', 'monospace'],
-            }
-          }
-        }
-      }
-    </script>
-
+    <!-- Styles & Scripts via Vite -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     <style>
         [x-cloak] { display: none !important; }
@@ -113,8 +92,8 @@
 </head>
 <body class="min-h-screen bg-[#f3f4f6] text-gray-900 font-sans flex flex-col justify-between antialiased selection:bg-[#ea580c] selection:text-white">
 
-    <!-- Main Content: Loading & Pending Card -->
-    <main class="w-full max-w-xl mx-auto px-4 py-8 my-auto flex-grow flex flex-col justify-center"
+    <!-- Main Content: Loading & Pending Card with Smooth Entrance Animation -->
+    <main class="w-full max-w-xl mx-auto px-4 py-8 my-auto flex-grow flex flex-col justify-center animate-page-enter"
           x-data="pendingStatusPage('{{ $email }}', '{{ $status }}')">
 
         <div class="w-full bg-white rounded-[2.5rem] p-8 sm:p-12 shadow-[0_10px_35px_rgba(0,0,0,0.06)] text-center space-y-6 transition-all duration-300">
