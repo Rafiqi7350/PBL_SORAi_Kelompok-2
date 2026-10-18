@@ -17,14 +17,56 @@
             pendingPaymentCount: {{ $pendingPaymentCount ?? 0 }},
 
             planningForm: {
-                commodity: 'Daging Ayam Broiler Segar',
+                commodity: '{{ $availableCommodities->first()?->name ?? "Daging Ayam Broiler Segar" }}',
                 volume: 200,
-                targetDate: '2026-11',
-                supplier: 'Kelompok Tani Poultry Malang',
+                unit: 'kg',
+                targetDate: '{{ now()->addMonth()->format("Y-m") }}',
+                supplier_id: '{{ $availableSuppliers->first()?->id ?? "" }}',
                 notes: 'Standar potongan karkas dingin, pengiriman pagi pukul 05:00 WIB.'
             },
 
             supplyPlans: @json($supplyPlans ?? []),
+            planningFilterStatus: 'all',
+            planningSearchQuery: '',
+
+            get filteredSupplyPlans() {
+                var self = this;
+                return this.supplyPlans.filter(function(p) {
+                    var matchStatus = (self.planningFilterStatus === 'all') || (p.status === self.planningFilterStatus);
+                    var q = self.planningSearchQuery.toLowerCase().trim();
+                    var matchQuery = !q || (p.commodity && p.commodity.toLowerCase().includes(q)) || (p.supplier && p.supplier.toLowerCase().includes(q)) || (p.id && p.id.toLowerCase().includes(q));
+                    return matchStatus && matchQuery;
+                });
+            },
+            get planningCountApproved() {
+                return this.supplyPlans.filter(function(p) { return p.status === 'DISETUJUI'; }).length;
+            },
+            get planningCountAdjusted() {
+                return this.supplyPlans.filter(function(p) { return p.status === 'DISESUAIKAN'; }).length;
+            },
+            get planningCountPending() {
+                return this.supplyPlans.filter(function(p) { return p.status === 'MENUNGGU_KONFIRMASI' || p.status === 'DALAM_REVIEW'; }).length;
+            },
+            getSelectedSupplierName: function() {
+                var suppliers = @json($availableSuppliers ?? []);
+                for (var i = 0; i < suppliers.length; i++) {
+                    if (suppliers[i].id === this.planningForm.supplier_id) {
+                        return suppliers[i].company_name;
+                    }
+                }
+                return 'Pemasok Mitra Terpilih';
+            },
+            formatMonthPreview: function(ym) {
+                if (!ym) return '-';
+                var parts = ym.split('-');
+                if (parts.length !== 2) return ym;
+                var monthNames = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+                var m = parseInt(parts[1], 10);
+                if (m >= 1 && m <= 12) {
+                    return monthNames[m - 1] + ' ' + parts[0];
+                }
+                return ym;
+            },
 
             formVolume: 100,
             formFrequency: '2x Seminggu (Senin & Kamis)',
@@ -527,158 +569,420 @@
     <!-- ========================================================= -->
     <div x-cloak x-show="activeTab === 'supply-planning'" class="space-y-6">
 
-        <!-- HEADER TITLE -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-gray-200">
-            <div>
-                <span class="text-xs font-mono font-bold text-[#ea580c] uppercase tracking-wider">KOLABORASI RANTAI PASOK MITRA</span>
-                <h2 class="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">Collaborative Supply Planning</h2>
-                <p class="text-xs text-gray-500 mt-0.5">Sampaikan estimasi proyeksi kebutuhan dapur UMKM bulan depan agar pemasok mitra dapat merencanakan kapasitas panen dan ternak secara presisi tanpa risiko kelangkaan stok.</p>
+        <!-- 1. HERO HEADER WITH KPI CHIPS (SOLID ORANGE) -->
+        <div class="rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden bg-[#ea580c]" style="background-color: #ea580c;">
+            <!-- Ambient subtle blur accents -->
+            <div class="absolute -right-16 -top-16 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
+            <div class="absolute -left-12 -bottom-12 w-48 h-48 bg-white/5 rounded-full blur-xl pointer-events-none"></div>
+
+            <div class="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                <div class="space-y-2 max-w-2xl">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 backdrop-blur-md text-[11px] font-bold tracking-wider uppercase text-white border border-white/25">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <span>Kolaborasi Rantai Pasok Pangan</span>
+                    </div>
+                    <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+                        Collaborative Supply Planning
+                    </h2>
+                    <p class="text-xs sm:text-sm text-orange-50/95 leading-relaxed">
+                        Sampaikan estimasi proyeksi kebutuhan bahan baku dapur Anda untuk periode mendatang. Pemasok mitra dapat merencanakan kuota panen & persediaan secara presisi tanpa risiko kelangkaan stok.
+                    </p>
+                </div>
+
+                <!-- 4 Quick Stats Pills (Clean Uniform White Contrast) -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 bg-white/15 backdrop-blur-md p-3 rounded-2xl border border-white/25">
+                    <div class="px-3.5 py-2.5 rounded-xl bg-white/15 text-center">
+                        <span class="block text-[10px] text-white/80 uppercase font-mono font-bold tracking-wider">Total Rencana</span>
+                        <span class="text-xl font-black text-white" x-text="supplyPlans.length"></span>
+                    </div>
+                    <div class="px-3.5 py-2.5 rounded-xl bg-white/15 text-center">
+                        <span class="block text-[10px] text-white/80 uppercase font-mono font-bold tracking-wider">Siap 100%</span>
+                        <span class="text-xl font-black text-white" x-text="planningCountApproved"></span>
+                    </div>
+                    <div class="px-3.5 py-2.5 rounded-xl bg-white/15 text-center">
+                        <span class="block text-[10px] text-white/80 uppercase font-mono font-bold tracking-wider">Disesuaikan</span>
+                        <span class="text-xl font-black text-white" x-text="planningCountAdjusted"></span>
+                    </div>
+                    <div class="px-3.5 py-2.5 rounded-xl bg-white/15 text-center">
+                        <span class="block text-[10px] text-white/80 uppercase font-mono font-bold tracking-wider">Menunggu</span>
+                        <span class="text-xl font-black text-white" x-text="planningCountPending"></span>
+                    </div>
+                </div>
             </div>
-            <div class="flex items-center gap-2">
-                <span class="bg-orange-50 border border-orange-200 text-[#ea580c] px-3.5 py-1.5 rounded-full text-xs font-bold font-mono">
-                    Proyeksi Q4 2026
+        </div>
+
+        <!-- 2. MAIN 2-COLUMN SECTION: FORM (LEFT) & MANFAAT (RIGHT) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+            <!-- LEFT: FORM INPUT ESTIMASI (8 COLS) -->
+            <div class="lg:col-span-8 bg-white rounded-3xl p-6 sm:p-7 border border-gray-200/80 shadow-sm space-y-6">
+                <div class="flex items-center gap-3 border-b border-gray-100 pb-4">
+                    <div class="w-10 h-10 rounded-2xl bg-orange-50 border border-orange-100 text-[#ea580c] flex items-center justify-center font-bold text-lg shadow-xs">
+                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base sm:text-lg font-extrabold text-gray-900 tracking-tight">Formulir Estimasi Kebutuhan Pasokan</h3>
+                        <p class="text-xs text-gray-500">Kirimkan estimasi kuantitas dapur untuk periode mendatang langsung ke pemasok.</p>
+                    </div>
+                </div>
+
+                <form action="{{ route('umkm.supply-planning.store') }}" method="POST" class="space-y-5 text-xs font-semibold">
+                    @csrf
+
+                    <!-- Group 1: Pemasok & Komoditas -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block mb-1.5 text-gray-700 font-bold">
+                                Mitra Pemasok Terpilih <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <select name="supplier_id" x-model="planningForm.supplier_id" required class="w-full pl-3.5 pr-8 py-3 rounded-2xl bg-[#f1f2f4] text-gray-800 font-medium border-0 focus:outline-none focus:ring-2 focus:ring-[#ea580c] appearance-none cursor-pointer">
+                                    <option value="" disabled>-- Pilih Mitra Pemasok --</option>
+                                    @forelse($availableSuppliers as $sup)
+                                        <option value="{{ $sup->id }}">{{ $sup->company_name }} ({{ $sup->delivery_area ?? 'Lokal' }})</option>
+                                    @empty
+                                        <option value="" disabled>Belum ada pemasok terdaftar</option>
+                                    @endforelse
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block mb-1.5 text-gray-700 font-bold">
+                                Komoditas Bahan Baku <span class="text-red-500">*</span>
+                            </label>
+                            <div class="relative">
+                                <select name="commodity_name" x-model="planningForm.commodity" required class="w-full pl-3.5 pr-8 py-3 rounded-2xl bg-[#f1f2f4] text-gray-800 font-medium border-0 focus:outline-none focus:ring-2 focus:ring-[#ea580c] appearance-none cursor-pointer">
+                                    @forelse($availableCommodities as $comm)
+                                        <option value="{{ $comm->name }}">{{ $comm->name }} ({{ $comm->category }})</option>
+                                    @empty
+                                        <option>Daging Ayam Broiler Segar</option>
+                                        <option>Bawang Merah Biru Probolinggo</option>
+                                        <option>Telur Ayam Ras Grade A</option>
+                                        <option>Cabai Rawit Merah Super</option>
+                                        <option>Daging Sapi Lokal Segar</option>
+                                    @endforelse
+                                </select>
+                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Group 2: Estimasi Volume + Satuan & Periode Bulan -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block mb-1.5 text-gray-700 font-bold">
+                                Estimasi Kuantitas & Satuan <span class="text-red-500">*</span>
+                            </label>
+                            <div class="flex rounded-2xl overflow-hidden bg-[#f1f2f4] focus-within:ring-2 focus-within:ring-[#ea580c]">
+                                <input type="number" step="0.1" min="0.1" name="estimated_quantity" x-model="planningForm.volume" required placeholder="Contoh: 200" class="w-full p-3 bg-transparent text-gray-800 font-bold border-0 focus:outline-none" />
+                                <select name="unit" x-model="planningForm.unit" class="bg-gray-200/80 px-3 py-3 text-gray-700 font-bold border-0 focus:outline-none cursor-pointer text-xs">
+                                    @forelse($availableUnits as $unit)
+                                        <option value="{{ $unit->name }}">{{ $unit->name }} ({{ $unit->symbol }})</option>
+                                    @empty
+                                        <option value="kg">kg</option>
+                                        <option value="liter">liter</option>
+                                        <option value="pcs">pcs</option>
+                                        <option value="ikat">ikat</option>
+                                        <option value="karung">karung</option>
+                                        <option value="dus">dus</option>
+                                    @endforelse
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="block mb-1.5 text-gray-700 font-bold">
+                                Periode Bulan Target <span class="text-red-500">*</span>
+                            </label>
+                            <input type="month" name="period_month_year" x-model="planningForm.targetDate" value="{{ now()->addMonth()->format('Y-m') }}" required class="w-full p-3 rounded-2xl bg-[#f1f2f4] text-gray-800 font-bold border-0 focus:outline-none focus:ring-2 focus:ring-[#ea580c]" />
+                        </div>
+                    </div>
+
+                    <!-- Group 3: Catatan Khusus Kebutuhan Dapur -->
+                    <div>
+                        <label class="block mb-1.5 text-gray-700 font-bold">
+                            Catatan Khusus Kebutuhan Dapur (Opsional)
+                        </label>
+                        <textarea name="notes" x-model="planningForm.notes" rows="3" placeholder="Contoh: Potongan dada fillet dingin 4°C, pengiriman subuh jam 05.00 WIB 2x seminggu..." class="w-full p-3.5 rounded-2xl bg-[#f1f2f4] text-gray-800 font-medium border-0 focus:outline-none focus:ring-2 focus:ring-[#ea580c]"></textarea>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-gray-100">
+                        <span class="text-[11px] text-gray-500 font-medium flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-[#ea580c]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Data langsung disinkronkan ke dasbor mitra
+                        </span>
+                        <button type="submit" class="w-full sm:w-auto bg-[#ea580c] hover:bg-[#c2410c] text-white px-7 py-3 rounded-full font-bold shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 cursor-pointer active:scale-95">
+                            <span>Kirim Estimasi ke Pemasok</span>
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- RIGHT: MANFAAT & ALUR KOLABORASI (4 COLS) -->
+            <div class="lg:col-span-4 space-y-5">
+                <div class="bg-white rounded-3xl p-6 border border-gray-200/80 shadow-sm space-y-4">
+                    <div class="flex items-center gap-2 pb-2 border-b border-gray-100">
+                        <div class="w-8 h-8 rounded-xl bg-orange-50 text-[#ea580c] border border-orange-100 flex items-center justify-center font-bold text-sm">
+                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                            </svg>
+                        </div>
+                        <h4 class="text-xs font-mono font-bold uppercase tracking-wider text-gray-800">
+                            Keuntungan Perencanaan
+                        </h4>
+                    </div>
+
+                    <div class="space-y-3.5 text-xs">
+                        <div class="flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-xl bg-orange-50 text-[#ea580c] border border-orange-100 flex items-center justify-center shrink-0">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h5 class="font-bold text-gray-900">Sinkronisasi Siklus Panen</h5>
+                                <p class="text-[11px] text-gray-500 leading-relaxed mt-0.5">Petani/pemasok menyiapkan kapasitas kandang & panen sesuai kebutuhan bulanan Anda.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h5 class="font-bold text-gray-900">Proteksi Stabilitas Harga Grosir</h5>
+                                <p class="text-[11px] text-gray-500 leading-relaxed mt-0.5">Dapur terhindar dari lonjakan harga mendadak akibat kelangkaan bahan di pasar eceran.</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h5 class="font-bold text-gray-900">Prioritas Pasokan Subuh</h5>
+                                <p class="text-[11px] text-gray-500 leading-relaxed mt-0.5">Dapur Anda masuk antrean alokasi pengiriman pertama sebelum operasional dimulai.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3-Step Flow Checklist -->
+                    <div class="pt-3 border-t border-gray-100 space-y-2">
+                        <span class="text-[10px] font-mono font-bold uppercase text-gray-400 block tracking-wider">Alur Kerja Kolaborasi</span>
+                        <div class="space-y-2 text-[11px] text-gray-600 font-medium">
+                            <div class="flex items-center gap-2">
+                                <span class="w-5 h-5 rounded-full bg-orange-100 text-[#ea580c] text-[10px] font-bold flex items-center justify-center shrink-0">1</span>
+                                <span>UMKM kirim estimasi kebutuhan</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="w-5 h-5 rounded-full bg-orange-100 text-[#ea580c] text-[10px] font-bold flex items-center justify-center shrink-0">2</span>
+                                <span>Pemasok konfirmasi kuota pasokan</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <span class="w-5 h-5 rounded-full bg-orange-100 text-[#ea580c] text-[10px] font-bold flex items-center justify-center shrink-0">3</span>
+                                <span>Pasokan terjamin aman & stabil</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- 3. SECTION: RIWAYAT & STATUS KESEPAKATAN SUPPLY PLANNING -->
+        <div class="bg-white rounded-3xl border border-gray-200/80 shadow-sm p-6 sm:p-7 space-y-6">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+                <div>
+                    <h3 class="font-extrabold text-lg text-gray-900 tracking-tight">Riwayat Estimasi &amp; Status Respon Mitra</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">Pantau konfirmasi kesiapan panen dan alokasi kuota pasokan dari pemasok mitra untuk dapur Anda.</p>
+                </div>
+                <span class="text-xs font-mono font-bold text-gray-600 bg-gray-50 border border-gray-200 px-3.5 py-1.5 rounded-full self-start sm:self-auto">
+                    Total: <span class="text-[#ea580c] font-black" x-text="supplyPlans.length"></span> Permintaan
                 </span>
             </div>
-        </div>
 
-        <!-- 3 VALUE HIGHLIGHT CARDS -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm space-y-2">
-                <div class="w-9 h-9 rounded-full bg-orange-100 text-[#ea580c] flex items-center justify-center font-bold text-lg">
-                    🌾
-                </div>
-                <h4 class="font-bold text-sm text-gray-900">Sinkronisasi Panen & Ternak</h4>
-                <p class="text-xs text-gray-500 leading-relaxed">Pemasok mitra menyiapkan kapasitas kandang dan petik ladang sesuai proyeksi bulanan dapur Anda.</p>
-            </div>
-
-            <div class="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm space-y-2">
-                <div class="w-9 h-9 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold text-lg">
-                    🔒
-                </div>
-                <h4 class="font-bold text-sm text-gray-900">Kunci Stabilitas Harga Grosir</h4>
-                <p class="text-xs text-gray-500 leading-relaxed">Melindungi margin operasional dapur dari volatilitas dan lonjakan harga pasar eceran mendadak.</p>
-            </div>
-
-            <div class="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm space-y-2">
-                <div class="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-lg">
-                    🚚
-                </div>
-                <h4 class="font-bold text-sm text-gray-900">Prioritas Suplai Subuh Hari</h4>
-                <p class="text-xs text-gray-500 leading-relaxed">Pesanan Anda masuk ke antrean pemotongan dan distribusi pertama sebelum jam 07.00 WIB pagi.</p>
-            </div>
-        </div>
-
-        <!-- FORM COLLABORATIVE SUPPLY PLANNING -->
-        <div class="bg-white p-6 sm:p-7 rounded-3xl shadow-sm border border-gray-100 space-y-5">
-            <div class="flex items-center gap-3 border-b border-gray-100 pb-4">
-                <div class="w-10 h-10 rounded-2xl bg-[#ea580c] text-white flex items-center justify-center shadow-md">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                    </svg>
-                </div>
-                <div>
-                    <h3 class="font-bold text-lg text-gray-900">Form Pengajuan Proyeksi Pasokan Dapur</h3>
-                    <p class="text-xs text-gray-500">Estimasi ini akan dikirimkan langsung ke dashboard pemasok mitra untuk dicocokkan dengan siklus panen.</p>
-                </div>
-            </div>
-
-            <form @submit.prevent="sendSupplyPlan()" class="space-y-4 text-xs font-semibold">
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div>
-                        <label class="block mb-1.5 text-gray-700">Pilih Komoditas Pasokan:</label>
-                        <select x-model="planningForm.commodity" class="w-full p-3 rounded-2xl bg-[#f1f2f4] text-gray-800 font-medium border-0 focus:outline-none focus:ring-2 focus:ring-[#ea580c]">
-                            <option>Daging Ayam Broiler Segar</option>
-                            <option>Bawang Merah Biru Probolinggo</option>
-                            <option>Telur Ayam Ras Grade A</option>
-                            <option>Cabai Rawit Merah Super</option>
-                            <option>Daging Sapi Lokal Segar</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block mb-1.5 text-gray-700">Mitra Pemasok Terpilih:</label>
-                        <select x-model="planningForm.supplier" class="w-full p-3 rounded-2xl bg-[#f1f2f4] text-gray-800 font-medium border-0 focus:outline-none focus:ring-2 focus:ring-[#ea580c]">
-                            <option>Kelompok Tani Poultry Malang</option>
-                            <option>Distributor Rempah Nusantara</option>
-                            <option>Peternakan Ayam Bertelur Blitar</option>
-                            <option>Kelompok Tani Sayur Batu</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block mb-1.5 text-gray-700">Estimasi Volume (kg / satuan):</label>
-                        <input type="number" x-model="planningForm.volume" required min="1" placeholder="Contoh: 200" class="w-full p-3 rounded-2xl bg-[#f1f2f4] text-gray-800 font-medium border-0 focus:outline-none focus:ring-2 focus:ring-[#ea580c]" />
-                    </div>
-
-                    <div>
-                        <label class="block mb-1.5 text-gray-700">Proyeksi Bulan Target:</label>
-                        <input type="month" x-model="planningForm.targetDate" required class="w-full p-3 rounded-2xl bg-[#f1f2f4] text-gray-800 font-medium border-0 focus:outline-none focus:ring-2 focus:ring-[#ea580c]" />
-                    </div>
+            <!-- FILTER BAR: PENCARIAN & FILTERING PANJANG MENYATU SAMPAI KE SAMPING -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-3 w-full">
+                <!-- Field Cari Full Width di Kolom Kiri -->
+                <div class="md:col-span-5 lg:col-span-6 relative w-full">
+                    <span class="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-gray-400">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                    </span>
+                    <input type="text"
+                           x-model="planningSearchQuery"
+                           placeholder="Cari komoditas bahan baku atau nama pemasok mitra..."
+                           class="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-[#f1f2f4] text-xs font-medium text-gray-800 placeholder-gray-400 border-0 focus:outline-none focus:ring-2 focus:ring-[#ea580c] transition" />
                 </div>
 
-                <div>
-                    <label class="block mb-1.5 text-gray-700">Catatan Khusus Kebutuhan Dapur (Opsional):</label>
-                    <input type="text" x-model="planningForm.notes" placeholder="Contoh: Potongan dada fillet suhu dingin, frekuensi pengiriman 2x seminggu subuh..." class="w-full p-3 rounded-2xl bg-[#f1f2f4] text-gray-800 font-medium border-0 focus:outline-none focus:ring-2 focus:ring-[#ea580c]" />
-                </div>
-
-                <div class="flex justify-end pt-2">
-                    <button type="submit" class="bg-[#ea580c] hover:bg-[#c2410c] text-white px-8 py-3 rounded-full font-bold shadow-sm transition inline-flex items-center gap-2 cursor-pointer">
-                        <span>Kirim Estimasi Proyeksi ke Pemasok</span>
-                        <span>→</span>
+                <!-- Filtering Buttons Full Width di Kolom Kanan Menempel ke Ujung Samping -->
+                <div class="md:col-span-7 lg:col-span-6 grid grid-cols-4 gap-1.5 bg-[#f1f2f4] p-1.5 rounded-2xl text-xs font-bold w-full">
+                    <button type="button"
+                            @click="planningFilterStatus = 'all'"
+                            :class="planningFilterStatus === 'all' ? 'bg-[#ea580c] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'"
+                            class="py-2 px-1 text-center rounded-xl transition text-[11px] cursor-pointer flex items-center justify-center gap-1">
+                        <span>Semua</span>
+                        <span class="opacity-80 font-mono text-[10px]" x-text="'(' + supplyPlans.length + ')'"></span>
+                    </button>
+                    <button type="button"
+                            @click="planningFilterStatus = 'MENUNGGU_KONFIRMASI'"
+                            :class="planningFilterStatus === 'MENUNGGU_KONFIRMASI' ? 'bg-[#ea580c] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'"
+                            class="py-2 px-1 text-center rounded-xl transition text-[11px] cursor-pointer flex items-center justify-center gap-1">
+                        <span>Menunggu</span>
+                        <span class="opacity-80 font-mono text-[10px]" x-text="'(' + planningCountPending + ')'"></span>
+                    </button>
+                    <button type="button"
+                            @click="planningFilterStatus = 'DISETUJUI'"
+                            :class="planningFilterStatus === 'DISETUJUI' ? 'bg-[#ea580c] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'"
+                            class="py-2 px-1 text-center rounded-xl transition text-[11px] cursor-pointer flex items-center justify-center gap-1">
+                        <span>Disetujui</span>
+                        <span class="opacity-80 font-mono text-[10px]" x-text="'(' + planningCountApproved + ')'"></span>
+                    </button>
+                    <button type="button"
+                            @click="planningFilterStatus = 'DISESUAIKAN'"
+                            :class="planningFilterStatus === 'DISESUAIKAN' ? 'bg-[#ea580c] text-white shadow-xs' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200/60'"
+                            class="py-2 px-1 text-center rounded-xl transition text-[11px] cursor-pointer flex items-center justify-center gap-1">
+                        <span>Disesuaikan</span>
+                        <span class="opacity-80 font-mono text-[10px]" x-text="'(' + planningCountAdjusted + ')'"></span>
                     </button>
                 </div>
-            </form>
-        </div>
-
-        <!-- RIWAYAT & STATUS KESEPAKATAN SUPPLY PLANNING -->
-        <div class="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-4">
-            <div class="flex justify-between items-center border-b border-gray-100 pb-3">
-                <div>
-                    <h3 class="font-bold text-lg text-gray-900">📋 Riwayat Proyeksi & Respon Kapasitas Mitra</h3>
-                    <p class="text-xs text-gray-500">Pantau status konfirmasi kesiapan panen dari masing-masing pemasok mitra.</p>
-                </div>
-                <span class="text-xs font-mono font-bold text-[#ea580c]" x-text="supplyPlans.length + ' Proyeksi Tercatat'"></span>
             </div>
 
-            <div class="overflow-x-auto">
+            <!-- TABLE -->
+            <div class="overflow-x-auto rounded-2xl border border-gray-100">
                 <table class="w-full text-xs text-left">
-                    <thead class="bg-gray-50 font-mono text-gray-500 uppercase border-b border-gray-100">
+                    <thead class="bg-gray-50/80 font-mono text-gray-500 uppercase border-b border-gray-100 text-[11px]">
                         <tr>
-                            <th class="p-3.5">ID Proyeksi</th>
-                            <th class="p-3.5">Pemasok Mitra</th>
-                            <th class="p-3.5">Komoditas & Volume</th>
-                            <th class="p-3.5">Bulan Target</th>
+                            <th class="p-3.5">ID & Waktu</th>
+                            <th class="p-3.5">Mitra Pemasok</th>
+                            <th class="p-3.5">Bahan Baku & Volume</th>
+                            <th class="p-3.5">Periode Target</th>
                             <th class="p-3.5">Status Kolaborasi</th>
-                            <th class="p-3.5">Catatan Respon Pemasok</th>
+                            <th class="p-3.5">Catatan Respon Mitra</th>
+                            <th class="p-3.5 text-center">Aksi</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 font-medium">
-                        <template x-for="plan in supplyPlans" :key="plan.id">
-                            <tr class="hover:bg-gray-50/50 transition">
-                                <td class="p-3.5 font-mono font-bold text-[#ea580c]" x-text="plan.id"></td>
-                                <td class="p-3.5 font-bold text-gray-900" x-text="plan.supplier"></td>
-                                <td class="p-3.5">
-                                    <span class="font-semibold text-gray-900" x-text="plan.commodity"></span>
-                                    <span class="text-gray-500 font-bold block text-[11px]" x-text="plan.volume + ' ' + plan.unit"></span>
+                        <template x-for="plan in filteredSupplyPlans" :key="plan.id">
+                            <tr class="hover:bg-orange-50/20 transition">
+                                <td class="p-3.5 whitespace-nowrap">
+                                    <span class="font-mono font-extrabold text-[#ea580c] block" x-text="plan.id"></span>
+                                    <span class="text-[10px] text-gray-400 block" x-text="plan.created_at || '-'"></span>
                                 </td>
-                                <td class="p-3.5 font-bold text-gray-800" x-text="plan.targetMonth"></td>
-                                <td class="p-3.5">
-                                    <span class="px-2.5 py-1 rounded-full text-[10px] font-bold inline-block"
-                                          :class="plan.status === 'DISETUJUI' ? 'bg-emerald-100 text-emerald-800' : (plan.status === 'DITOLAK' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800')"
-                                          x-text="plan.status === 'DISETUJUI' ? '✓ Disetujui Mitra' : (plan.status === 'DITOLAK' ? '✕ Pengajuan Ditolak' : '● Menunggu Konfirmasi')">
+                                <td class="p-3.5 whitespace-nowrap">
+                                    <div class="flex items-center gap-2">
+                                        <div class="w-7 h-7 rounded-lg bg-orange-50 text-[#ea580c] border border-orange-100 flex items-center justify-center shrink-0">
+                                            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                            </svg>
+                                        </div>
+                                        <span class="font-bold text-gray-900" x-text="plan.supplier"></span>
+                                    </div>
+                                </td>
+                                <td class="p-3.5 whitespace-nowrap">
+                                    <span class="font-bold text-gray-900 block" x-text="plan.commodity"></span>
+                                    <div class="flex items-center gap-2 mt-0.5">
+                                        <span class="text-gray-600 font-mono text-[11px]" x-text="'Permintaan: ' + plan.volume + ' ' + plan.unit"></span>
+                                        <template x-if="plan.confirmed_volume">
+                                            <span class="text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md font-bold text-[10px] font-mono" x-text="'Disetujui: ' + plan.confirmed_volume + ' ' + plan.unit"></span>
+                                        </template>
+                                    </div>
+                                </td>
+                                <td class="p-3.5 font-bold text-gray-800 whitespace-nowrap">
+                                    <span class="bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full text-[11px] font-mono inline-flex items-center gap-1.5">
+                                        <svg class="w-3.5 h-3.5 text-[#ea580c]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                        <span x-text="plan.targetMonth"></span>
                                     </span>
                                 </td>
-                                <td class="p-3.5 text-gray-600 italic text-[11px]" x-text="plan.note"></td>
+                                <td class="p-3.5 whitespace-nowrap">
+                                    <template x-if="plan.status === 'DISETUJUI'">
+                                        <span class="px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
+                                            <span>Disetujui Penuh</span>
+                                        </span>
+                                    </template>
+                                    <template x-if="plan.status === 'DISESUAIKAN'">
+                                        <span class="px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1.5 bg-blue-50 text-blue-700 border border-blue-200">
+                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                                            <span>Disesuaikan Pemasok</span>
+                                        </span>
+                                    </template>
+                                    <template x-if="plan.status === 'DITOLAK'">
+                                        <span class="px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1.5 bg-rose-50 text-rose-700 border border-rose-200">
+                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                                            <span>Kapasitas Penuh</span>
+                                        </span>
+                                    </template>
+                                    <template x-if="plan.status === 'MENUNGGU_KONFIRMASI' || plan.status === 'DALAM_REVIEW'">
+                                        <span class="px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 border border-amber-200">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                            <span>Menunggu Konfirmasi</span>
+                                        </span>
+                                    </template>
+                                </td>
+                                <td class="p-3.5 text-gray-600 text-[11px] max-w-xs">
+                                    <template x-if="plan.supplier_notes">
+                                        <div class="bg-orange-50/60 border border-orange-100 rounded-xl p-2 text-gray-800 space-y-0.5">
+                                            <span class="font-bold text-[9px] text-orange-600 uppercase font-mono block">Respon Pemasok:</span>
+                                            <span x-text="plan.supplier_notes"></span>
+                                        </div>
+                                    </template>
+                                    <template x-if="!plan.supplier_notes">
+                                        <span class="italic text-gray-400" x-text="plan.note || 'Menunggu peninjauan kuota panen/stok mitra.'"></span>
+                                    </template>
+                                </td>
+                                <td class="p-3.5 text-center">
+                                    <template x-if="plan.can_delete && plan.uuid">
+                                        <form :action="'{{ url('/umkm/supply-planning') }}/' + plan.uuid" method="POST" onsubmit="return confirm('Apakah Anda yakin ingin membatalkan estimasi kebutuhan ini?');">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button type="submit" class="text-xs text-red-500 hover:text-white hover:bg-red-500 border border-red-200 px-3 py-1 rounded-full font-bold transition inline-flex items-center gap-1 shadow-xs cursor-pointer">
+                                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                <span>Batalkan</span>
+                                            </button>
+                                        </form>
+                                    </template>
+                                    <template x-if="!plan.can_delete || !plan.uuid">
+                                        <span class="text-gray-300 text-xs font-mono">—</span>
+                                    </template>
+                                </td>
                             </tr>
                         </template>
 
-                        <template x-if="supplyPlans.length === 0">
+                        <template x-if="filteredSupplyPlans.length === 0">
                             <tr>
-                                <td colspan="6" class="p-8 text-center text-gray-500">
-                                    <div class="py-6 space-y-2">
-                                        <span class="text-3xl block">📋</span>
-                                        <p class="font-bold text-gray-800 text-sm">Belum Ada Riwayat Pengajuan Kemitraan</p>
-                                        <p class="text-xs text-gray-500 max-w-sm mx-auto">Silakan ajukan permintaan kemitraan pasokan bahan baku melalui tab Katalog untuk memulai kolaborasi rantai pasok.</p>
+                                <td colspan="7" class="p-10 text-center text-gray-500">
+                                    <div class="py-8 space-y-3">
+                                        <div class="w-14 h-14 rounded-2xl bg-orange-50 text-[#ea580c] border border-orange-100 flex items-center justify-center mx-auto">
+                                            <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                            </svg>
+                                        </div>
+                                        <h4 class="font-extrabold text-gray-800 text-sm">Tidak Ada Data Estimasi Pasokan</h4>
+                                        <p class="text-xs text-gray-500 max-w-md mx-auto">
+                                            Gunakan formulir di atas untuk menyampaikan proyeksi kebutuhan bahan baku dapur Anda kepada mitra pemasok.
+                                        </p>
                                     </div>
                                 </td>
                             </tr>

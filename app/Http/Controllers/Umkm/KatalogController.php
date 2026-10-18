@@ -4,12 +4,14 @@ namespace App\Http\Controllers\Umkm;
 
 use App\Http\Controllers\Controller;
 use App\Models\Commodity;
+use App\Models\CommodityUnit;
 use App\Models\Order;
 use App\Models\Partnership;
 use App\Models\PartnershipDeliverySchedule;
 use App\Models\SupplierProduct;
+use App\Models\SupplierProfile;
+use App\Models\SupplyPlan;
 use App\Models\User;
-use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -177,22 +179,46 @@ class KatalogController extends Controller
                         'notes' => $schedule->special_instructions ?? ($partnership->submission_details ?? 'Pasokan terikat kontrak kemitraan resmi.'),
                     ];
                 }
-
-                // Format Collaborative Supply Planning (Semua pengajuan UMKM)
-                $supplyPlans[] = [
-                    'id' => 'CSP-'.strtoupper(substr($partnership->id, 0, 8)),
-                    'commodity' => $commodityName,
-                    'volume' => $totalContractVolume,
-                    'unit' => $schedule->unit,
-                    'targetMonth' => Carbon::parse($schedule->start_date ?? $partnership->created_at)->translatedFormat('F Y'),
-                    'supplier' => $supplierName,
-                    'status' => $collabStatus,
-                    'note' => $isApproved
-                        ? 'Kapasitas siap dipenuhi dengan pengiriman '.$schedule->frequency_type.'.'
-                        : ($isRejected ? 'Pemasok belum dapat memenuhi kuota pasokan yang diajukan.' : 'Sedang dalam review kapasitas gudang/ternak pemasok.'),
-                ];
             }
         }
+
+        // Ambil data riwayat Collaborative Supply Planning riil dari database untuk UMKM ini
+        $realSupplyPlans = $umkm ? SupplyPlan::with(['partnership.supplier'])
+            ->whereHas('partnership', function ($q) use ($umkm) {
+                $q->where('umkm_id', $umkm->id);
+            })
+            ->latest()
+            ->get() : collect();
+
+        $formattedSupplyPlans = $realSupplyPlans->map(function ($plan) {
+            return [
+                'id' => 'CSP-'.strtoupper(substr($plan->id, 0, 8)),
+                'uuid' => $plan->id,
+                'commodity' => $plan->commodity_name ?? 'Bahan Baku',
+                'volume' => (float) $plan->estimated_quantity,
+                'confirmed_volume' => $plan->confirmed_quantity ? (float) $plan->confirmed_quantity : null,
+                'unit' => $plan->unit ?? 'kg',
+                'targetMonth' => $plan->period_month_year,
+                'supplier' => $plan->partnership?->supplier?->company_name ?? 'Pemasok Mitra',
+                'status' => $plan->supplier_confirmation_status ?? 'MENUNGGU_KONFIRMASI',
+                'note' => $plan->notes,
+                'supplier_notes' => $plan->supplier_notes,
+                'created_at' => $plan->created_at?->format('d/m/Y H:i'),
+                'can_delete' => $plan->supplier_confirmation_status === 'MENUNGGU_KONFIRMASI',
+            ];
+        })->toArray();
+
+        // Gabungkan dengan supply plans dari schedule (jika belum ada di supply_plans)
+        $supplyPlans = ! empty($formattedSupplyPlans) ? $formattedSupplyPlans : $supplyPlans;
+
+        // Ambil daftar supplier aktif untuk dropdown form Collaborative Supply Planning
+        $availableSuppliers = SupplierProfile::whereHas('user', function ($q) {
+            $q->where('status', 'active');
+        })->orderBy('company_name')->get();
+
+        // Ambil master komoditas & satuan untuk opsi pilihan kebutuhan UMKM
+        $availableCommodities = Commodity::orderBy('name')->get();
+        $availableUnits = CommodityUnit::orderBy('name')->get();
 
         // Ambil daftar ID supplier_products yang sudah diajukan oleh UMKM ini (yang belum ditolak)
         $appliedProductIds = $umkm ? PartnershipDeliverySchedule::whereHas('partnership', function ($q) use ($umkm) {
@@ -224,6 +250,9 @@ class KatalogController extends Controller
             'sort',
             'autoOrdersList',
             'supplyPlans',
+            'availableSuppliers',
+            'availableCommodities',
+            'availableUnits',
             'appliedProductIds',
             'pendingValidationCount',
             'pendingPaymentCount'

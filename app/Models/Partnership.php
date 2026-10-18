@@ -39,4 +39,9 @@ class Partnership extends Model
     {
         return $this->hasOne(PartnershipDeliverySchedule::class, 'partnership_id')->latest('created_at');
     }
+
+    public function supplyPlans(): HasMany
+    {
+        return $this->hasMany(SupplyPlan::class, 'partnership_id');
+    }
 }
