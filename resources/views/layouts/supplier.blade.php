@@ -77,9 +77,24 @@
                     Kelola Stok (CRUD)
                 </a>
 
-                <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                    Supply Planning
+                <!-- Active Link: Supply Planning (Collaborative Supply Planning) -->
+                @php
+                    $pendingSupplyPlansCount = auth()->user()?->supplierProfile
+                        ? \App\Models\SupplyPlan::whereHas('partnership', fn($q) => $q->where('supplier_id', auth()->user()->supplierProfile->id))
+                            ->where('supplier_confirmation_status', 'MENUNGGU_KONFIRMASI')->count()
+                        : 0;
+                @endphp
+                <a href="{{ route('supplier.supply-planning.index') }}" class="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition
+                    {{ request()->routeIs('supplier.supply-planning.*') ? 'bg-[#ea580c] text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        Supply Planning
+                    </div>
+                    @if($pendingSupplyPlansCount > 0)
+                        <span class="{{ request()->routeIs('supplier.supply-planning.*') ? 'bg-white text-[#ea580c]' : 'bg-[#ea580c] text-white' }} text-[10px] font-black px-2 py-0.5 rounded-full">
+                            {{ $pendingSupplyPlansCount }}
+                        </span>
+                    @endif
                 </a>
 
                 <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">

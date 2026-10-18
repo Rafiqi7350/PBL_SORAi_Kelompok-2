@@ -11,6 +11,8 @@ use App\Http\Controllers\Auth\SupplierRegisterController;
 use App\Http\Controllers\Auth\UmkmRegisterController;
 use App\Http\Controllers\Supplier\KatalogSupplierController;
 use App\Http\Controllers\Supplier\PengajuanMasukController;
+use App\Http\Controllers\Supplier\SupplyPlanningController as SupplierSupplyPlanningController;
+use App\Http\Controllers\Umkm\CollaborativeSupplyPlanningController;
 use App\Http\Controllers\Umkm\KatalogController;
 use App\Http\Controllers\Umkm\PemesananController;
 use App\Http\Middleware\EnsureUserIsAdmin;
@@ -48,6 +50,9 @@ Route::prefix('umkm')->name('umkm.')->middleware(EnsureUserIsUmkm::class)->group
     Route::get('/katalog', [KatalogController::class, 'index'])->name('katalog.index');
     Route::post('/katalog/ajukan-kemitraan', [KatalogController::class, 'ajukanKemitraan'])->name('katalog.ajukan');
 
+    Route::post('/supply-planning', [CollaborativeSupplyPlanningController::class, 'store'])->name('supply-planning.store');
+    Route::delete('/supply-planning/{id}', [CollaborativeSupplyPlanningController::class, 'destroy'])->name('supply-planning.destroy');
+
     Route::get('/pemesanan', [PemesananController::class, 'index'])->name('pemesanan.index');
     Route::get('/pemesanan/{order}/konfirmasi', [PemesananController::class, 'showKonfirmasi'])->name('pemesanan.konfirmasi.show');
     Route::post('/pemesanan/{order}/konfirmasi', [PemesananController::class, 'konfirmasi'])->name('pemesanan.konfirmasi');
@@ -66,6 +71,9 @@ Route::prefix('supplier')->name('supplier.')->middleware(EnsureUserIsSupplier::c
     Route::get('/pengajuan-masuk', [PengajuanMasukController::class, 'index'])->name('pengajuan-masuk.index');
     Route::patch('/pengajuan-masuk/{id}/terima', [PengajuanMasukController::class, 'terima'])->name('pengajuan-masuk.terima');
     Route::patch('/pengajuan-masuk/{id}/tolak', [PengajuanMasukController::class, 'tolak'])->name('pengajuan-masuk.tolak');
+
+    Route::get('/supply-planning', [SupplierSupplyPlanningController::class, 'index'])->name('supply-planning.index');
+    Route::patch('/supply-planning/{id}/konfirmasi', [SupplierSupplyPlanningController::class, 'konfirmasi'])->name('supply-planning.konfirmasi');
 });
 
 /* Admin Protected Routes (Master Data Komoditas, Kategori, Satuan Baku, User Moderasi) */

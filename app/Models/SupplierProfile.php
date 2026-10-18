@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class SupplierProfile extends Model
 {
@@ -44,5 +45,10 @@ class SupplierProfile extends Model
     public function partnerships(): HasMany
     {
         return $this->hasMany(Partnership::class, 'supplier_id');
+    }
+
+    public function supplyPlans(): HasManyThrough
+    {
+        return $this->hasManyThrough(SupplyPlan::class, Partnership::class, 'supplier_id', 'partnership_id');
     }
 }
