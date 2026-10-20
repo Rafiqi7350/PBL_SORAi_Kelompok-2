@@ -163,6 +163,7 @@
 
     <!-- Main Content Area -->
     <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 pt-0 pb-8">
+        @include('partials.flash-notification')
         @yield('content')
     </main>
 

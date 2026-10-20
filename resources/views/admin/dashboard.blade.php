@@ -36,7 +36,12 @@
             isCategoryModalOpen: false,
             isUnitModalOpen: false,
             notification: '{{ session('success') ?? session('warning') ?? '' }}',
-            clearNotif() { this.notification = ''; }
+            clearNotif() { this.notification = ''; },
+            init() {
+                if (this.notification) {
+                    setTimeout(() => { this.notification = ''; }, 4000);
+                }
+            }
         }" 
         class="min-h-screen bg-[#f8fafc] text-slate-900 flex">
 
@@ -181,6 +186,9 @@
             <div 
                 x-show="notification" 
                 x-cloak
+                x-transition:leave="transition ease-in duration-300"
+                x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+                x-transition:leave-end="opacity-0 -translate-y-2 scale-98"
                 class="bg-emerald-50 text-emerald-800 border border-emerald-200 p-4 rounded-2xl text-xs font-bold flex justify-between items-center shadow-sm">
                 <div class="flex items-center gap-2">
                     <span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-xs">✓</span>
