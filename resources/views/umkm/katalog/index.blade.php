@@ -5,7 +5,8 @@
     function umkmCatalogPage() {
         return {
             selectedCommodity: null,
-            orderSubTab: 'auto-order', // 'auto-order' | 'confirm' | 'payment' | 'rating'
+            orderSubTab: (new URLSearchParams(window.location.search).get('subtab') || 'auto-order'), // 'auto-order' | 'confirm' | 'backorder' | 'payment' | 'rating'
+            backorderFilter: 'all', // 'all' | 'pending' | 'approved' | 'rejected'
             payingOrder: null,
             selectedPaymentMethod: 'bca',
             previewAutoOrder: null,
@@ -13,7 +14,19 @@
             stars: 5,
             reviewText: '',
             notificationMsg: @json(session('success') ?? ''),
+            init() {
+                var self = this;
+                if (this.notificationMsg) {
+                    setTimeout(function() { self.notificationMsg = ''; }, 4000);
+                }
+            },
             pendingValidationCount: {{ $pendingValidationCount ?? 0 }},
+            pendingBackorderCount: {{ $pendingBackorderCount ?? 0 }},
+            pendingBackorderApprovalCount: {{ $pendingBackorderApprovalCount ?? 0 }},
+            rejectingBackorderId: null,
+            rejectionReason: '',
+            rejectingAction: 'create_backorder',
+            approvingBackorderOrder: null,
             pendingPaymentCount: {{ $pendingPaymentCount ?? 0 }},
 
             planningForm: {
@@ -239,6 +252,10 @@
             confirmPhotoPreview: null,
             confirmNotes: '',
 
+            confirmingBackorderId: null,
+            confirmBackorderPhotoPreview: null,
+            confirmBackorderNotes: '',
+
             onConfirmPhotoChange: function(event) {
                 var file = event.target.files[0];
                 if (file) {
@@ -246,8 +263,25 @@
                 }
             },
 
+            onConfirmBackorderPhotoChange: function(event) {
+                var file = event.target.files[0];
+                if (file) {
+                    this.confirmBackorderPhotoPreview = URL.createObjectURL(file);
+                }
+            },
+
+            payingInvoice: null,
+            payingOrder: null,
+            selectedPaymentMethod: 'BCA Virtual Account',
+
+            openBatchInvoicePayment: function(inv) {
+                this.payingInvoice = inv;
+                this.selectedPaymentMethod = 'BCA Virtual Account';
+            },
+
             openMidtransPayment: function(order) {
                 this.payingOrder = order;
+                this.selectedPaymentMethod = 'BCA Virtual Account';
             },
 
             simulateMidtransSuccess: function() {
@@ -321,7 +355,7 @@
     </div>
 
     @if(session('error'))
-        <div x-data="{ showError: true }" x-cloak x-show="showError" x-transition class="fixed top-20 right-4 sm:right-8 z-50 max-w-md w-full">
+        <div x-data="{ showError: true }" x-init="setTimeout(() => showError = false, 4500)" x-cloak x-show="showError" x-transition class="fixed top-20 right-4 sm:right-8 z-50 max-w-md w-full">
             <div class="bg-rose-600 text-white p-4 rounded-2xl font-medium text-xs flex justify-between items-center shadow-xl">
                 <span>{{ session('error') }}</span>
                 <button type="button" @click="showError = false" class="font-bold text-base ml-2 hover:opacity-75 cursor-pointer">✕</button>
@@ -1008,6 +1042,7 @@
 
         <!-- SUB-NAVIGASI TAB CLEAN UNDERLINE DESIGN (ORANGE ACCENTS) -->
         <div class="border-b border-gray-200 flex flex-wrap items-center gap-6 sm:gap-8 text-xs font-bold">
+            <!-- 1. Pemesanan Otomatis -->
             <button 
                 type="button"
                 @click="orderSubTab = 'auto-order'"
@@ -1019,12 +1054,35 @@
                 </template>
             </button>
 
+            <!-- 2. Persetujuan Backorder -->
+            <button 
+                type="button"
+                @click="orderSubTab = 'backorder'"
+                class="pb-3 relative transition flex items-center gap-2 cursor-pointer"
+                :class="orderSubTab === 'backorder' ? 'text-gray-900 font-extrabold' : 'text-gray-500 hover:text-gray-900'">
+                <span>Persetujuan Backorder</span>
+                <template x-if="pendingBackorderApprovalCount > 0">
+                    <span class="bg-rose-500 text-white text-[10px] px-2 py-0.5 rounded-full font-mono font-bold shadow-xs animate-pulse"
+                          x-text="pendingBackorderApprovalCount + ' Pengajuan'">
+                    </span>
+                </template>
+                <template x-if="pendingBackorderApprovalCount === 0 && pendingBackorderCount > 0">
+                    <span class="bg-amber-400 text-amber-950 text-[10px] px-2 py-0.5 rounded-full font-mono font-black shadow-xs"
+                          x-text="pendingBackorderCount">
+                    </span>
+                </template>
+                <template x-if="orderSubTab === 'backorder'">
+                    <span class="absolute bottom-0 left-0 w-full h-1 bg-[#ea580c] rounded-t-full"></span>
+                </template>
+            </button>
+
+            <!-- 3. Konfirmasi Pesanan -->
             <button 
                 type="button"
                 @click="orderSubTab = 'confirm'"
                 class="pb-3 relative transition flex items-center gap-2 cursor-pointer"
                 :class="orderSubTab === 'confirm' ? 'text-gray-900 font-extrabold' : 'text-gray-500 hover:text-gray-900'">
-                <span>Konfirmasi Penerimaan</span>
+                <span>Konfirmasi Pesanan</span>
                 <template x-if="pendingValidationCount > 0">
                     <span class="bg-[#ea580c] text-white text-[10px] px-2 py-0.5 rounded-full font-mono font-bold"
                           x-text="pendingValidationCount">
@@ -1035,6 +1093,7 @@
                 </template>
             </button>
 
+            <!-- 4. Pembayaran Midtrans -->
             <button 
                 type="button"
                 @click="orderSubTab = 'payment'"
@@ -1051,6 +1110,7 @@
                 </template>
             </button>
 
+            <!-- 5. Rating & Ulasan -->
             <button 
                 type="button"
                 @click="orderSubTab = 'rating'"
@@ -1173,17 +1233,26 @@
         <div x-show="orderSubTab === 'confirm'" class="bg-white rounded-3xl border border-gray-100 overflow-hidden p-6 space-y-4 shadow-sm">
             <div class="flex justify-between items-center border-b border-gray-100 pb-3">
                 <div>
-                    <h3 class="font-bold text-lg text-gray-900">Validasi & Konfirmasi Barang Tiba di Dapur</h3>
-                    <p class="text-xs text-gray-500">Periksa kuantitas dan mutu bahan baku saat tiba. Upload foto bukti penerimaan untuk mengkonfirmasi.</p>
+                    <h3 class="font-bold text-lg text-gray-900">Validasi & Konfirmasi Kedatangan Barang (Batch 1)</h3>
+                    <p class="text-xs text-gray-500">Periksa kuantitas dan mutu bahan baku saat tiba di dapur. Upload foto bukti penerimaan fisik untuk mengkonfirmasi.</p>
                 </div>
             </div>
 
             @php
                 $umkmProfile = auth()->user()?->umkmProfile;
                 $dbOrders = $umkmProfile
-                    ? \App\Models\Order::with(['partnership.supplier', 'items.supplierProduct.commodity', 'shipmentConfirmation'])
+                    ? \App\Models\Order::with(['partnership.supplier', 'items.supplierProduct.commodity', 'shipmentConfirmations'])
                         ->whereHas('partnership', fn($q) => $q->where('umkm_id', $umkmProfile->id))
-                        ->whereIn('order_status', ['MENUNGGU_KONFIRMASI_BARANG', 'BARANG_DITERIMA', 'DIKIRIM'])
+                        ->whereIn('order_status', [
+                            'MENUNGGU_KONFIRMASI_BARANG',
+                            'DIKIRIM',
+                            'shipped',
+                            'partially_shipped',
+                            'backorder_pending',
+                            'BARANG_DITERIMA',
+                            'completed',
+                            'completed_partial',
+                        ])
                         ->latest()->get()
                     : collect();
             @endphp
@@ -1197,7 +1266,7 @@
                     </div>
                     <div class="space-y-1">
                         <p class="font-bold text-gray-800 text-sm">Belum ada pesanan yang perlu dikonfirmasi</p>
-                        <p class="text-xs text-gray-400">Pesanan yang sudah dikirim pemasok akan muncul di sini.</p>
+                        <p class="text-xs text-gray-400">Pesanan yang dikirim oleh pemasok akan muncul di sini untuk divalidasi.</p>
                     </div>
                 </div>
             @else
@@ -1207,57 +1276,218 @@
                             <tr>
                                 <th class="p-3.5">ID Pesanan</th>
                                 <th class="p-3.5">Pemasok Mitra</th>
-                                <th class="p-3.5">Detail Komoditas</th>
+                                <th class="p-3.5">Detail Komoditas & Pemenuhan</th>
                                 <th class="p-3.5">Total Tagihan</th>
-                                <th class="p-3.5">Status</th>
+                                <th class="p-3.5">Status Pengiriman</th>
                                 <th class="p-3.5">Bukti Foto</th>
                                 <th class="p-3.5 text-center">Aksi Konfirmasi</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 font-medium">
                             @foreach($dbOrders as $dbOrder)
+                                @php
+                                    $firstItem = $dbOrder->items->first();
+                                    $totalQty = (float) $dbOrder->items->sum('quantity');
+                                    $deliveredQty = (float) $dbOrder->items->sum('quantity_delivered');
+                                    $remainingQty = (float) $dbOrder->items->sum('quantity_remaining');
+                                    $unit = $firstItem?->supplierProduct?->commodity?->unit ?? 'kg';
+                                    $batch1 = $dbOrder->shipmentConfirmations->firstWhere('shipment_batch', 1) ?? $dbOrder->shipmentConfirmation;
+                                    $batch2 = $dbOrder->shipmentConfirmations->firstWhere('shipment_batch', 2);
+                                    $isBatch1Confirmed = $batch1 && $batch1->received_at !== null;
+                                    $isBatch2Confirmed = $batch2 && $batch2->received_at !== null;
+                                    $isBatch2Shipped = $batch2 && $batch2->shipped_at !== null;
+                                @endphp
                                 <tr class="hover:bg-gray-50/50 transition">
-                                    <td class="p-3.5 font-mono font-bold text-[#ea580c]">{{ strtoupper(substr($dbOrder->id, 0, 8)) }}</td>
-                                    <td class="p-3.5 font-bold text-gray-900">{{ $dbOrder->partnership->supplier->company_name }}</td>
-                                    <td class="p-3.5">
+                                    <td class="p-3.5 font-mono font-bold text-[#ea580c] whitespace-nowrap">
+                                        #ORD-{{ strtoupper(substr($dbOrder->id, 0, 8)) }}
+                                    </td>
+                                    <td class="p-3.5 font-bold text-gray-900">
+                                        {{ $dbOrder->partnership?->supplier?->company_name ?? 'Pemasok Mitra' }}
+                                    </td>
+                                    <td class="p-3.5 space-y-1">
                                         @foreach($dbOrder->items as $item)
-                                            <span class="font-semibold text-gray-900 block">{{ $item->supplierProduct->commodity->name }}</span>
-                                            <span class="text-gray-500 text-[11px]">{{ number_format($item->quantity, 0) }} {{ $item->supplierProduct->commodity->unit }}</span>
+                                            <span class="font-bold text-gray-900 block text-xs">
+                                                {{ $item->supplierProduct?->commodity?->name ?? 'Bahan Baku' }}
+                                            </span>
                                         @endforeach
-                                    </td>
-                                    <td class="p-3.5 font-bold text-gray-900">Rp {{ number_format($dbOrder->total_amount, 0, ',', '.') }}</td>
-                                    <td class="p-3.5">
-                                        @if($dbOrder->order_status === 'MENUNGGU_KONFIRMASI_BARANG')
-                                            <span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full text-[10px] font-bold">⏳ Menunggu Validasi</span>
-                                        @elseif($dbOrder->order_status === 'DIKIRIM')
-                                            <span class="bg-sky-100 text-sky-800 px-2.5 py-1 rounded-full text-[10px] font-bold">🚚 Dikirim</span>
+
+                                        <!-- LABEL RINCIAN PEMENUHAN (SPLIT SHIPMENT / BACKORDER) -->
+                                        @if($dbOrder->order_status === 'cancelled')
+                                            <div class="bg-rose-50 border border-rose-200 text-rose-800 px-2.5 py-1 rounded-lg text-[11px] font-mono leading-tight">
+                                                <span>✕ Pesanan Dibatalkan: Stok gudang pemasok kosong.</span>
+                                            </div>
+                                        @elseif($batch1 && $batch1->backorder_action === 'create_backorder')
+                                            <div class="bg-orange-50 border border-orange-200 text-orange-950 px-2.5 py-1 rounded-lg text-[11px] font-mono leading-tight">
+                                                <span>Terkirim Parsial: <strong>{{ number_format($deliveredQty, 0) }}/{{ number_format($totalQty, 0) }} {{ $unit }}</strong></span>
+                                                <span class="text-[#ea580c] block font-semibold">— Sisa {{ number_format($remainingQty, 0) }} {{ $unit }} dalam antrean Backorder Pemasok</span>
+                                            </div>
+                                        @elseif($batch1 && $batch1->backorder_action === 'no_backorder')
+                                            <div class="bg-rose-50 border border-rose-200 text-rose-950 px-2.5 py-1 rounded-lg text-[11px] font-mono leading-tight">
+                                                <span>Terkirim Parsial: <strong>{{ number_format($deliveredQty, 0) }}/{{ number_format($totalQty, 0) }} {{ $unit }}</strong></span>
+                                                <span class="text-rose-700 block font-semibold">— Sisa {{ number_format(max(0, $totalQty - $deliveredQty), 0) }} {{ $unit }} Dibatalkan Pemasok (Total Tagihan Disesuaikan)</span>
+                                            </div>
                                         @else
-                                            <span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-[10px] font-bold">✓ Barang Diterima</span>
+                                            <div class="text-gray-500 text-[11px]">
+                                                Pengiriman Penuh: <strong>{{ number_format($totalQty, 0) }} {{ $unit }}</strong>
+                                            </div>
+                                        @endif
+                                    </td>
+                                    <td class="p-3.5 font-bold text-gray-900 whitespace-nowrap">
+                                        Rp {{ number_format($dbOrder->total_amount, 0, ',', '.') }}
+                                    </td>
+                                    <td class="p-3.5">
+                                        @if($dbOrder->order_status === 'cancelled')
+                                            <span class="bg-rose-100 text-rose-800 px-2.5 py-1 rounded-full text-[10px] font-bold">
+                                                ✕ Dibatalkan Pemasok (Stok Kosong)
+                                            </span>
+                                        @elseif(in_array($dbOrder->order_status, ['pending', 'confirmed']))
+                                            <span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                                Menunggu Pemasok Cek Stok & Kirim
+                                            </span>
+                                        @elseif($batch1 && $batch1->backorder_action === 'create_backorder')
+                                            {{-- Skenario Backorder --}}
+                                            @if($batch1->shipped_at === null)
+                                                @if($batch1->backorder_approval_status === 'pending' || $dbOrder->order_status === 'waiting_backorder_approval')
+                                                    <span class="bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                                                        Menunggu Persetujuan Backorder Anda
+                                                    </span>
+                                                @else
+                                                    <span class="bg-purple-100 text-purple-800 px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                                        <span class="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></span>
+                                                        Disetujui — Menunggu Pemasok Berangkatkan Barang
+                                                    </span>
+                                                @endif
+                                            @elseif(! $isBatch1Confirmed)
+                                                <span class="bg-sky-100 text-sky-800 px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping"></span>
+                                                    Kloter 1 Sedang Dikirim ({{ number_format($deliveredQty, 0) }} {{ $unit }})
+                                                </span>
+                                            @elseif($isBatch2Shipped && ! $isBatch2Confirmed)
+                                                <span class="bg-sky-100 text-sky-900 border border-sky-300 px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1 animate-pulse">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-sky-600"></span>
+                                                    Kloter 2 (Sisa Backorder) Sedang Dikirim!
+                                                </span>
+                                            @elseif($isBatch2Confirmed)
+                                                <span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                                    <svg class="w-3 h-3 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                    <span>Selesai Lengkap (Kloter 1 & 2 Diterima)</span>
+                                                </span>
+                                            @else
+                                                <span class="bg-purple-100 text-purple-800 px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                                    <svg class="w-3 h-3 text-purple-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                    <span>Kloter 1 Diterima (Menunggu Sisa Kloter 2)</span>
+                                                </span>
+                                            @endif
+                                        @elseif($batch1 && $batch1->backorder_action === 'no_backorder')
+                                            {{-- Skenario No Backorder --}}
+                                            @if(! $isBatch1Confirmed)
+                                                <span class="bg-sky-100 text-sky-800 px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping"></span>
+                                                    Armada Sedang Mengirim (Sesuai Stok: {{ number_format($deliveredQty, 0) }} {{ $unit }})
+                                                </span>
+                                            @else
+                                                <span class="bg-stone-100 text-stone-800 px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                                    <svg class="w-3 h-3 text-stone-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                    <span>Diterima (Selesai Sebagian)</span>
+                                                </span>
+                                            @endif
+                                        @else
+                                            {{-- Skenario Kirim Penuh / Biasa --}}
+                                            @if(! $isBatch1Confirmed)
+                                                <span class="bg-sky-100 text-sky-800 px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping"></span>
+                                                    Armada Pemasok Sedang Mengirim
+                                                </span>
+                                            @else
+                                                <span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                                    <svg class="w-3 h-3 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                    <span>Barang Diterima Penuh</span>
+                                                </span>
+                                            @endif
                                         @endif
                                     </td>
                                     <td class="p-3.5">
-                                        @if($dbOrder->shipmentConfirmation?->proof_photo_url)
-                                            <a href="{{ $dbOrder->shipmentConfirmation->proof_photo_url }}" target="_blank">
-                                                <img src="{{ $dbOrder->shipmentConfirmation->proof_photo_url }}"
-                                                     alt="Bukti"
-                                                     class="w-14 h-14 object-cover rounded-xl border border-gray-200 hover:scale-110 transition cursor-pointer">
-                                            </a>
-                                        @else
-                                            <span class="text-gray-300 text-[11px]">—</span>
-                                        @endif
+                                        <div class="flex items-center gap-1.5">
+                                            @if($batch1?->proof_photo_url)
+                                                <a href="{{ $batch1->proof_photo_url }}" target="_blank" title="Bukti Foto Kloter 1">
+                                                    <img src="{{ $batch1->proof_photo_url }}"
+                                                         alt="Bukti Kloter 1"
+                                                         class="w-10 h-10 object-cover rounded-xl border border-gray-200 hover:scale-110 transition cursor-pointer shadow-xs">
+                                                </a>
+                                            @endif
+                                            @if($batch2?->proof_photo_url)
+                                                <a href="{{ $batch2->proof_photo_url }}" target="_blank" title="Bukti Foto Kloter 2 (Sisa Backorder)">
+                                                    <img src="{{ $batch2->proof_photo_url }}"
+                                                         alt="Bukti Kloter 2"
+                                                         class="w-10 h-10 object-cover rounded-xl border-2 border-amber-400 hover:scale-110 transition cursor-pointer shadow-xs">
+                                                </a>
+                                            @endif
+                                            @if(! $batch1?->proof_photo_url && ! $batch2?->proof_photo_url)
+                                                <span class="text-gray-300 text-[11px]">—</span>
+                                            @endif
+                                        </div>
                                     </td>
                                     <td class="p-3.5 text-center">
-                                        @if(in_array($dbOrder->order_status, ['MENUNGGU_KONFIRMASI_BARANG', 'DIKIRIM']))
+                                        @if($dbOrder->order_status === 'cancelled')
+                                            <span class="text-xs text-rose-500 font-bold">Pesanan Batal</span>
+                                        @elseif(in_array($dbOrder->order_status, ['pending', 'confirmed']))
+                                            <span class="text-xs text-gray-400 font-medium italic">Menunggu Armada Dikirim</span>
+                                        @elseif($batch1 && $batch1->shipped_at === null)
+                                            <span class="text-xs text-amber-600 font-medium italic">
+                                                @if($batch1->backorder_approval_status === 'pending' || $dbOrder->order_status === 'waiting_backorder_approval')
+                                                    <button type="button" @click="orderSubTab = 'backorder'" class="text-[#ea580c] font-bold underline cursor-pointer">
+                                                        Tinjau di Tab Backorder →
+                                                    </button>
+                                                @else
+                                                    Pemasok Sedang Siapkan Barang
+                                                @endif
+                                            </span>
+                                        @elseif(! $isBatch1Confirmed)
+                                            {{-- Konfirmasi Kloter 1 (Bisa Pesanan Biasa, No Backorder, atau Kloter 1 Backorder) --}}
                                             <button
                                                 type="button"
                                                 @click="confirmingOrderId = '{{ $dbOrder->id }}'; confirmPhotoPreview = null; confirmNotes = '';"
-                                                class="bg-[#ea580c] hover:bg-[#c2410c] text-white px-4 py-1.5 rounded-full font-bold text-[11px] shadow-sm transition cursor-pointer">
-                                                📷 Konfirmasi & Upload Foto
+                                                class="bg-[#ea580c] hover:bg-[#c2410c] text-white px-4 py-2 rounded-full font-bold text-[11px] shadow-xs transition cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5">
+                                                @if($batch1 && $batch1->backorder_action === 'create_backorder')
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg><span>Konfirmasi Terima Kloter 1</span>
+                                                @else
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg><span>Konfirmasi Penerimaan Fisik</span>
+                                                @endif
+                                            </button>
+                                        @elseif($batch1 && $batch1->backorder_action === 'create_backorder' && $isBatch2Shipped && ! $isBatch2Confirmed)
+                                            {{-- Kloter 1 sudah diterima, Kloter 2 (Sisa Backorder) tiba! Konfirmasi Kloter 2 ada di sini! --}}
+                                            <button
+                                                type="button"
+                                                @click="confirmingBackorderId = '{{ $dbOrder->id }}'; confirmBackorderPhotoPreview = null; confirmBackorderNotes = '';"
+                                                class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-full font-bold text-[11px] shadow-xs transition cursor-pointer whitespace-nowrap animate-pulse inline-flex items-center gap-1.5">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg><span>Konfirmasi Sisa Backorder (Kloter 2)</span>
                                             </button>
                                         @else
-                                            <span class="text-emerald-700 font-bold text-[11px] inline-flex items-center gap-1">
-                                                ✓ Telah Dikonfirmasi
-                                            </span>
+                                            {{-- Sudah Selesai Diterima --}}
+                                            <div class="space-y-1">
+                                                <span class="text-emerald-700 font-bold text-[11px] inline-flex items-center gap-1">
+                                                    <svg class="w-3 h-3 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                    @if($isBatch2Confirmed)
+                                                        <span>Selesai Lengkap (Kloter 1 & 2)</span>
+                                                    @elseif($batch1 && $batch1->backorder_action === 'create_backorder')
+                                                        <span>Kloter 1 Diterima</span>
+                                                    @else
+                                                        <span>Barang Diterima</span>
+                                                    @endif
+                                                </span>
+                                                <button type="button"
+                                                        @click="orderSubTab = 'payment'"
+                                                        class="bg-orange-50 hover:bg-orange-100 text-[#ea580c] px-3 py-1 rounded-full font-bold text-[10px] block mx-auto border border-orange-200 cursor-pointer">
+                                                    Bayar Tagihan Invoice →
+                                                </button>
+                                                @if($batch1 && $batch1->backorder_action === 'create_backorder' && ! $isBatch2Shipped)
+                                                    <span class="text-[10px] text-gray-400 block font-sans">
+                                                        Menunggu pengiriman sisa kloter 2
+                                                    </span>
+                                                @endif
+                                            </div>
                                         @endif
                                     </td>
                                 </tr>
@@ -1268,16 +1498,16 @@
             @endif
         </div>
 
-        <!-- MODAL KONFIRMASI PENERIMAAN + UPLOAD FOTO (TERHUBUNG DATABASE) -->
+        <!-- MODAL KONFIRMASI PENERIMAAN BATCH 1 + UPLOAD FOTO (TERHUBUNG DATABASE) -->
         <div x-cloak x-show="confirmingOrderId" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <div @click.away="confirmingOrderId = null" class="bg-white max-w-lg w-full rounded-[2rem] p-6 space-y-5 shadow-2xl border border-gray-100">
                 <div class="flex justify-between items-start border-b border-gray-100 pb-4">
                     <div>
-                        <span class="text-xs font-bold text-[#ea580c] uppercase font-mono tracking-wider">KONFIRMASI PENERIMAAN BARANG</span>
-                        <h3 class="text-xl font-bold text-gray-900 mt-1">Upload Bukti Penerimaan</h3>
-                        <p class="text-xs text-gray-500 mt-0.5">Foto barang yang sudah tiba di dapur Anda sebagai bukti konfirmasi resmi.</p>
+                        <span class="text-xs font-bold text-[#ea580c] uppercase font-mono tracking-wider">KONFIRMASI PENERIMAAN FISIK BATCH 1</span>
+                        <h3 class="text-xl font-bold text-gray-900 mt-1">Upload Bukti Penerimaan Dapur</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Foto barang kloter pertama yang sudah tiba di dapur Anda sebagai bukti konfirmasi resmi.</p>
                     </div>
-                    <button type="button" @click="confirmingOrderId = null" class="text-gray-400 hover:text-gray-700 font-bold text-lg cursor-pointer">✕</button>
+                    <button type="button" @click="confirmingOrderId = null" class="text-gray-400 hover:text-gray-700 cursor-pointer p-1 rounded-lg hover:bg-gray-100 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
 
                 <template x-if="confirmingOrderId">
@@ -1286,7 +1516,7 @@
 
                         <!-- Preview Foto -->
                         <div>
-                            <label class="block text-xs font-bold text-gray-700 mb-2">Foto Bukti Penerimaan Barang <span class="text-rose-500">*</span></label>
+                            <label class="block text-xs font-bold text-gray-700 mb-2">Foto Bukti Penerimaan Barang Batch 1 <span class="text-rose-500">*</span></label>
                             <div class="border-2 border-dashed border-gray-200 rounded-2xl p-4 text-center cursor-pointer hover:border-[#ea580c] transition"
                                  @click="$refs.photoInput.click()">
                                 <template x-if="!confirmPhotoPreview">
@@ -1317,12 +1547,12 @@
 
                         <!-- Catatan Konfirmasi -->
                         <div>
-                            <label class="block text-xs font-bold text-gray-700 mb-1.5">Catatan Penerimaan (Opsional)</label>
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5">Catatan Kondisi Kedatangan (Opsional)</label>
                             <textarea
                                 name="confirmation_notes"
                                 rows="3"
                                 x-model="confirmNotes"
-                                placeholder="Contoh: Semua barang sesuai pesanan, kondisi segar dan tidak ada yang rusak."
+                                placeholder="Contoh: Kondisi bahan baku segar, kuantitas kloter 1 sesuai timbangan dapur."
                                 class="w-full px-4 py-2.5 rounded-xl bg-[#f1f2f4] text-gray-900 text-xs font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ea580c] border-0">
                             </textarea>
                         </div>
@@ -1334,7 +1564,7 @@
                             </button>
                             <button type="submit"
                                 class="w-1/2 bg-[#ea580c] hover:bg-[#c2410c] text-white py-3 rounded-full font-bold text-xs shadow-sm transition cursor-pointer">
-                                ✓ Konfirmasi & Simpan
+                                ✓ Konfirmasi Batch 1
                             </button>
                         </div>
                     </form>
@@ -1342,59 +1572,665 @@
             </div>
         </div>
 
-
-        <!-- SUB-TAB 3: PEMBAYARAN MIDTRANS -->
-        <div x-show="orderSubTab === 'payment'" class="bg-white rounded-3xl border border-gray-100 overflow-hidden p-6 space-y-4 shadow-sm">
-            <div class="flex justify-between items-center border-b border-gray-100 pb-3">
+        <!-- ======================================================== -->
+        <!-- SUB-TAB 3: PESANAN BACKORDER (TAB BARU KHUSUS UMKM)       -->
+        <!-- ======================================================== -->
+        <div x-show="orderSubTab === 'backorder'" class="bg-white rounded-3xl border border-gray-100 overflow-hidden p-6 space-y-4 shadow-sm">
+            <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-gray-100 pb-4">
                 <div>
-                    <h3 class="font-bold text-lg text-gray-900">Pembayaran Tagihan Pasokan Via Midtrans</h3>
-                    <p class="text-xs text-gray-500">Bayar tagihan pasokan bahan baku secara resmi dan terintegrasi melalui Virtual Account / QRIS Midtrans.</p>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-mono font-extrabold text-amber-700 uppercase tracking-widest bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                            SPLIT SHIPMENT / BACKORDER
+                        </span>
+                    </div>
+                    <h3 class="font-bold text-lg text-gray-900 mt-0.5">Pemantauan Pengiriman Sisa Pasokan (Backorder)</h3>
+                    <p class="text-xs text-gray-500">
+                        Pesanan di bawah ini dikirim secara bertahap oleh pemasok mitra. Konfirmasi kedatangan fisik Batch 2 saat sisa barang tiba di dapur.
+                    </p>
+                </div>
+                <span class="bg-amber-50 border border-amber-200 text-amber-900 font-mono font-bold text-xs px-3.5 py-1.5 rounded-full w-fit">
+                    {{ $pendingBackorderCount }} Antrean Backorder
+                </span>
+            </div>
+
+            @php
+                $backorderOrders = $backorderOrders ?? ($umkmProfile
+                    ? \App\Models\Order::with(['partnership.supplier', 'items.supplierProduct.commodity', 'shipmentConfirmations', 'payments'])
+                        ->whereHas('partnership', fn($q) => $q->where('umkm_id', $umkmProfile->id))
+                        ->where(function ($q) {
+                            $q->whereIn('order_status', [\App\Models\Order::STATUS_BACKORDER_PENDING, \App\Models\Order::STATUS_WAITING_BACKORDER_APPROVAL])
+                                ->orWhere(function ($oq) {
+                                    $oq->whereIn('order_status', ['shipped', 'partially_shipped', \App\Models\Order::STATUS_COMPLETED_PARTIAL, \App\Models\Order::STATUS_CANCELLED])
+                                        ->whereHas('shipmentConfirmations', function ($sq) {
+                                            $sq->where(function ($bsq) {
+                                                $bsq->whereIn('backorder_action', ['create_backorder', 'no_backorder'])
+                                                    ->orWhereIn('backorder_approval_status', ['pending', 'approved', 'rejected']);
+                                            });
+                                        });
+                                });
+                        })
+                        ->latest('created_at')->get()
+                    : collect());
+
+                $countPendingApproval = $backorderOrders->filter(function($o) {
+                    $b1 = $o->shipmentConfirmations->firstWhere('shipment_batch', 1);
+                    return $o->order_status === \App\Models\Order::STATUS_WAITING_BACKORDER_APPROVAL || ($b1 && $b1->backorder_approval_status === 'pending');
+                })->count();
+
+                $countApproved = $backorderOrders->filter(function($o) {
+                    $b1 = $o->shipmentConfirmations->firstWhere('shipment_batch', 1);
+                    return $b1 && $b1->backorder_approval_status === 'approved';
+                })->count();
+
+                $countRejected = $backorderOrders->filter(function($o) {
+                    $b1 = $o->shipmentConfirmations->firstWhere('shipment_batch', 1);
+                    return $b1 && $b1->backorder_approval_status === 'rejected';
+                })->count();
+            @endphp
+
+            <!-- QUICK FILTER STATUS BACKORDER -->
+            <div class="flex flex-wrap items-center gap-2 pt-1 pb-1">
+                <button type="button"
+                        @click="backorderFilter = 'all'"
+                        class="px-3.5 py-1.5 rounded-full text-xs font-bold transition cursor-pointer"
+                        :class="backorderFilter === 'all' ? 'bg-[#ea580c] text-white shadow-xs' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'">
+                    Semua ({{ $backorderOrders->count() }})
+                </button>
+                <button type="button"
+                        @click="backorderFilter = 'pending'"
+                        class="px-3.5 py-1.5 rounded-full text-xs font-bold transition cursor-pointer flex items-center gap-1.5"
+                        :class="backorderFilter === 'pending' ? 'bg-amber-500 text-white shadow-xs' : 'bg-amber-50 text-amber-900 border border-amber-200 hover:bg-amber-100'">
+                    <span>⏳ Menunggu Keputusan</span>
+                    @if($countPendingApproval > 0)
+                        <span class="bg-rose-500 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">
+                            {{ $countPendingApproval }}
+                        </span>
+                    @endif
+                </button>
+                <button type="button"
+                        @click="backorderFilter = 'approved'"
+                        class="px-3.5 py-1.5 rounded-full text-xs font-bold transition cursor-pointer"
+                        :class="backorderFilter === 'approved' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-emerald-50 text-emerald-900 border border-emerald-200 hover:bg-emerald-100'">
+                    ✓ Disetujui ({{ $countApproved }})
+                </button>
+                <button type="button"
+                        @click="backorderFilter = 'rejected'"
+                        class="px-3.5 py-1.5 rounded-full text-xs font-bold transition cursor-pointer"
+                        :class="backorderFilter === 'rejected' ? 'bg-rose-600 text-white shadow-xs' : 'bg-rose-50 text-rose-800 border border-rose-200 hover:bg-rose-100'">
+                    ✕ Ditolak ({{ $countRejected }})
+                </button>
+            </div>
+
+            @if($backorderOrders->isEmpty())
+                <div class="py-14 text-center space-y-3">
+                    <div class="w-14 h-14 mx-auto rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shadow-xs">
+                        <span>📦</span>
+                    </div>
+                    <div class="space-y-1">
+                        <p class="font-bold text-gray-800 text-sm">Tidak Ada Pesanan Dalam Status Backorder</p>
+                        <p class="text-xs text-gray-400">Semua pesanan Anda terpenuhi penuh atau tidak ada sisa pasokan yang tertunda.</p>
+                    </div>
+                </div>
+            @else
+                <div class="space-y-4">
+                    @foreach($backorderOrders as $boOrder)
+                        @php
+                            $firstItem = $boOrder->items->first();
+                            $totalQty = (float) $boOrder->items->sum('quantity');
+                            $deliveredQty = (float) $boOrder->items->sum('quantity_delivered');
+                            $remainingQty = (float) $boOrder->items->sum('quantity_remaining');
+                            $unit = $firstItem?->supplierProduct?->commodity?->unit ?? 'kg';
+                            $batch1 = $boOrder->shipmentConfirmations->firstWhere('shipment_batch', 1);
+                            $batch2 = $boOrder->shipmentConfirmations->firstWhere('shipment_batch', 2);
+                            $isBatch2Shipped = $batch2 && $batch2->shipped_at !== null;
+                            $isBatch2Received = $batch2 && $batch2->received_at !== null;
+                            $approvalStatus = $batch1?->backorder_approval_status ?? ($boOrder->order_status === 'waiting_backorder_approval' ? 'pending' : 'approved');
+                            $estimatedDateText = $batch1?->backorder_estimated_delivery_date
+                                ? \Carbon\Carbon::parse($batch1->backorder_estimated_delivery_date)->translatedFormat('l, d F Y')
+                                : 'Sesuai jadwal restock pemasok';
+                        @endphp
+
+                        <div x-show="backorderFilter === 'all' || backorderFilter === '{{ $approvalStatus }}'"
+                             class="bg-gray-50/70 rounded-3xl border border-gray-200/80 p-5 space-y-4 transition hover:border-amber-300">
+                            <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-gray-200/60 pb-3">
+                                <div class="flex items-center gap-3">
+                                    <span class="font-mono font-bold text-xs text-[#ea580c]">
+                                        #ORD-{{ strtoupper(substr($boOrder->id, 0, 8)) }}
+                                    </span>
+                                    <span class="text-xs font-bold text-gray-900">
+                                        {{ $boOrder->partnership?->supplier?->company_name ?? 'Pemasok Mitra' }}
+                                    </span>
+                                </div>
+
+                                <!-- STATUS INDIKATOR -->
+                                <div>
+                                    @if($isBatch2Received)
+                                        <span class="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5">
+                                            <svg class="w-3 h-3 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                            <span>Sisa Backorder Telah Diterima Penuh</span>
+                                        </span>
+                                    @elseif($approvalStatus === 'pending' || $boOrder->order_status === 'waiting_backorder_approval')
+                                        <span class="bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5 animate-pulse">
+                                            <svg class="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                            <span>Menunggu Persetujuan Anda</span>
+                                        </span>
+                                    @elseif($approvalStatus === 'rejected')
+                                        <span class="bg-rose-100 text-rose-800 text-[11px] font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5">
+                                            <svg class="w-3 h-3 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            <span>Pengajuan Ditolak ({{ $batch1?->backorder_action === 'no_backorder' ? 'Pesanan Dibatalkan' : 'Selesai Sebagian' }})
+                                        </span>
+                                    @elseif($isBatch2Shipped)
+                                        <span class="bg-sky-100 text-sky-800 text-[11px] font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5 animate-pulse">
+                                            <svg class="w-3.5 h-3.5 text-sky-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0"/></svg>
+                                            <span>Pengiriman Sisa Backorder Sedang Menuju Dapur</span>
+                                        </span>
+                                    @elseif($batch1 && $batch1->shipped_at === null)
+                                        <span class="bg-purple-100 text-purple-900 border border-purple-200 text-[11px] font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5">
+                                            <svg class="w-3.5 h-3.5 text-purple-700 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                            <span>Disetujui — Menunggu Pemasok Memberangkatkan Barang</span>
+                                        </span>
+                                    @elseif($batch1 && $batch1->backorder_action === 'no_backorder')
+                                        <span class="bg-emerald-100 text-emerald-800 text-[11px] font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5">
+                                            <svg class="w-3 h-3 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                            <span>Barang Terkirim — Sisa Ditiadakan (No Backorder)</span>
+                                        </span>
+                                    @else
+                                        <span class="bg-amber-100 text-amber-900 text-[11px] font-bold px-3 py-1 rounded-full inline-flex items-center gap-1.5">
+                                            <svg class="w-3.5 h-3.5 text-amber-700 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                            <span>Kloter 1 Terkirim — Menunggu Jadwal Kirim Sisa Backorder ({{ number_format($remainingQty, 0) }} {{ $unit }})
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+
+                            <!-- KOTAK PERSETUJUAN & KEPUTUSAN BACKORDER / NO BACKORDER (ALUR 2) -->
+                            @if($approvalStatus === 'pending' || $boOrder->order_status === 'waiting_backorder_approval')
+                                <div class="bg-gradient-to-r from-amber-50 to-orange-50 border-2 border-amber-300 rounded-2xl p-4.5 space-y-3.5 shadow-xs">
+                                    <div class="flex items-start gap-3">
+                                        <div class="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
+                                            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                        </div>
+                                        <div class="space-y-1 flex-1">
+                                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                                <span class="text-[10px] font-mono font-extrabold uppercase tracking-widest text-amber-900 bg-amber-200/70 px-2.5 py-0.5 rounded-full">
+                                                    {{ $batch1?->backorder_action === 'no_backorder' ? 'PENGAJUAN PEMENUHAN SEBAGIAN (TANPA BACKORDER)' : 'PENGAJUAN BACKORDER DARI PEMASOK' }}
+                                                </span>
+                                                @if($batch1?->backorder_action !== 'no_backorder')
+                                                    <span class="text-xs font-mono font-bold text-amber-900">
+                                                        Janji Kirim: <strong>{{ $estimatedDateText }}</strong>
+                                                    </span>
+                                                @else
+                                                    <span class="text-xs font-mono font-bold text-rose-700">
+                                                        Sisa Pesanan Ditiadakan (Stok Habis)
+                                                    </span>
+                                                @endif
+                                            </div>
+                                            <p class="text-xs text-gray-800 leading-relaxed pt-0.5">
+                                                @if($batch1?->backorder_action === 'no_backorder')
+                                                    Pemasok hanya sanggup mengirimkan <strong class="text-emerald-700 font-extrabold">{{ number_format($deliveredQty, 0) }} {{ $unit }}</strong> dan <strong class="text-rose-700 font-extrabold">tidak dapat mengirimkan sisa {{ number_format($remainingQty, 0) }} {{ $unit }}</strong> karena stok gudang habis. Jika Anda setuju, sisa pesanan ditiadakan, tagihan disesuaikan hanya untuk {{ number_format($deliveredQty, 0) }} {{ $unit }}, dan pemasok akan memberangkatkan barang.
+                                                @else
+                                                    Pemasok hanya dapat mengirimkan <strong class="text-emerald-700 font-extrabold">{{ number_format($deliveredQty, 0) }} {{ $unit }}</strong> saat ini dan mengajukan pengiriman sisa <strong class="text-[#ea580c] font-extrabold">{{ number_format($remainingQty, 0) }} {{ $unit }}</strong> pada tanggal <strong class="text-gray-900 underline">{{ $estimatedDateText }}</strong>. Apakah Anda setuju?
+                                                @endif
+                                            </p>
+                                            @if($batch1?->backorder_notes)
+                                                <div class="bg-white/80 border border-amber-200/80 rounded-xl p-2.5 text-[11px] text-gray-700 space-y-0.5 mt-1.5">
+                                                    <span class="font-bold text-amber-900 block text-[10px] uppercase font-mono">Alasan / Catatan dari Pemasok:</span>
+                                                    <p class="italic">"{{ $batch1->backorder_notes }}"</p>
+                                                </div>
+                                            @endif
+                                        </div>
+                                    </div>
+
+                                    <!-- 2 TOMBOL TINDAKAN: SETUJUI VS TOLAK -->
+                                    <div class="pt-2 border-t border-amber-200/80 flex flex-wrap items-center justify-end gap-2.5">
+                                        <!-- Opsi Tolak (Buka Modal Alasan Penolakan) -->
+                                        <button type="button"
+                                                @click="rejectingBackorderId = '{{ $boOrder->id }}'; rejectionReason = ''; rejectingAction = '{{ $batch1?->backorder_action ?? 'create_backorder' }}';"
+                                                class="bg-white hover:bg-rose-50 text-rose-700 border border-rose-300 hover:border-rose-400 px-4 py-2 rounded-xl text-xs font-bold transition shadow-xs cursor-pointer flex items-center gap-1.5">
+                                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                            <span>{{ $batch1?->backorder_action === 'no_backorder' ? 'Tolak & Batalkan Pesanan' : 'Tolak & Batalkan Sisa (' . number_format($remainingQty, 0) . ' ' . $unit . ')' }}</span>
+                                        </button>
+
+                                        <!-- Opsi Terima (Buka Modal Kustom) -->
+                                        <button type="button"
+                                                @click="approvingBackorderOrder = {
+                                                    id: '{{ $boOrder->id }}',
+                                                    orderCode: '#ORD-{{ strtoupper(substr($boOrder->id, 0, 8)) }}',
+                                                    supplier: '{{ addslashes($boOrder->partnership?->supplier?->company_name ?? 'Pemasok Mitra') }}',
+                                                    commodity: '{{ addslashes($firstItem?->supplierProduct?->commodity?->name ?? 'Bahan Baku') }}',
+                                                    deliveredQty: '{{ number_format($deliveredQty, 0) }}',
+                                                    remainingQty: '{{ number_format($remainingQty, 0) }}',
+                                                    unit: '{{ $unit }}',
+                                                    eta: '{{ $estimatedDateText }}',
+                                                    action: '{{ $batch1?->backorder_action ?? 'create_backorder' }}',
+                                                    notes: '{{ addslashes($batch1?->backorder_notes ?? '') }}',
+                                                    actionUrl: '{{ route('umkm.pemesanan.terima-backorder', $boOrder) }}'
+                                                }"
+                                                class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-xl text-xs font-extrabold transition shadow-xs cursor-pointer flex items-center gap-1.5">
+                                            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                            <span>{{ $batch1?->backorder_action === 'no_backorder' ? 'Setujui Pemenuhan Sebagian' : 'Terima Backorder' }}</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            @elseif($approvalStatus === 'rejected')
+                                <div class="bg-rose-50 border border-rose-200 rounded-2xl p-3 text-xs text-rose-900 flex items-center justify-between">
+                                    <div>
+                                        <strong class="font-bold flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg><span>Pengajuan {{ $batch1?->backorder_action === 'no_backorder' ? 'Pemenuhan Sebagian' : 'Backorder' }} Ditolak</span></strong>
+                                        <span class="text-[11px] text-rose-700">
+                                            {{ $batch1?->backorder_action === 'no_backorder' ? 'Seluruh pesanan dibatalkan sesuai keputusan penolakan Anda.' : 'Sisa barang ditiadakan permanen. Total tagihan telah dipotong hanya untuk ' . number_format($deliveredQty, 0) . ' ' . $unit . '.' }}
+                                        </span>
+                                        @if($batch1?->backorder_rejection_reason)
+                                            <p class="text-[10px] text-gray-600 italic mt-0.5">Alasan UMKM: "{{ $batch1->backorder_rejection_reason }}"</p>
+                                        @endif
+                                    </div>
+                                    <span class="bg-rose-100 text-rose-800 text-[10px] font-bold px-2.5 py-1 rounded-full whitespace-nowrap">
+                                        {{ $batch1?->backorder_action === 'no_backorder' ? 'Pesanan Dibatalkan' : 'Selesai Sebagian' }}
+                                    </span>
+                                </div>
+                            @else
+                                <div class="bg-emerald-50/70 border border-emerald-200 rounded-xl px-3 py-2 text-[11px] text-emerald-900 flex flex-wrap items-center justify-between gap-1">
+                                    <span class="font-bold flex items-center gap-1.5">
+                                        <svg class="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                        <span>Pengajuan {{ $batch1?->backorder_action === 'no_backorder' ? 'Pemenuhan Sebagian (No Backorder)' : 'Backorder' }} Disetujui</span>
+                                    </span>
+                                    @if($batch1?->backorder_action !== 'no_backorder')
+                                        <span class="text-emerald-800 font-mono text-[10px]">
+                                            Janji tiba sisa barang: <strong>{{ $estimatedDateText }}</strong>
+                                        </span>
+                                    @else
+                                        <span class="text-emerald-800 font-mono text-[10px]">
+                                            Sisa ditiadakan. Tagihan disesuaikan untuk {{ number_format($deliveredQty, 0) }} {{ $unit }}.
+                                        </span>
+                                    @endif
+                                </div>
+                            @endif
+
+                            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                                <!-- KOMODITAS & RINCIAN VOLUME -->
+                                <div class="md:col-span-4 space-y-1">
+                                    <span class="text-[10px] font-mono uppercase text-gray-400 font-bold">Komoditas Bahan Baku</span>
+                                    <h4 class="font-extrabold text-sm text-gray-900">
+                                        {{ $firstItem?->supplierProduct?->commodity?->name ?? 'Bahan Baku' }}
+                                    </h4>
+                                    <p class="text-xs text-gray-500 font-mono">
+                                        Total Kontrak: <strong>{{ number_format($totalQty, 0) }} {{ $unit }}</strong>
+                                    </p>
+                                </div>
+
+                                <!-- PERBANDINGAN BATCH 1 & BATCH 2 -->
+                                <div class="md:col-span-5 bg-white p-3 rounded-2xl border border-gray-200/80 space-y-1.5 text-xs font-mono">
+                                    <div class="flex justify-between items-center text-emerald-800 font-semibold">
+                                        <span class="flex items-center gap-1"><svg class="w-3 h-3 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg><span>Kloter 1 Diterima:</span></span>
+                                        <strong>{{ number_format($deliveredQty, 0) }} {{ $unit }}</strong>
+                                    </div>
+                                    <div class="flex justify-between items-center text-amber-900 font-bold border-t border-gray-100 pt-1">
+                                        <span class="flex items-center gap-1"><svg class="w-3.5 h-3.5 text-amber-700 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg><span>Sisa Backorder (Kloter 2):</span></span>
+                                        <span class="text-amber-600 font-black text-sm">{{ number_format($remainingQty, 0) }} {{ $unit }}</span>
+                                    </div>
+                                    @if($batch2?->tracking_notes)
+                                        <p class="text-[10px] text-gray-500 font-sans italic pt-1 border-t border-gray-100">
+                                            Resi/Armada Kloter 2: "{{ $batch2->tracking_notes }}"
+                                        </p>
+                                    @endif
+                                </div>
+
+                                <!-- STATUS KEPUTUSAN & PENGALIHAN KE TAB KONFIRMASI PESANAN -->
+                                <div class="md:col-span-3 flex flex-col items-end justify-center space-y-1.5 text-right">
+                                    @if($approvalStatus === 'pending')
+                                        <span class="text-xs text-amber-700 font-bold block">
+                                            ⚠️ Menunggu Keputusan
+                                        </span>
+                                        <span class="text-[11px] text-gray-500">
+                                            Tentukan persetujuan pada kotak di atas.
+                                        </span>
+                                    @elseif($approvalStatus === 'rejected')
+                                        <span class="text-xs text-rose-600 font-bold block">
+                                            ✕ Pengajuan Ditolak
+                                        </span>
+                                        <span class="text-[11px] text-gray-400">
+                                            Sisa pesanan dibatalkan permanen.
+                                        </span>
+                                    @else
+                                        <span class="text-xs text-emerald-700 font-bold block">
+                                            ✓ Backorder Disetujui
+                                        </span>
+                                        <p class="text-[10px] text-gray-500">
+                                            Konfirmasi penerimaan fisik (Kloter 1 maupun Kloter 2) dipantau di tab Konfirmasi Pesanan.
+                                        </p>
+                                        <button type="button"
+                                                @click="orderSubTab = 'confirm'"
+                                                class="bg-orange-50 hover:bg-orange-100 text-[#ea580c] border border-orange-200 px-3.5 py-1.5 rounded-full font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs transition cursor-pointer mt-1">
+                                            <span>Buka Konfirmasi Pesanan →</span>
+                                        </button>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+        </div>
+
+        <!-- MODAL KONFIRMASI TERIMA SISA BACKORDER (BATCH 2) -->
+        <div x-cloak x-show="confirmingBackorderId" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div @click.away="confirmingBackorderId = null" class="bg-white max-w-lg w-full rounded-[2rem] p-6 space-y-5 shadow-2xl border border-gray-100">
+                <div class="flex justify-between items-start border-b border-gray-100 pb-4">
+                    <div>
+                        <span class="text-xs font-bold text-amber-600 uppercase font-mono tracking-wider">KONFIRMASI PENERIMAAN SISA BACKORDER (BATCH 2)</span>
+                        <h3 class="text-xl font-bold text-gray-900 mt-1">Upload Bukti Penerimaan Batch 2</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Pastikan sisa barang pasokan telah Anda terima dengan baik di dapur.</p>
+                    </div>
+                    <button type="button" @click="confirmingBackorderId = null" class="text-gray-400 hover:text-gray-700 cursor-pointer p-1 rounded-lg hover:bg-gray-100 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+
+                <template x-if="confirmingBackorderId">
+                    <form :action="`/umkm/pemesanan/${confirmingBackorderId}/konfirmasi-backorder`" method="POST" enctype="multipart/form-data" class="space-y-4">
+                        @csrf
+
+                        <!-- Preview Foto -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-2">Foto Bukti Penerimaan Sisa Backorder <span class="text-rose-500">*</span></label>
+                            <div class="border-2 border-dashed border-gray-200 rounded-2xl p-4 text-center cursor-pointer hover:border-amber-500 transition"
+                                 @click="$refs.photoBackorderInput.click()">
+                                <template x-if="!confirmBackorderPhotoPreview">
+                                    <div class="space-y-2 py-3">
+                                        <div class="w-11 h-11 mx-auto rounded-xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
+                                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                        </div>
+                                        <p class="text-xs text-gray-600 font-bold">Pilih foto penerimaan Batch 2</p>
+                                        <p class="text-[11px] text-gray-400">JPG, PNG, WEBP — Maks. 5MB</p>
+                                    </div>
+                                </template>
+                                <template x-if="confirmBackorderPhotoPreview">
+                                    <img :src="confirmBackorderPhotoPreview" class="max-h-48 mx-auto rounded-xl object-contain" alt="Preview">
+                                </template>
+                            </div>
+                            <input
+                                type="file"
+                                name="proof_photo"
+                                required
+                                accept="image/*"
+                                x-ref="photoBackorderInput"
+                                class="hidden"
+                                @change="onConfirmBackorderPhotoChange($event)">
+                        </div>
+
+                        <!-- Catatan Konfirmasi -->
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 mb-1.5">Catatan Penerimaan Batch 2 (Opsional)</label>
+                            <textarea
+                                name="confirmation_notes"
+                                rows="3"
+                                x-model="confirmBackorderNotes"
+                                placeholder="Contoh: Sisa 50 kg diterima lengkap dan mutu baik."
+                                class="w-full px-4 py-2.5 rounded-xl bg-[#f1f2f4] text-gray-900 text-xs font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-amber-500 border-0">
+                            </textarea>
+                        </div>
+
+                        <div class="flex gap-3 pt-2">
+                            <button type="button" @click="confirmingBackorderId = null"
+                                class="w-1/2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-full font-bold text-xs transition cursor-pointer">
+                                Batal
+                            </button>
+                            <button type="submit"
+                                class="w-1/2 bg-amber-500 hover:bg-amber-600 text-white py-3 rounded-full font-bold text-xs shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                <span>Konfirmasi Selesai Penuh</span>
+                            </button>
+                        </div>
+                    </form>
+                </template>
+            </div>
+        </div>
+
+        <!-- MODAL TOLAK BACKORDER / NO BACKORDER & ISI ALASAN (ALUR 2.b) -->
+        <div x-cloak x-show="rejectingBackorderId" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div @click.away="rejectingBackorderId = null" class="bg-white max-w-md w-full rounded-[2rem] p-6 space-y-4 shadow-2xl border border-gray-100">
+                <div class="flex justify-between items-start border-b border-gray-100 pb-3">
+                    <div>
+                        <span class="text-[10px] font-bold text-rose-600 uppercase font-mono tracking-wider">KEPUTUSAN PENOLAKAN</span>
+                        <h3 class="text-lg font-bold text-gray-900 mt-0.5" x-text="rejectingAction === 'no_backorder' ? 'Tolak & Batalkan Seluruh Pesanan' : 'Tolak & Batalkan Sisa Barang'"></h3>
+                        <p class="text-xs text-gray-500" x-text="rejectingAction === 'no_backorder' ? 'Seluruh pesanan akan dibatalkan karena Anda menolak pemenuhan sebagian tanpa sisa.' : 'Sisa pesanan tidak akan dikirim lagi dan tagihan Anda akan otomatis dipotong.'"></p>
+                    </div>
+                    <button type="button" @click="rejectingBackorderId = null" class="text-gray-400 hover:text-gray-700 cursor-pointer p-1 rounded-lg hover:bg-gray-100 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+
+                <template x-if="rejectingBackorderId">
+                    <form :action="`/umkm/pemesanan/${rejectingBackorderId}/tolak-backorder`" method="POST" class="space-y-4">
+                        @csrf
+                        <div class="space-y-1.5">
+                            <label class="block text-xs font-bold text-gray-700">
+                                Alasan Singkat Penolakan: <span class="text-rose-500">*</span>
+                            </label>
+                            <textarea name="rejection_reason"
+                                      x-model="rejectionReason"
+                                      rows="3"
+                                      required
+                                      placeholder="Contoh: Kebutuhan dapur sangat mendesak, sisa bahan baku akan kami beli mandiri hari ini."
+                                      class="w-full px-4 py-2.5 rounded-xl bg-[#f1f2f4] text-gray-900 text-xs font-medium placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500 border-0"></textarea>
+                            <p class="text-[11px] text-gray-400" x-text="rejectingAction === 'no_backorder' ? 'Pemasok akan menerima pemberitahuan bahwa seluruh pesanan dibatalkan.' : 'Pemasok akan menerima pemberitahuan bahwa sisa pesanan tidak perlu dikirimkan lagi.'"></p>
+                        </div>
+
+                        <div class="flex gap-3 pt-2">
+                            <button type="button" @click="rejectingBackorderId = null"
+                                    class="w-1/2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-full font-bold text-xs transition cursor-pointer">
+                                Batal
+                            </button>
+                            <button type="submit"
+                                    class="w-1/2 bg-rose-600 hover:bg-rose-700 text-white py-3 rounded-full font-bold text-xs shadow-sm transition cursor-pointer">
+                                <span x-text="rejectingAction === 'no_backorder' ? 'Ya, Tolak & Batalkan Pesanan' : 'Ya, Tolak & Batalkan Sisa'"></span>
+                            </button>
+                        </div>
+                    </form>
+                </template>
+            </div>
+        </div>
+
+        <!-- MODAL PERSETUJUAN TERIMA BACKORDER / NO BACKORDER (CUSTOM MODAL PREMIUM) -->
+        <div x-cloak x-show="approvingBackorderOrder" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div @click.away="approvingBackorderOrder = null" class="bg-white max-w-md w-full rounded-[2rem] p-6 space-y-4 shadow-2xl border border-gray-100">
+                <div class="flex justify-between items-start border-b border-gray-100 pb-3">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shadow-xs">
+                            <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-bold text-emerald-700 uppercase font-mono tracking-wider">KONFIRMASI PERSETUJUAN</span>
+                            <h3 class="text-base font-bold text-gray-900" x-text="approvingBackorderOrder?.action === 'no_backorder' ? 'Setujui Pemenuhan Sebagian?' : 'Setujui Pengajuan Backorder?'"></h3>
+                        </div>
+                    </div>
+                    <button type="button" @click="approvingBackorderOrder = null" class="text-gray-400 hover:text-gray-700 cursor-pointer p-1 rounded-lg hover:bg-gray-100 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                </div>
+
+                <template x-if="approvingBackorderOrder">
+                    <form :action="approvingBackorderOrder.actionUrl" method="POST" class="space-y-4">
+                        @csrf
+                        <div class="bg-emerald-50/60 border border-emerald-200 rounded-2xl p-4 space-y-2.5 text-xs">
+                            <template x-if="approvingBackorderOrder.action === 'no_backorder'">
+                                <div class="space-y-2">
+                                    <p class="text-gray-600">
+                                        Pemasok (<strong class="text-gray-900" x-text="approvingBackorderOrder.supplier"></strong>) mengajukan pemenuhan sebagian tanpa backorder:
+                                    </p>
+                                    <div class="flex items-center justify-between bg-white px-3.5 py-2.5 rounded-xl border border-emerald-200/80 shadow-2xs font-mono">
+                                        <span class="text-gray-700 font-bold" x-text="approvingBackorderOrder.commodity"></span>
+                                        <span class="text-emerald-700 font-extrabold text-sm" x-text="'Dikirim: ' + approvingBackorderOrder.deliveredQty + ' ' + approvingBackorderOrder.unit"></span>
+                                    </div>
+                                    <div class="text-[11px] text-rose-700 bg-rose-50 border border-rose-200 p-2.5 rounded-xl space-y-0.5">
+                                        <strong class="flex items-center gap-1.5 font-bold"><svg class="w-3.5 h-3.5 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg><span>Sisa Pasokan Ditiadakan:</span></strong>
+                                        <p>Sisa <strong x-text="approvingBackorderOrder.remainingQty + ' ' + approvingBackorderOrder.unit"></strong> ditiadakan & tagihan otomatis disesuaikan.</p>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <template x-if="approvingBackorderOrder.action !== 'no_backorder'">
+                                <div class="space-y-2">
+                                    <p class="text-gray-600">
+                                        Pemasok (<strong class="text-gray-900" x-text="approvingBackorderOrder.supplier"></strong>) mengajukan sisa pengiriman barang:
+                                    </p>
+                                    <div class="flex items-center justify-between bg-white px-3.5 py-2.5 rounded-xl border border-emerald-200/80 shadow-2xs font-mono">
+                                        <span class="text-gray-700 font-bold" x-text="approvingBackorderOrder.commodity"></span>
+                                        <span class="text-emerald-700 font-extrabold text-sm" x-text="approvingBackorderOrder.remainingQty + ' ' + approvingBackorderOrder.unit"></span>
+                                    </div>
+                                    <div class="text-[11px] text-emerald-900 space-y-1.5 pt-1">
+                                        <p class="flex items-center gap-1.5 font-medium">
+                                            <svg class="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                            <span>Estimasi kirim sisa barang: <strong class="underline decoration-emerald-400" x-text="approvingBackorderOrder.eta"></strong></span>
+                                        </p>
+                                    </div>
+                                </div>
+                            </template>
+
+                            <template x-if="approvingBackorderOrder.notes">
+                                <p class="text-gray-500 italic bg-white/70 p-2 rounded-lg border border-emerald-100">
+                                    Catatan pemasok: "<span x-text="approvingBackorderOrder.notes"></span>"
+                                </p>
+                            </template>
+                        </div>
+
+                        <p class="text-[11px] text-gray-500 leading-normal" x-text="approvingBackorderOrder.action === 'no_backorder' ? 'Dengan menyetujui, pemasok akan segera memberangkatkan barang yang tersedia. Invoice resmi diterbitkan saat barang diberangkatkan.' : 'Dengan menyetujui, pemasok akan mempersiapkan pengiriman Batch 2 sesuai tanggal di atas. Tagihan Invoice Batch 2 akan terbit saat barang kloter 2 tiba di dapur.'">
+                        </p>
+
+                        <div class="flex gap-3 pt-1">
+                            <button type="button" @click="approvingBackorderOrder = null"
+                                    class="w-1/2 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3 rounded-full font-bold text-xs transition cursor-pointer">
+                                Batal
+                            </button>
+                            <button type="submit"
+                                    class="w-1/2 bg-emerald-600 hover:bg-emerald-700 text-white py-3 rounded-full font-bold text-xs shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5">
+                                <span>✓</span>
+                                <span x-text="approvingBackorderOrder.action === 'no_backorder' ? 'Ya, Setujui Pemenuhan Sebagian' : 'Ya, Setujui Backorder'"></span>
+                            </button>
+                        </div>
+                    </form>
+                </template>
+            </div>
+        </div>
+
+        <!-- SUB-TAB 4: PEMBAYARAN MIDTRANS (INVOICE PER BATCH) -->
+        <div x-show="orderSubTab === 'payment'" class="bg-white rounded-3xl border border-gray-100 overflow-hidden p-6 space-y-4 shadow-sm">
+            <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-gray-100 pb-4">
+                <div>
+                    <span class="text-[10px] font-bold text-[#ea580c] uppercase font-mono tracking-wider">TAGIHAN RESMI SESUAI BATCH PENGIRIMAN</span>
+                    <h3 class="font-extrabold text-xl text-gray-900 mt-0.5">Pembayaran Tagihan Invoice Via Midtrans</h3>
+                    <p class="text-xs text-gray-500 mt-0.5">Setiap kloter pengiriman (Batch 1 maupun Batch 2 Backorder) diterbitkan invoice terpisah sesuai fisik barang yang tiba.</p>
                 </div>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-xs text-left">
-                    <thead class="bg-gray-50 font-mono text-gray-500 uppercase border-b border-gray-100">
-                        <tr>
-                            <th class="p-3.5">ID Pesanan</th>
-                            <th class="p-3.5">Pemasok</th>
-                            <th class="p-3.5">Komoditas & Volume</th>
-                            <th class="p-3.5">Total Tagihan</th>
-                            <th class="p-3.5">Status Pembayaran</th>
-                            <th class="p-3.5 text-center">Aksi Bayar Online</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100 font-medium">
-                        <template x-for="ord in orders" :key="'pay-' + ord.id">
-                            <tr class="hover:bg-gray-50/50 transition">
-                                <td class="p-3.5 font-mono font-bold text-[#ea580c]" x-text="ord.id"></td>
-                                <td class="p-3.5 font-bold text-gray-900" x-text="ord.supplierName"></td>
-                                <td class="p-3.5 text-gray-700" x-text="ord.commodity + ' (' + ord.approvedQty + ' ' + ord.unit + ')'"></td>
-                                <td class="p-3.5 font-bold text-gray-900" x-text="'Rp ' + ord.total.toLocaleString('id-ID')"></td>
-                                <td class="p-3.5">
-                                    <span class="px-2.5 py-1 rounded-full text-[10px] font-bold"
-                                          :class="ord.paymentStatus === 'PAID' ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'"
-                                          x-text="ord.paymentStatus === 'PAID' ? '✓ LUNAS' : 'BELUM DIBAYAR'">
-                                    </span>
-                                </td>
-                                <td class="p-3.5 text-center">
-                                    <template x-if="ord.paymentStatus === 'UNPAID'">
-                                        <button 
-                                            type="button"
-                                            @click="openMidtransPayment(ord)" 
-                                            class="bg-[#ea580c] hover:bg-[#c2410c] text-white px-4 py-1.5 rounded-full font-bold text-[11px] shadow-sm transition cursor-pointer">
-                                            Bayar Midtrans →
-                                        </button>
-                                    </template>
-                                    <template x-if="ord.paymentStatus === 'PAID'">
-                                        <span class="text-emerald-700 font-bold text-[11px]">✓ Lunas</span>
-                                    </template>
-                                </td>
+            @if($batchInvoices->isEmpty())
+                <div class="py-14 text-center space-y-3">
+                    <div class="w-14 h-14 mx-auto rounded-2xl bg-orange-50 border border-orange-100/80 flex items-center justify-center text-[#ea580c] shadow-xs">
+                        <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </div>
+                    <div class="space-y-1">
+                        <p class="font-bold text-gray-800 text-sm">Belum Ada Tagihan Invoice Pasokan</p>
+                        <p class="text-xs text-gray-400">Invoice pembayaran akan otomatis diterbitkan untuk setiap kloter batch pengiriman saat pemasok memproses pengiriman bahan baku.</p>
+                    </div>
+                </div>
+            @else
+                <div class="overflow-x-auto">
+                    <table class="w-full text-xs text-left">
+                        <thead class="bg-gray-50 font-mono text-gray-500 uppercase border-b border-gray-100">
+                            <tr>
+                                <th class="p-3.5">No. Invoice & Batch</th>
+                                <th class="p-3.5">Pemasok Mitra</th>
+                                <th class="p-3.5">Detail Komoditas & Kuantitas Batch</th>
+                                <th class="p-3.5">Nominal Tagihan Batch</th>
+                                <th class="p-3.5">Status Pembayaran</th>
+                                <th class="p-3.5 text-center">Aksi Bayar Online</th>
                             </tr>
-                        </template>
-                    </tbody>
-                </table>
-            </div>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 font-medium">
+                            @foreach($batchInvoices as $inv)
+                                @php
+                                    $invOrder = $inv->order;
+                                    $firstItem = $invOrder?->items?->first();
+                                    $commodityName = $firstItem?->supplierProduct?->commodity?->name ?? 'Komoditas Pasokan';
+                                    $unit = $firstItem?->supplierProduct?->commodity?->unit ?? 'kg';
+                                    $isPaid = $inv->isPaid();
+                                    $batchBadge = $inv->shipment_batch == 2 ? 'Kloter 2 (Backorder)' : 'Kloter 1';
+                                @endphp
+                                <tr class="hover:bg-gray-50/50 transition">
+                                    <td class="p-3.5 space-y-1">
+                                        <span class="font-mono font-bold text-[#ea580c] block text-xs">
+                                            {{ $inv->invoice_number ?? ('INV/' . strtoupper(substr($inv->order_id, 0, 8)) . '/B' . $inv->shipment_batch) }}
+                                        </span>
+                                        <span class="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full {{ $inv->shipment_batch == 2 ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-orange-50 text-[#ea580c] border border-orange-200' }}">
+                                            {{ $batchBadge }}
+                                        </span>
+                                        <span class="block text-[10px] text-gray-400 font-mono">
+                                            Ref: #ORD-{{ strtoupper(substr($inv->order_id, 0, 8)) }}
+                                        </span>
+                                    </td>
+                                    <td class="p-3.5 font-bold text-gray-900">
+                                        {{ $invOrder?->partnership?->supplier?->company_name ?? 'Pemasok Mitra' }}
+                                    </td>
+                                    <td class="p-3.5 space-y-1">
+                                        <strong class="text-gray-900 block text-xs">{{ $commodityName }}</strong>
+                                        <div class="text-[11px] text-gray-600 font-mono">
+                                            Kuantitas Batch: <strong>{{ number_format((float) ($inv->quantity_billed ?: 0), 1) }} {{ $unit }}</strong>
+                                        </div>
+                                        @if($inv->notes)
+                                            <span class="text-[10px] text-gray-400 italic block">{{ $inv->notes }}</span>
+                                        @endif
+                                    </td>
+                                    <td class="p-3.5 whitespace-nowrap">
+                                        <span class="font-extrabold text-gray-900 text-sm block font-mono">
+                                            Rp {{ number_format($inv->amount, 0, ',', '.') }}
+                                        </span>
+                                        <span class="text-[10px] text-gray-400 block font-mono">Sesuai kuantitas batch</span>
+                                    </td>
+                                    <td class="p-3.5 whitespace-nowrap">
+                                        @if($isPaid)
+                                            <span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                                <span>✓ LUNAS</span>
+                                            </span>
+                                            @if($inv->paid_at || $inv->transaction_time)
+                                                <span class="block text-[10px] text-gray-400 mt-1 font-mono">
+                                                    {{ ($inv->paid_at ?? $inv->transaction_time)->format('d/m/Y H:i') }}
+                                                </span>
+                                            @endif
+                                        @else
+                                            <span class="bg-rose-100 text-rose-800 px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span>
+                                                BELUM DIBAYAR
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="p-3.5 text-center whitespace-nowrap">
+                                        @if(! $isPaid)
+                                            <button 
+                                                type="button"
+                                                @click="openBatchInvoicePayment({
+                                                    id: '{{ $inv->id }}',
+                                                    invoiceNumber: '{{ $inv->invoice_number }}',
+                                                    batch: {{ $inv->shipment_batch }},
+                                                    batchName: '{{ $batchBadge }}',
+                                                    orderCode: '{{ strtoupper(substr($inv->order_id, 0, 8)) }}',
+                                                    supplierName: '{{ addslashes($invOrder?->partnership?->supplier?->company_name ?? 'Pemasok') }}',
+                                                    commodity: '{{ addslashes($commodityName) }}',
+                                                    quantity: '{{ number_format((float) ($inv->quantity_billed ?: 0), 1) }} {{ $unit }}',
+                                                    amount: {{ (float) $inv->amount }}
+                                                })" 
+                                                class="bg-[#ea580c] hover:bg-[#c2410c] text-white px-4 py-2 rounded-full font-bold text-[11px] shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5 mx-auto">
+                                                <span>Bayar {{ $batchBadge }} →</span>
+                                            </button>
+                                        @else
+                                            <span class="text-emerald-700 font-bold text-[11px] inline-flex items-center gap-1">
+                                                ✓ Lunas via {{ $inv->payment_method ?? 'Midtrans' }}
+                                            </span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
         </div>
 
         <!-- SUB-TAB 4: RATING & ULASAN -->
@@ -1489,7 +2325,7 @@
 
         </div>
 
-    </div>
+    </div> <!-- /TAB: PESANAN & PENGIRIMAN -->
 
     <!-- ========================================================= -->
     <!-- TAB 3: DASHBOARD ANALISIS UMKM                           -->
@@ -1917,13 +2753,16 @@
                     Tutup
                 </button>
                 <template x-if="!isPublishedToday(previewAutoOrder)">
-                    <button 
-                        type="button" 
-                        @click="handlePublishAutoOrder(previewAutoOrder)" 
-                        class="w-1/2 bg-[#ea580c] hover:bg-[#c2410c] text-white py-3 rounded-full font-bold text-xs hover:brightness-95 transition shadow-sm cursor-pointer flex items-center justify-center gap-1.5">
-                        <span>Terbitkan Pesanan Sekarang</span>
-                        <span>→</span>
-                    </button>
+                    <form action="{{ route('umkm.pemesanan.terbitkan') }}" method="POST" class="w-1/2">
+                        @csrf
+                        <input type="hidden" name="schedule_id" :value="previewAutoOrder?.scheduleId">
+                        <button 
+                            type="submit" 
+                            class="w-full bg-[#ea580c] hover:bg-[#c2410c] text-white py-3 rounded-full font-bold text-xs hover:brightness-95 transition shadow-sm cursor-pointer flex items-center justify-center gap-1.5">
+                            <span>Terbitkan Pesanan Sekarang</span>
+                            <span>→</span>
+                        </button>
+                    </form>
                 </template>
 
                 <template x-if="isPublishedToday(previewAutoOrder)">
@@ -1945,8 +2784,84 @@
     </div>
 
     <!-- ========================================================= -->
-    <!-- MODAL MIDTRANS PAYMENT SIMULATOR                          -->
+    <!-- MODAL MIDTRANS PAYMENT SIMULATOR (BATCH INVOICE)          -->
     <!-- ========================================================= -->
+    <div x-cloak x-show="payingInvoice" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div @click.away="payingInvoice = null" class="bg-white max-w-md w-full rounded-3xl p-6 sm:p-7 space-y-5 shadow-2xl border border-gray-100">
+            <div class="flex justify-between items-start border-b border-gray-100 pb-3">
+                <div>
+                    <span class="text-xs font-bold text-[#ea580c] uppercase font-mono">MIDTRANS PAYMENT GATEWAY</span>
+                    <h3 class="text-xl font-extrabold text-gray-900 mt-0.5">Pembayaran Tagihan Batch</h3>
+                    <p class="text-xs text-gray-500 font-mono mt-0.5" x-text="'No. Invoice: ' + payingInvoice?.invoiceNumber"></p>
+                </div>
+                <button type="button" @click="payingInvoice = null" class="text-gray-400 hover:text-gray-700 cursor-pointer p-1 rounded-lg hover:bg-gray-100 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+            </div>
+
+            <!-- DETAIL INVOICE BATCH -->
+            <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2 text-xs font-mono">
+                <div class="flex justify-between text-gray-600">
+                    <span>Kloter Pengiriman:</span>
+                    <span class="font-bold text-[#ea580c]" x-text="payingInvoice?.batchName"></span>
+                </div>
+                <div class="flex justify-between text-gray-600">
+                    <span>Ref. Pesanan:</span>
+                    <span class="font-bold text-gray-800" x-text="'#ORD-' + payingInvoice?.orderCode"></span>
+                </div>
+                <div class="flex justify-between text-gray-600">
+                    <span>Pemasok:</span>
+                    <span class="font-bold text-gray-900" x-text="payingInvoice?.supplierName"></span>
+                </div>
+                <div class="flex justify-between text-gray-600">
+                    <span>Kuantitas Batch:</span>
+                    <span class="font-bold text-gray-900" x-text="payingInvoice?.commodity + ' (' + payingInvoice?.quantity + ')'"></span>
+                </div>
+                <div class="flex justify-between text-base text-[#ea580c] font-black pt-2 border-t border-gray-200">
+                    <span>Total Tagihan Batch:</span>
+                    <span x-text="'Rp ' + (payingInvoice?.amount ? payingInvoice.amount.toLocaleString('id-ID') : 0)"></span>
+                </div>
+            </div>
+
+            <form :action="`/umkm/pemesanan/pembayaran/${payingInvoice?.id}/bayar`" method="POST" class="space-y-4">
+                @csrf
+                <input type="hidden" name="payment_method" :value="selectedPaymentMethod">
+
+                <div class="space-y-2 text-xs font-semibold">
+                    <span class="block text-gray-600 text-[11px]">Pilih Metode Pembayaran Midtrans:</span>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button"
+                                @click="selectedPaymentMethod = 'Midtrans BCA Virtual Account'"
+                                :class="selectedPaymentMethod === 'Midtrans BCA Virtual Account' ? 'border-[#ea580c] bg-orange-50 text-[#ea580c]' : 'border-gray-200 bg-[#f1f2f4] text-gray-800'"
+                                class="p-2.5 rounded-xl border text-center font-bold cursor-pointer transition text-xs">
+                            BCA VA
+                        </button>
+                        <button type="button"
+                                @click="selectedPaymentMethod = 'Midtrans Mandiri Virtual Account'"
+                                :class="selectedPaymentMethod === 'Midtrans Mandiri Virtual Account' ? 'border-[#ea580c] bg-orange-50 text-[#ea580c]' : 'border-gray-200 bg-[#f1f2f4] text-gray-800'"
+                                class="p-2.5 rounded-xl border text-center font-bold cursor-pointer transition text-xs">
+                            Mandiri VA
+                        </button>
+                        <button type="button"
+                                @click="selectedPaymentMethod = 'Midtrans QRIS'"
+                                :class="selectedPaymentMethod === 'Midtrans QRIS' ? 'border-[#ea580c] bg-orange-50 text-[#ea580c]' : 'border-gray-200 bg-[#f1f2f4] text-gray-800'"
+                                class="p-2.5 rounded-xl border text-center font-bold cursor-pointer transition text-xs">
+                            QRIS
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 pt-1">
+                    <button type="button" @click="payingInvoice = null" class="w-1/3 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3.5 rounded-full font-bold text-xs transition cursor-pointer">
+                        Batal
+                    </button>
+                    <button type="submit" class="w-2/3 bg-[#ea580c] hover:bg-[#c2410c] text-white py-3.5 rounded-full font-bold text-xs shadow-md transition cursor-pointer flex items-center justify-center gap-1.5">
+                        <span>Bayar Batch Ini via Midtrans</span><svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL FALLBACK UNTUK MOCK ORDER DEMO -->
     <div x-cloak x-show="payingOrder" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div @click.away="payingOrder = null" class="bg-white max-w-md w-full rounded-3xl p-6 sm:p-7 space-y-5 shadow-2xl border border-gray-100">
             <div class="flex justify-between items-start border-b border-gray-100 pb-3">
@@ -1954,7 +2869,7 @@
                     <span class="text-xs font-bold text-[#ea580c] uppercase font-mono">MIDTRANS PAYMENT GATEWAY</span>
                     <h3 class="text-xl font-extrabold text-gray-900">Pembayaran Tagihan Pasokan</h3>
                 </div>
-                <button type="button" @click="payingOrder = null" class="text-gray-400 hover:text-gray-700 font-bold text-lg cursor-pointer">✕</button>
+                <button type="button" @click="payingOrder = null" class="text-gray-400 hover:text-gray-700 cursor-pointer p-1 rounded-lg hover:bg-gray-100 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
 
             <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2 text-xs font-mono">
@@ -1967,17 +2882,8 @@
                 </div>
             </div>
 
-            <div class="space-y-2 text-xs font-semibold">
-                <span class="block text-gray-600 text-[11px]">Pilih Metode Pembayaran Midtrans:</span>
-                <div class="grid grid-cols-3 gap-2">
-                    <button type="button" @click="selectedPaymentMethod = 'bca'" :class="selectedPaymentMethod === 'bca' ? 'border-[#ea580c] bg-orange-50 text-[#ea580c]' : 'border-gray-200 bg-[#f1f2f4] text-gray-800'" class="p-2.5 rounded-xl border text-center font-bold cursor-pointer transition">BCA VA</button>
-                    <button type="button" @click="selectedPaymentMethod = 'mandiri'" :class="selectedPaymentMethod === 'mandiri' ? 'border-[#ea580c] bg-orange-50 text-[#ea580c]' : 'border-gray-200 bg-[#f1f2f4] text-gray-800'" class="p-2.5 rounded-xl border text-center font-bold cursor-pointer transition">Mandiri VA</button>
-                    <button type="button" @click="selectedPaymentMethod = 'qris'" :class="selectedPaymentMethod === 'qris' ? 'border-[#ea580c] bg-orange-50 text-[#ea580c]' : 'border-gray-200 bg-[#f1f2f4] text-gray-800'" class="p-2.5 rounded-xl border text-center font-bold cursor-pointer transition">QRIS</button>
-                </div>
-            </div>
-
             <button type="button" @click="simulateMidtransSuccess()" class="w-full bg-[#ea580c] hover:bg-[#c2410c] text-white py-3.5 rounded-full font-bold text-xs shadow-md transition cursor-pointer">
-                Simulasi Pembayaran Berhasil (Sukses) ✓
+                Simulasi Pembayaran Berhasil (Sukses)
             </button>
         </div>
     </div>

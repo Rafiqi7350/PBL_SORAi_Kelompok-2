@@ -5,12 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>SORAI - Kelola Stok Komoditas Pemasok</title>
     
-    <!-- Google Fonts Outfit & Space Mono -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
     
-    <!-- Alpine.js -->
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -22,10 +20,8 @@
 </head>
 <body class="bg-[#f3f4f6] text-gray-900 antialiased min-h-screen flex">
 
-    <!-- Sidebar Kiri (Dark Theme) -->
     <aside class="w-64 bg-[#1E222D] text-white flex flex-col justify-between min-h-screen p-6 shrink-0">
         <div class="space-y-6">
-            <!-- Brand / Logo -->
             <div class="flex items-center gap-3">
                 <div class="bg-[#ea580c] text-white rounded-full w-10 h-10 flex items-center justify-center font-bold text-xl shadow-xs">
                     S
@@ -36,12 +32,10 @@
                 </div>
             </div>
 
-            <!-- Panel Tag -->
             <div class="text-[10px] font-black uppercase text-[#ea580c] tracking-widest px-1">
                 PANEL PEMASOK
             </div>
 
-            <!-- Navigation Menu -->
             <nav class="space-y-2">
                 <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
@@ -65,19 +59,31 @@
                     @endif
                 </a>
 
-                <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
-                    Pesanan & Pengiriman
+                @php
+                    $pendingOrdersCount = auth()->user()?->supplierProfile
+                        ? \App\Models\Order::whereHas('partnership', fn($q) => $q->where('supplier_id', auth()->user()->supplierProfile->id))
+                            ->whereIn('order_status', ['pending', 'confirmed', 'MENUNGGU_KONFIRMASI_BARANG'])->count()
+                        : 0;
+                @endphp
+                <a href="{{ route('supplier.pengiriman.index') }}" class="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition
+                    {{ request()->routeIs('supplier.pengiriman.*') ? 'bg-[#ea580c] text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
+                    <div class="flex items-center gap-3">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                        Pesanan & Pengiriman
+                    </div>
+                    @if($pendingOrdersCount > 0)
+                        <span class="{{ request()->routeIs('supplier.pengiriman.*') ? 'bg-white text-[#ea580c]' : 'bg-[#ea580c] text-white' }} text-[10px] font-black px-2 py-0.5 rounded-full">
+                            {{ $pendingOrdersCount }}
+                        </span>
+                    @endif
                 </a>
 
-                <!-- Active Link: Kelola Stok -->
                 <a href="{{ route('supplier.katalog.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition
                     {{ request()->routeIs('supplier.katalog.*') ? 'bg-[#ea580c] text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                     Kelola Stok (CRUD)
                 </a>
 
-                <!-- Active Link: Supply Planning (Collaborative Supply Planning) -->
                 @php
                     $pendingSupplyPlansCount = auth()->user()?->supplierProfile
                         ? \App\Models\SupplyPlan::whereHas('partnership', fn($q) => $q->where('supplier_id', auth()->user()->supplierProfile->id))
@@ -104,7 +110,6 @@
             </nav>
         </div>
 
-        <!-- Sidebar Bottom Actions -->
         <div class="space-y-3 pt-6">
             <div class="bg-gray-800/60 p-3 rounded-2xl flex items-center gap-3 border border-gray-700/50">
                 <div class="w-8 h-8 rounded-full bg-[#ea580c] text-white flex items-center justify-center font-extrabold text-xs">
@@ -127,14 +132,8 @@
         </div>
     </aside>
 
-    <!-- Main Content Area -->
     <main class="flex-1 p-8 md:p-10 overflow-y-auto">
-        @if(session('success'))
-            <div class="bg-emerald-50 border border-emerald-400 text-emerald-900 px-5 py-3 rounded-2xl mb-6 flex items-center justify-between">
-                <span class="font-bold text-sm">{{ session('success') }}</span>
-                <button onclick="this.parentElement.remove()" class="font-bold text-lg">&times;</button>
-            </div>
-        @endif
+        @include('partials.flash-notification')
 
         @yield('content')
     </main>

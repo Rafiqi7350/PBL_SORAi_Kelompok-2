@@ -155,16 +155,8 @@
     <!-- AREA KONTEN UTAMA SISI ADMIN (KANAN) -->
     <main class="flex-1 ml-64 p-8 overflow-y-auto space-y-6 min-w-0">
 
-        <!-- Flash Success Notification -->
-        @if(session('success'))
-            <div class="bg-emerald-50 text-emerald-800 border border-emerald-200 p-4 rounded-2xl text-xs font-bold flex justify-between items-center shadow-sm" role="alert">
-                <div class="flex items-center gap-2">
-                    <span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-xs">✓</span>
-                    <span>{{ session('success') }}</span>
-                </div>
-                <button onclick="this.parentElement.remove()" class="font-bold text-base hover:text-rose-700 cursor-pointer">&times;</button>
-            </div>
-        @endif
+        <!-- Flash Notifications (Auto-Dismiss) -->
+        @include('partials.flash-notification')
 
         <!-- Flash Validation Errors -->
         @if($errors->any())
