@@ -13,6 +13,24 @@ class Order extends Model
 {
     use HasFactory, HasUuids;
 
+    public const STATUS_PENDING = 'pending';
+
+    public const STATUS_CONFIRMED = 'confirmed';
+
+    public const STATUS_SHIPPED = 'shipped';
+
+    public const STATUS_PARTIALLY_SHIPPED = 'partially_shipped';
+
+    public const STATUS_WAITING_BACKORDER_APPROVAL = 'waiting_backorder_approval';
+
+    public const STATUS_BACKORDER_PENDING = 'backorder_pending';
+
+    public const STATUS_COMPLETED = 'completed';
+
+    public const STATUS_COMPLETED_PARTIAL = 'completed_partial';
+
+    public const STATUS_CANCELLED = 'cancelled';
+
     protected $fillable = [
         'partnership_id',
         'order_date',
@@ -42,11 +60,49 @@ class Order extends Model
 
     public function shipmentConfirmation(): HasOne
     {
-        return $this->hasOne(ShipmentConfirmation::class);
+        return $this->hasOne(ShipmentConfirmation::class)->latestOfMany();
+    }
+
+    public function shipmentConfirmations(): HasMany
+    {
+        return $this->hasMany(ShipmentConfirmation::class)->orderBy('shipment_batch', 'asc');
     }
 
     public function payment(): HasOne
     {
-        return $this->hasOne(Payment::class);
+        return $this->hasOne(Payment::class)->latestOfMany();
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class)->orderBy('shipment_batch', 'asc');
+    }
+
+    public function hasBackorder(): bool
+    {
+        return $this->order_status === self::STATUS_BACKORDER_PENDING
+            || $this->items->sum('quantity_remaining') > 0
+            || $this->shipmentConfirmations()->where('backorder_action', 'create_backorder')->exists();
+    }
+
+    public function isNoBackorder(): bool
+    {
+        return $this->shipmentConfirmations()->where('backorder_action', 'no_backorder')->exists()
+            || $this->order_status === self::STATUS_COMPLETED_PARTIAL;
+    }
+
+    public function getTotalOrderedQuantityAttribute(): float
+    {
+        return (float) $this->items->sum('quantity');
+    }
+
+    public function getTotalDeliveredQuantityAttribute(): float
+    {
+        return (float) $this->items->sum('quantity_delivered');
+    }
+
+    public function getTotalRemainingQuantityAttribute(): float
+    {
+        return (float) $this->items->sum('quantity_remaining');
     }
 }

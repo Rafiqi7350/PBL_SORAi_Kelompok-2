@@ -8,6 +8,7 @@ use App\Models\CommodityUnit;
 use App\Models\Order;
 use App\Models\Partnership;
 use App\Models\PartnershipDeliverySchedule;
+use App\Models\Payment;
 use App\Models\SupplierProduct;
 use App\Models\SupplierProfile;
 use App\Models\SupplyPlan;
@@ -160,8 +161,14 @@ class KatalogController extends Controller
                         ? now()->format('d/m/Y')
                         : ($nextDate ? $nextDate->format('d/m/Y') : now()->addDay()->format('d/m/Y'));
 
+                    $isPublishedToday = Order::where('partnership_id', $partnership->id)
+                        ->whereDate('created_at', now()->toDateString())
+                        ->exists();
+
                     $autoOrdersList[] = [
                         'id' => 'AUTO-'.strtoupper(substr($schedule->id, 0, 8)),
+                        'scheduleId' => $schedule->id,
+                        'partnershipId' => $partnership->id,
                         'contractId' => 'CTR-'.strtoupper(substr($partnership->id, 0, 8)),
                         'supplierName' => $supplierName,
                         'commodity' => $commodityName,
@@ -174,7 +181,7 @@ class KatalogController extends Controller
                         'deliveryTime' => $timeStr,
                         'nextDelivery' => $nextDeliveryDate,
                         'nextScheduledPublish' => $nextScheduledPublishText,
-                        'isPublishedToday' => false,
+                        'isPublishedToday' => $isPublishedToday,
                         'autoStatus' => $schedule->is_auto_order_active ? 'TERJADWAL' : 'NON-AKTIF',
                         'notes' => $schedule->special_instructions ?? ($partnership->submission_details ?? 'Pasokan terikat kontrak kemitraan resmi.'),
                     ];
@@ -226,18 +233,93 @@ class KatalogController extends Controller
                 ->whereNotIn('status', ['rejected', 'ditolak']);
         })->pluck('supplier_product_id')->toArray() : [];
 
-        // Hitung jumlah pesanan yang belum divalidasi/dikonfirmasi oleh UMKM
+        // Hitung jumlah pesanan yang perlu divalidasi penerimaannya (Batch 1) oleh UMKM (hanya yang sudah diberangkatkan)
         $pendingValidationCount = $umkm ? Order::whereHas('partnership', function ($q) use ($umkm) {
             $q->where('umkm_id', $umkm->id);
-        })->whereIn('order_status', ['MENUNGGU_KONFIRMASI_BARANG', 'DIKIRIM'])->count() : 0;
+        })->where(function ($q) {
+            $q->whereIn('order_status', ['MENUNGGU_KONFIRMASI_BARANG', 'DIKIRIM', 'shipped', 'partially_shipped'])
+                ->whereHas('shipmentConfirmations', function ($sq) {
+                    $sq->where('shipment_batch', 1)->whereNotNull('shipped_at')->whereNull('received_at');
+                });
+        })->count() : 0;
 
-        // Hitung jumlah tagihan pesanan yang belum dibayar oleh UMKM
-        $pendingPaymentCount = $umkm ? Order::whereHas('partnership', function ($q) use ($umkm) {
+        // Hitung jumlah pesanan yang menunggu persetujuan backorder dari UMKM
+        $pendingBackorderApprovalCount = $umkm ? Order::whereHas('partnership', function ($q) use ($umkm) {
             $q->where('umkm_id', $umkm->id);
-        })->where('order_status', 'BARANG_DITERIMA')
-            ->whereDoesntHave('payment', function ($q) {
-                $q->whereIn('payment_status', ['PAID', 'settlement', 'capture', 'success']);
-            })->count() : 0;
+        })->where(function ($q) {
+            $q->where('order_status', Order::STATUS_WAITING_BACKORDER_APPROVAL)
+                ->orWhereHas('shipmentConfirmations', function ($sq) {
+                    $sq->where('backorder_action', 'create_backorder')
+                        ->where('backorder_approval_status', 'pending');
+                });
+        })->count() : 0;
+
+        // Hitung total pesanan backorder aktif (menunggu persetujuan + menunggu kirim sisa)
+        $pendingBackorderCount = $umkm ? Order::whereHas('partnership', function ($q) use ($umkm) {
+            $q->where('umkm_id', $umkm->id);
+        })->where(function ($q) {
+            $q->whereIn('order_status', [Order::STATUS_BACKORDER_PENDING, Order::STATUS_WAITING_BACKORDER_APPROVAL])
+                ->orWhere(function ($oq) {
+                    $oq->whereIn('order_status', ['shipped', 'partially_shipped'])
+                        ->whereHas('shipmentConfirmations', function ($sq) {
+                            $sq->where('backorder_action', 'create_backorder')
+                                ->where('backorder_approval_status', '!=', 'rejected');
+                        })
+                        ->whereDoesntHave('shipmentConfirmations', function ($sq) {
+                            $sq->where('shipment_batch', 2)->whereNotNull('received_at');
+                        });
+                });
+        })->count() : 0;
+
+        // Ambil daftar pesanan backorder untuk UMKM ini
+        $backorderOrders = $umkm ? Order::with([
+            'partnership.supplier',
+            'items.supplierProduct.commodity',
+            'shipmentConfirmations',
+            'payments',
+        ])
+            ->whereHas('partnership', fn ($q) => $q->where('umkm_id', $umkm->id))
+            ->where(function ($q) {
+                $q->whereIn('order_status', [Order::STATUS_BACKORDER_PENDING, Order::STATUS_WAITING_BACKORDER_APPROVAL])
+                    ->orWhere(function ($oq) {
+                        $oq->whereIn('order_status', ['shipped', 'partially_shipped', Order::STATUS_COMPLETED_PARTIAL, Order::STATUS_CANCELLED])
+                            ->whereHas('shipmentConfirmations', function ($sq) {
+                                $sq->where(function ($bsq) {
+                                    $bsq->whereIn('backorder_action', ['create_backorder', 'no_backorder'])
+                                        ->orWhereIn('backorder_approval_status', ['pending', 'approved', 'rejected']);
+                                });
+                            });
+                    });
+            })
+            ->latest('created_at')
+            ->get() : collect();
+
+        // Ambil seluruh invoice/tagihan per batch untuk UMKM ini
+        $batchInvoices = $umkm ? Payment::with([
+            'order.partnership.supplier',
+            'order.items.supplierProduct.commodity',
+            'shipmentConfirmation',
+        ])->whereHas('order.partnership', function ($q) use ($umkm) {
+            $q->where('umkm_id', $umkm->id);
+        })->latest('created_at')->get() : collect();
+
+        // Hitung jumlah tagihan batch yang belum dibayar oleh UMKM
+        $pendingPaymentCount = $umkm ? Payment::whereHas('order.partnership', function ($q) use ($umkm) {
+            $q->where('umkm_id', $umkm->id);
+        })->whereNotIn('payment_status', ['PAID', 'settlement', 'capture', 'success', 'LUNAS'])->count() : 0;
+
+        // Hitung statistik pesanan untuk widget kartu referensi (Pesanan Aktif, Selesai, Dibatalkan)
+        $activeOrdersCount = $umkm ? Order::whereHas('partnership', fn ($q) => $q->where('umkm_id', $umkm->id))
+            ->whereIn('order_status', [
+                'pending', 'confirmed', 'MENUNGGU_KONFIRMASI_BARANG', 'DIKIRIM', 'shipped', 'partially_shipped',
+                Order::STATUS_WAITING_BACKORDER_APPROVAL, Order::STATUS_BACKORDER_PENDING,
+            ])->count() : 0;
+
+        $completedOrdersCount = $umkm ? Order::whereHas('partnership', fn ($q) => $q->where('umkm_id', $umkm->id))
+            ->whereIn('order_status', ['completed', 'BARANG_DITERIMA', Order::STATUS_COMPLETED_PARTIAL])->count() : 0;
+
+        $cancelledOrdersCount = $umkm ? Order::whereHas('partnership', fn ($q) => $q->where('umkm_id', $umkm->id))
+            ->where('order_status', Order::STATUS_CANCELLED)->count() : 0;
 
         return view('umkm.katalog.index', compact(
             'products',
@@ -255,7 +337,14 @@ class KatalogController extends Controller
             'availableUnits',
             'appliedProductIds',
             'pendingValidationCount',
-            'pendingPaymentCount'
+            'pendingBackorderCount',
+            'pendingBackorderApprovalCount',
+            'backorderOrders',
+            'pendingPaymentCount',
+            'batchInvoices',
+            'activeOrdersCount',
+            'completedOrdersCount',
+            'cancelledOrdersCount'
         ));
     }
 

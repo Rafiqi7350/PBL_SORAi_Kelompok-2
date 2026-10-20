@@ -44,4 +44,9 @@ class Partnership extends Model
     {
         return $this->hasMany(SupplyPlan::class, 'partnership_id');
     }
+
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class, 'partnership_id');
+    }
 }

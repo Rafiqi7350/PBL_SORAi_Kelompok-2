@@ -15,6 +15,9 @@ class OrderItem extends Model
         'order_id',
         'supplier_product_id',
         'quantity',
+        'quantity_delivered',
+        'quantity_remaining',
+        'fulfillment_item_status',
         'unit_price',
         'subtotal',
     ];
@@ -23,6 +26,8 @@ class OrderItem extends Model
     {
         return [
             'quantity' => 'decimal:2',
+            'quantity_delivered' => 'decimal:2',
+            'quantity_remaining' => 'decimal:2',
             'unit_price' => 'decimal:2',
             'subtotal' => 'decimal:2',
         ];

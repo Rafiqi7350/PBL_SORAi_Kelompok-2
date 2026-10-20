@@ -11,6 +11,7 @@ use App\Http\Controllers\Auth\SupplierRegisterController;
 use App\Http\Controllers\Auth\UmkmRegisterController;
 use App\Http\Controllers\Supplier\KatalogSupplierController;
 use App\Http\Controllers\Supplier\PengajuanMasukController;
+use App\Http\Controllers\Supplier\PengirimanController as SupplierPengirimanController;
 use App\Http\Controllers\Supplier\SupplyPlanningController as SupplierSupplyPlanningController;
 use App\Http\Controllers\Umkm\CollaborativeSupplyPlanningController;
 use App\Http\Controllers\Umkm\KatalogController;
@@ -54,8 +55,13 @@ Route::prefix('umkm')->name('umkm.')->middleware(EnsureUserIsUmkm::class)->group
     Route::delete('/supply-planning/{id}', [CollaborativeSupplyPlanningController::class, 'destroy'])->name('supply-planning.destroy');
 
     Route::get('/pemesanan', [PemesananController::class, 'index'])->name('pemesanan.index');
+    Route::post('/pemesanan/terbitkan', [PemesananController::class, 'terbitkan'])->name('pemesanan.terbitkan');
     Route::get('/pemesanan/{order}/konfirmasi', [PemesananController::class, 'showKonfirmasi'])->name('pemesanan.konfirmasi.show');
     Route::post('/pemesanan/{order}/konfirmasi', [PemesananController::class, 'konfirmasi'])->name('pemesanan.konfirmasi');
+    Route::post('/pemesanan/{order}/konfirmasi-backorder', [PemesananController::class, 'konfirmasiBackorder'])->name('pemesanan.konfirmasi-backorder');
+    Route::post('/pemesanan/{order}/terima-backorder', [PemesananController::class, 'terimaBackorder'])->name('pemesanan.terima-backorder');
+    Route::post('/pemesanan/{order}/tolak-backorder', [PemesananController::class, 'tolakBackorder'])->name('pemesanan.tolak-backorder');
+    Route::post('/pemesanan/pembayaran/{payment}/bayar', [PemesananController::class, 'bayarInvoice'])->name('pemesanan.bayar-invoice');
 });
 
 /* Supplier Routes */
@@ -74,6 +80,11 @@ Route::prefix('supplier')->name('supplier.')->middleware(EnsureUserIsSupplier::c
 
     Route::get('/supply-planning', [SupplierSupplyPlanningController::class, 'index'])->name('supply-planning.index');
     Route::patch('/supply-planning/{id}/konfirmasi', [SupplierSupplyPlanningController::class, 'konfirmasi'])->name('supply-planning.konfirmasi');
+
+    Route::get('/pengiriman', [SupplierPengirimanController::class, 'index'])->name('pengiriman.index');
+    Route::post('/pengiriman/{order}/kirim', [SupplierPengirimanController::class, 'prosesKirim'])->name('pengiriman.kirim');
+    Route::post('/pengiriman/{order}/kirim-batch1', [SupplierPengirimanController::class, 'kirimBatch1'])->name('pengiriman.kirim-batch1');
+    Route::post('/pengiriman/{order}/kirim-backorder', [SupplierPengirimanController::class, 'kirimBackorder'])->name('pengiriman.kirim-backorder');
 });
 
 /* Admin Protected Routes (Master Data Komoditas, Kategori, Satuan Baku, User Moderasi) */

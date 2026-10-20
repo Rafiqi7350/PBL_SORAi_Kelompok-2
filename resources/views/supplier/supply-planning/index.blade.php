@@ -56,29 +56,6 @@
     </div>
 
     {{-- Flash Notifications --}}
-    @if(session('success'))
-        <div class="bg-emerald-500 text-white p-4 rounded-2xl text-xs font-bold flex items-center justify-between shadow-lg animate-in fade-in">
-            <div class="flex items-center gap-2.5">
-                <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
-                </svg>
-                <span>{{ session('success') }}</span>
-            </div>
-            <button type="button" onclick="this.parentElement.remove()" class="text-white hover:text-emerald-100 font-bold p-1 cursor-pointer">✕</button>
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div class="bg-rose-500 text-white p-4 rounded-2xl text-xs font-bold flex items-center justify-between shadow-lg animate-in fade-in">
-            <div class="flex items-center gap-2.5">
-                <svg class="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-                <span>{{ session('error') }}</span>
-            </div>
-            <button type="button" onclick="this.parentElement.remove()" class="text-white hover:text-rose-100 font-bold p-1 cursor-pointer">✕</button>
-        </div>
-    @endif
 
     {{-- 4 Metric KPI Cards --}}
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
