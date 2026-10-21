@@ -149,6 +149,8 @@ class KatalogSupplierController extends Controller
         if ($request->hasFile('image')) {
             $path = $request->file('image')->store('commodities', 'public');
             $productData['image_url'] = '/storage/'.$path;
+        } else {
+            $productData['image_url'] = null;
         }
 
         SupplierProduct::create($productData);
