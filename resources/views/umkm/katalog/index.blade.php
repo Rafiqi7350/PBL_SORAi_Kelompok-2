@@ -475,11 +475,18 @@
                     <div class="bg-white rounded-3xl overflow-hidden flex flex-col justify-between shadow-sm hover:shadow-md transition-all border border-gray-100 group">
                         
                         <!-- Gambar Komoditas & Badges -->
-                        <div class="relative h-44 w-full bg-gray-100 overflow-hidden">
-                            @if($product->image_url)
-                                <img src="{{ $product->image_url }}" alt="{{ $product->commodity->name }}" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500" onerror="this.src='https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=500&auto=format&fit=crop&q=60'">
+                        <div class="relative h-44 w-full bg-gray-100 overflow-hidden flex items-center justify-center">
+                            @if($product->display_image_url)
+                                <img src="{{ $product->display_image_url }}" 
+                                     alt="{{ $product->commodity->name }}" 
+                                     class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
                             @else
-                                <img src="https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=500&auto=format&fit=crop&q=60" alt="{{ $product->commodity->name }}" class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
+                                <div class="w-full h-full flex flex-col items-center justify-center text-gray-400 bg-gray-50 border-b border-gray-100">
+                                    <svg class="w-10 h-10 mb-1 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    </svg>
+                                    <span class="text-[10px] font-bold text-gray-400">Belum Ada Foto</span>
+                                </div>
                             @endif
 
                             @if(in_array($product->id, $appliedProductIds ?? []))
@@ -572,6 +579,7 @@
                                              'stock_status' => $product->stock_status,
                                              'stock_capacity' => $product->stock_capacity,
                                              'is_halal' => $product->is_halal_certified,
+                                             'image_url' => $product->display_image_url,
                                          ]) }})" 
                                         class="w-full bg-[#ea580c] hover:bg-[#c2410c] text-white font-bold py-2.5 rounded-full text-xs transition shadow-sm active:scale-95 cursor-pointer">
                                         Ajukan Permintaan →
@@ -2478,10 +2486,22 @@
         <div @click.away="selectedCommodity = null" class="bg-white max-w-2xl w-full rounded-[2.2rem] p-6 sm:p-8 space-y-5 shadow-2xl relative border border-gray-100 max-h-[92vh] overflow-y-auto">
             
             <div class="flex justify-between items-start border-b border-gray-100 pb-4">
-                <div>
-                    <span class="text-xs font-bold text-orange-600 uppercase font-mono">FORM PENGAJUAN KEMITRAAN & JADWAL PASOKAN</span>
-                    <h3 class="text-2xl font-bold text-gray-900 tracking-tight" x-text="selectedCommodity?.commodity_name"></h3>
-                    <p class="text-xs text-gray-600">Mitra Pemasok: <span class="font-bold text-gray-900" x-text="selectedCommodity?.company_name"></span></p>
+                <div class="flex items-center gap-4">
+                    <template x-if="selectedCommodity?.image_url">
+                        <img :src="selectedCommodity?.image_url" :alt="selectedCommodity?.commodity_name" class="w-16 h-16 rounded-2xl object-cover border border-gray-200/80 shadow-2xs shrink-0">
+                    </template>
+                    <template x-if="!selectedCommodity?.image_url">
+                        <div class="w-16 h-16 rounded-2xl bg-gray-100 border border-gray-200 flex flex-col items-center justify-center shrink-0 text-gray-400">
+                            <svg class="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                        </div>
+                    </template>
+                    <div>
+                        <span class="text-xs font-bold text-orange-600 uppercase font-mono">FORM PENGAJUAN KEMITRAAN & JADWAL PASOKAN</span>
+                        <h3 class="text-2xl font-bold text-gray-900 tracking-tight" x-text="selectedCommodity?.commodity_name"></h3>
+                        <p class="text-xs text-gray-600">Mitra Pemasok: <span class="font-bold text-gray-900" x-text="selectedCommodity?.company_name"></span></p>
+                    </div>
                 </div>
                 <button type="button" @click="selectedCommodity = null" class="text-gray-400 hover:text-gray-700 font-bold text-lg cursor-pointer p-1">✕</button>
             </div>

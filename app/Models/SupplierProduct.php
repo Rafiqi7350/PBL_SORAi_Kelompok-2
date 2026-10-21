@@ -44,6 +44,37 @@ class SupplierProduct extends Model
         return $this->commodity?->unit ?: 'kg';
     }
 
+    public function getDisplayImageUrlAttribute(): ?string
+    {
+        if (! empty($this->image_url)) {
+            if (str_starts_with($this->image_url, 'http://') || str_starts_with($this->image_url, 'https://')) {
+                return $this->image_url;
+            }
+
+            if (str_starts_with($this->image_url, '/storage/') || str_starts_with($this->image_url, 'storage/')) {
+                $relativePath = ltrim($this->image_url, '/');
+                if (file_exists(public_path($relativePath))) {
+                    return asset($this->image_url);
+                }
+
+                return null;
+            }
+
+            if (file_exists(public_path(ltrim($this->image_url, '/')))) {
+                return asset($this->image_url);
+            }
+
+            return asset($this->image_url);
+        }
+
+        return null;
+    }
+
+    public function getDefaultFallbackImageUrlAttribute(): ?string
+    {
+        return null;
+    }
+
     public function scopeTersedia($query)
     {
         return $query->where('stock_status', 'Tersedia');

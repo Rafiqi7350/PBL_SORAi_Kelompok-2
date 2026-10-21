@@ -128,10 +128,10 @@
             </div>
 
             <!-- Foto Produk Komoditas (File Upload) -->
-            <div x-data="{ photoPreview: '{{ $product->image_url ? (str_starts_with($product->image_url, "http") ? $product->image_url : asset($product->image_url)) : "" }}' }">
+            <div x-data="{ photoPreview: '{{ $product->display_image_url ?? '' }}' }">
                 <label class="block text-xs font-bold text-gray-700 mb-1.5">Foto Produk Komoditas</label>
                 <div class="flex flex-col sm:flex-row sm:items-center gap-4 p-4 bg-[#f8f9fa] border border-gray-100 rounded-2xl">
-                    <div class="w-20 h-20 rounded-2xl bg-white border-2 border-dashed border-gray-300 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs relative">
+                    <div class="w-20 h-20 rounded-2xl bg-white border border-gray-200 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs relative group">
                         <template x-if="photoPreview">
                             <img :src="photoPreview" class="w-full h-full object-cover">
                         </template>
@@ -160,7 +160,7 @@
                             "
                             class="block w-full text-xs text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-orange-50 file:text-[#ea580c] hover:file:bg-orange-100 cursor-pointer"
                         />
-                        <p class="text-[11px] font-medium text-gray-400">Pilih file baru jika ingin mengganti foto komoditas (JPG, PNG, WEBP, maks. 5MB). Biarkan kosong jika tidak ingin mengubah foto saat ini.</p>
+                        <p class="text-[11px] font-medium text-gray-400">Pilih file baru jika ingin mengganti foto komoditas (JPG, PNG, WEBP, maks. 5MB). Biarkan kosong jika ingin tetap menggunakan foto saat ini.</p>
                         @error('image')
                             <p class="text-xs text-rose-600 font-medium mt-1">{{ $message }}</p>
                         @enderror

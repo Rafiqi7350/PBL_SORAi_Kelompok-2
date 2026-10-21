@@ -150,11 +150,18 @@
                                     const reader = new FileReader();
                                     reader.onload = (e) => { photoPreview = e.target.result; };
                                     reader.readAsDataURL(file);
+                                } else {
+                                    photoPreview = null;
                                 }
                             "
                             class="block w-full text-xs text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-orange-50 file:text-[#ea580c] hover:file:bg-orange-100 cursor-pointer"
                         />
-                        <p class="text-[11px] font-medium text-gray-400">Pilih file foto dari perangkat Anda (JPG, PNG, WEBP, maks. 5MB). Foto akan otomatis tersimpan sebagai URL di sistem.</p>
+                        <div class="flex items-center justify-between text-[11px] font-medium text-gray-400">
+                            <span>Pilih file foto dari perangkat Anda (JPG, PNG, WEBP, maks. 5MB).</span>
+                            <button type="button" x-show="photoPreview" @click="photoPreview = null; $el.closest('form').querySelector('input[name=image]').value = ''" class="text-rose-500 font-bold hover:underline cursor-pointer text-xs shrink-0 ml-2">
+                                Hapus
+                            </button>
+                        </div>
                         @error('image')
                             <p class="text-xs text-rose-600 font-medium mt-1">{{ $message }}</p>
                         @enderror

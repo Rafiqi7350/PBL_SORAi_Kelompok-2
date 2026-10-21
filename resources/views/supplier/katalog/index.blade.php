@@ -58,8 +58,8 @@
                                 <!-- Gambar -->
                                 <td class="py-4 px-6">
                                     <div class="w-14 h-14 rounded-2xl overflow-hidden bg-gray-100 border border-gray-200/80 flex-shrink-0 shadow-2xs">
-                                        @if($product->image_url)
-                                            <img src="{{ str_starts_with($product->image_url, 'http') ? $product->image_url : asset($product->image_url) }}"
+                                        @if($product->display_image_url)
+                                            <img src="{{ $product->display_image_url }}"
                                                  alt="{{ $product->commodity->name }}"
                                                  class="w-full h-full object-cover">
                                         @else
