@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Umkm;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\OrderItem;
+use App\Models\PartnershipDeliverySchedule;
 use App\Models\Payment;
 use App\Models\ShipmentConfirmation;
 use Illuminate\Http\Request;
@@ -32,7 +34,7 @@ class PemesananController extends Controller
             'schedule_id' => 'required|exists:partnership_delivery_schedules,id',
         ]);
 
-        $schedule = \App\Models\PartnershipDeliverySchedule::with(['partnership.supplier', 'supplierProduct'])->findOrFail($request->input('schedule_id'));
+        $schedule = PartnershipDeliverySchedule::with(['partnership.supplier', 'supplierProduct'])->findOrFail($request->input('schedule_id'));
         $partnership = $schedule->partnership;
         $product = $schedule->supplierProduct;
 
@@ -53,7 +55,7 @@ class PemesananController extends Controller
                 'order_status' => Order::STATUS_PENDING,
             ]);
 
-            \App\Models\OrderItem::create([
+            OrderItem::create([
                 'order_id' => $order->id,
                 'supplier_product_id' => $product->id,
                 'quantity' => $volume,
@@ -390,4 +392,3 @@ class PemesananController extends Controller
             ->with('success', $msg);
     }
 }
-
