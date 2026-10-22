@@ -12,6 +12,7 @@ use App\Http\Controllers\Auth\UmkmRegisterController;
 use App\Http\Controllers\Supplier\KatalogSupplierController;
 use App\Http\Controllers\Supplier\PengajuanMasukController;
 use App\Http\Controllers\Supplier\PengirimanController as SupplierPengirimanController;
+use App\Http\Controllers\Supplier\SupplierDashboardController;
 use App\Http\Controllers\Supplier\SupplyPlanningController as SupplierSupplyPlanningController;
 use App\Http\Controllers\Umkm\CollaborativeSupplyPlanningController;
 use App\Http\Controllers\Umkm\KatalogController;
@@ -66,6 +67,9 @@ Route::prefix('umkm')->name('umkm.')->middleware(EnsureUserIsUmkm::class)->group
 
 /* Supplier Routes */
 Route::prefix('supplier')->name('supplier.')->middleware(EnsureUserIsSupplier::class)->group(function () {
+    Route::get('/', fn () => redirect()->route('supplier.dashboard'));
+    Route::get('/dashboard', [SupplierDashboardController::class, 'index'])->name('dashboard');
+
     Route::get('/katalog', [KatalogSupplierController::class, 'index'])->name('katalog.index');
     Route::get('/katalog/create', [KatalogSupplierController::class, 'create'])->name('katalog.create');
     Route::post('/katalog', [KatalogSupplierController::class, 'store'])->name('katalog.store');
