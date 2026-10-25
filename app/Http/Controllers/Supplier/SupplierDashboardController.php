@@ -12,6 +12,7 @@ use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 class SupplierDashboardController extends Controller
@@ -32,47 +33,46 @@ class SupplierDashboardController extends Controller
         }
         $formattedPeriod = $activeCarbon->locale('id')->translatedFormat('F Y');
 
-        // Mode live jika diminta via query param ?live=1
-        $isLive = $request->boolean('live');
-
-        if ($isLive) {
-            // 1. Total Omset Riil
+        // 1. Total Omset Riil
+        $omsetPaid = 0;
+        if ($supplier) {
             $omsetPaid = Payment::whereHas('order.partnership', function ($q) use ($supplier) {
-                if ($supplier) {
-                    $q->where('supplier_id', $supplier->id);
-                }
+                $q->where('supplier_id', $supplier->id);
             })
                 ->whereIn('payment_status', ['PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS', 'LUNAS', 'paid'])
                 ->sum('amount');
 
             if ($omsetPaid <= 0) {
                 $omsetPaid = Order::whereHas('partnership', function ($q) use ($supplier) {
-                    if ($supplier) {
-                        $q->where('supplier_id', $supplier->id);
-                    }
+                    $q->where('supplier_id', $supplier->id);
                 })
                     ->whereIn('order_status', [Order::STATUS_COMPLETED, 'completed', 'SELESAI', 'DIKIRIM', 'shipped'])
                     ->sum('total_amount');
             }
+        }
 
-            $totalOmset = (float) $omsetPaid;
+        $totalOmset = (float) $omsetPaid;
 
-            // Pertumbuhan omset dibanding bulan lalu
+        // Pertumbuhan omset dibanding bulan lalu
+        $omsetPrevMonth = 0;
+        if ($supplier) {
             $omsetPrevMonth = Order::whereHas('partnership', fn ($q) => $q->where('supplier_id', $supplier->id))
                 ->whereIn('order_status', [Order::STATUS_COMPLETED, 'completed', 'SELESAI'])
                 ->whereMonth('order_date', (clone $activeCarbon)->subMonth()->month)
                 ->whereYear('order_date', (clone $activeCarbon)->subMonth()->year)
                 ->sum('total_amount');
+        }
 
-            $growthPercentage = $omsetPrevMonth > 0
-                ? round((($totalOmset - $omsetPrevMonth) / $omsetPrevMonth) * 100, 1)
-                : 18.5;
+        $growthPercentage = $omsetPrevMonth > 0
+            ? round((($totalOmset - $omsetPrevMonth) / $omsetPrevMonth) * 100, 1)
+            : ($totalOmset > 0 ? 18.5 : 0.0);
 
-            // 2. Pesanan Aktif Riil
+        // 2. Pesanan Aktif Riil
+        $activeOrdersCount = 0;
+        $perluPenyesuaianCount = 0;
+        if ($supplier) {
             $activeOrdersCount = Order::whereHas('partnership', function ($q) use ($supplier) {
-                if ($supplier) {
-                    $q->where('supplier_id', $supplier->id);
-                }
+                $q->where('supplier_id', $supplier->id);
             })->whereIn('order_status', [
                 Order::STATUS_PENDING,
                 Order::STATUS_CONFIRMED,
@@ -89,9 +89,7 @@ class SupplierDashboardController extends Controller
             ])->count();
 
             $perluPenyesuaianCount = Order::whereHas('partnership', function ($q) use ($supplier) {
-                if ($supplier) {
-                    $q->where('supplier_id', $supplier->id);
-                }
+                $q->where('supplier_id', $supplier->id);
             })->where(function ($q) {
                 $q->whereIn('order_status', [
                     Order::STATUS_WAITING_BACKORDER_APPROVAL,
@@ -101,15 +99,17 @@ class SupplierDashboardController extends Controller
                     $iq->where('quantity_remaining', '>', 0);
                 });
             })->count();
+        }
 
-            // 3. Total Stok Terjual Riil (Bulan Berjalan)
+        // 3. Total Stok Terjual Riil (Bulan Berjalan)
+        $soldVolume = 0;
+        $topCommodityName = 'Daging Ayam Broiler';
+        if ($supplier) {
             $soldVolume = OrderItem::whereHas('order', function ($oq) use ($supplier, $activeCarbon) {
                 $oq->whereMonth('order_date', $activeCarbon->month)
                     ->whereYear('order_date', $activeCarbon->year)
                     ->whereHas('partnership', fn ($q) => $q->where('supplier_id', $supplier->id));
             })->sum('quantity');
-
-            $totalStokTerjual = (float) $soldVolume;
 
             $topCommodityItem = OrderItem::select('supplier_product_id', DB::raw('SUM(quantity) as total_qty'))
                 ->whereHas('order.partnership', fn ($q) => $q->where('supplier_id', $supplier->id))
@@ -118,101 +118,47 @@ class SupplierDashboardController extends Controller
                 ->with('supplierProduct.commodity')
                 ->first();
 
-            $topCommodityName = $topCommodityItem?->supplierProduct?->commodity?->name
-                ?? 'Daging Ayam Broiler';
+            if ($topCommodityItem?->supplierProduct?->commodity?->name) {
+                $topCommodityName = $topCommodityItem->supplierProduct->commodity->name;
+            }
+        }
 
-            // 4. Fulfillment Rate Riil
+        $totalStokTerjual = (float) $soldVolume;
+
+        // 4. Fulfillment Rate Riil
+        $totalOrdersCount = 0;
+        $completedOrdersCount = 0;
+        if ($supplier) {
             $totalOrdersCount = Order::whereHas('partnership', function ($q) use ($supplier) {
-                if ($supplier) {
-                    $q->where('supplier_id', $supplier->id);
-                }
+                $q->where('supplier_id', $supplier->id);
             })->count();
 
             $completedOrdersCount = Order::whereHas('partnership', function ($q) use ($supplier) {
-                if ($supplier) {
-                    $q->where('supplier_id', $supplier->id);
-                }
+                $q->where('supplier_id', $supplier->id);
             })->whereIn('order_status', [Order::STATUS_COMPLETED, 'completed', 'SELESAI'])->count();
+        }
 
-            $fulfillmentRate = ($totalOrdersCount > 0)
-                ? round(($completedOrdersCount / $totalOrdersCount) * 100, 1)
-                : 100.0;
+        $fulfillmentRate = ($totalOrdersCount > 0)
+            ? round(($completedOrdersCount / $totalOrdersCount) * 100, 1)
+            : 100.0;
 
-            $monthsTrend = $this->buildMonthlySalesTrend($supplier, $activeCarbon);
+        $monthsTrend = $this->buildMonthlySalesTrend($supplier, $activeCarbon);
 
+        $recentOrders = collect();
+        if ($supplier) {
             $recentOrders = Order::with([
                 'partnership.umkm',
                 'items.supplierProduct.commodity',
-                'payment',
             ])
                 ->whereHas('partnership', function ($q) use ($supplier) {
-                    if ($supplier) {
-                        $q->where('supplier_id', $supplier->id);
-                    }
+                    $q->where('supplier_id', $supplier->id);
                 })
                 ->latest('order_date')
                 ->take(10)
                 ->get();
-
-            $transactions = $this->formatRecentTransactions($recentOrders, $supplier);
-        } else {
-            // Data Benchmark Dashboard Pemasok (Persis sesuai referensi kartu supplier)
-            $totalOmset = 15300000;
-            $growthPercentage = 18.5;
-            $activeOrdersCount = 4;
-            $perluPenyesuaianCount = 1;
-            $totalStokTerjual = 450;
-            $topCommodityName = 'Daging Ayam Broiler';
-            $fulfillmentRate = 98.2;
-
-            $monthsTrend = [
-                ['month' => 'Mei', 'target' => 240, 'realisasi' => 200, 'value' => 200],
-                ['month' => 'Jun', 'target' => 300, 'realisasi' => 270, 'value' => 270],
-                ['month' => 'Jul', 'target' => 350, 'realisasi' => 320, 'value' => 320],
-                ['month' => 'Agu', 'target' => 380, 'realisasi' => 350, 'value' => 350],
-                ['month' => 'Sep', 'target' => 420, 'realisasi' => 390, 'value' => 390],
-                ['month' => 'Okt (Aktif)', 'target' => 450, 'realisasi' => 380, 'value' => 380],
-            ];
-
-            $transactions = [
-                [
-                    'date' => '01/10/2026',
-                    'id' => 'ORD-2026-001',
-                    'customerName' => 'Dapur Sambal Malang',
-                    'commodity' => 'Daging Ayam Broiler Segar',
-                    'volume' => '100 kg',
-                    'total' => 'Rp 3.400.000',
-                    'status' => 'MENUNGGU_KONFIRMASI_BARANG',
-                ],
-                [
-                    'date' => '28/09/2026',
-                    'id' => 'ORD-2026-002',
-                    'customerName' => 'Dapur Sambal Malang',
-                    'commodity' => 'Daging Ayam Broiler Segar',
-                    'volume' => '120 kg',
-                    'total' => 'Rp 4.080.000',
-                    'status' => 'PENYESUAIAN_STOK',
-                ],
-                [
-                    'date' => '22/09/2026',
-                    'id' => 'ORD-2026-003',
-                    'customerName' => 'Dapur Sambal Malang',
-                    'commodity' => 'Bawang Merah Biru Probolinggo',
-                    'volume' => '50 kg',
-                    'total' => 'Rp 1.400.000',
-                    'status' => 'DIKIRIM',
-                ],
-                [
-                    'date' => '15/09/2026',
-                    'id' => 'ORD-2026-004',
-                    'customerName' => 'Dapur Sambal Malang',
-                    'commodity' => 'Daging Ayam Broiler Segar',
-                    'volume' => '150 kg',
-                    'total' => 'Rp 5.100.000',
-                    'status' => 'SELESAI',
-                ],
-            ];
         }
+
+        $transactions = $this->formatRecentTransactions($recentOrders, $supplier);
 
         // 7. Data Rinci 4 Pilar Operasional Pemasok
         $orderStats = [
@@ -356,19 +302,23 @@ class SupplierDashboardController extends Controller
      * @return array<int, array<string, mixed>>
      */
     /**
-     * Susun tren penjualan 6 bulan terakhir (Kg/Bulan).
+     * Susun tren penjualan mulai dari bulan September dan seterusnya (Kg/Bulan).
      *
      * @return array<int, array<string, mixed>>
      */
     private function buildMonthlySalesTrend(?SupplierProfile $supplier, Carbon $activeCarbon): array
     {
         $months = [];
-        $benchmarkTargets = [240, 300, 350, 380, 420, 450];
+        $benchmarkTargets = [350, 400, 420, 450, 480, 500];
 
-        for ($i = 5; $i >= 0; $i--) {
-            $monthDate = (clone $activeCarbon)->subMonths($i);
+        // Mulai dari September tahun periode berjalan
+        $startYear = $activeCarbon->month < 9 ? $activeCarbon->year - 1 : $activeCarbon->year;
+        $startMonth = Carbon::create($startYear, 9, 1);
+
+        for ($i = 0; $i < 6; $i++) {
+            $monthDate = (clone $startMonth)->addMonths($i);
             $shortName = $monthDate->locale('id')->isoFormat('MMM');
-            $idx = 5 - $i;
+            $isActive = $monthDate->isSameMonth($activeCarbon);
 
             $realisasiKg = OrderItem::whereHas('order', function ($oq) use ($monthDate, $supplier) {
                 $oq->whereYear('order_date', $monthDate->year)
@@ -379,10 +329,10 @@ class SupplierDashboardController extends Controller
             })->sum('quantity');
 
             $finalRealisasi = (int) $realisasiKg;
-            $finalTarget = $benchmarkTargets[$idx % 6];
+            $finalTarget = $benchmarkTargets[$i % count($benchmarkTargets)];
 
             $months[] = [
-                'month' => $i === 0 ? $shortName.' (Aktif)' : $shortName,
+                'month' => $isActive ? $shortName.' (Aktif)' : $shortName,
                 'target' => $finalTarget,
                 'realisasi' => $finalRealisasi,
                 'value' => $finalRealisasi,

@@ -17,10 +17,9 @@
         body { font-family: 'Outfit', sans-serif; }
         .font-mono-code { font-family: 'Space Mono', monospace; }
     </style>
-</head>
 <body class="bg-[#f3f4f6] text-gray-900 antialiased min-h-screen flex">
 
-    <aside class="w-64 bg-[#1E222D] text-white flex flex-col justify-between min-h-screen p-6 shrink-0">
+    <aside class="fixed top-0 left-0 h-screen w-64 bg-[#1E222D] text-white flex flex-col justify-between p-6 z-30 overflow-y-auto shadow-xl">
         <div class="space-y-6">
             <div class="flex items-center gap-3">
                 <div class="bg-[#ea580c] text-white rounded-full w-10 h-10 flex items-center justify-center font-bold text-xl shadow-xs">
@@ -133,7 +132,7 @@
         </div>
     </aside>
 
-    <main class="flex-1 p-8 md:p-10 overflow-y-auto">
+    <main class="flex-1 ml-64 p-8 md:p-10 min-w-0">
         @include('partials.flash-notification')
 
         @yield('content')

@@ -74,19 +74,22 @@
             </div>
         </div>
 
+        @php
+            $maxChartVal = max(500, ...array_column($monthsTrend, 'target'), ...array_column($monthsTrend, 'realisasi'));
+        @endphp
         <div class="pt-6">
             <div class="h-44 sm:h-52 flex items-end justify-between gap-2 sm:gap-6 px-2 sm:px-6">
                 @foreach($monthsTrend as $bar)
                     <div class="flex-1 flex flex-col items-center h-full justify-end">
                         <div class="w-full flex items-end justify-center gap-1 sm:gap-2 h-full">
                             <!-- Target (Kuning) -->
-                            <div style="height: {{ ($bar['target'] / 500) * 100 }}%" class="w-1/2 max-w-[56px] bg-[#f6c95d] rounded-t-lg relative group transition-all hover:brightness-105">
+                            <div style="height: {{ ($bar['target'] / $maxChartVal) * 100 }}%" class="w-1/2 max-w-[56px] bg-[#f6c95d] rounded-t-lg relative group transition-all hover:brightness-105">
                                 <span class="absolute -top-7 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] font-sans px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-20">
                                     Target: {{ $bar['target'] }}kg
                                 </span>
                             </div>
                             <!-- Realisasi (Oranye) -->
-                            <div style="height: {{ ($bar['realisasi'] / 500) * 100 }}%" class="w-1/2 max-w-[56px] bg-[#ea580c] rounded-t-lg relative group transition-all hover:brightness-105">
+                            <div style="height: {{ ($bar['realisasi'] / $maxChartVal) * 100 }}%" class="w-1/2 max-w-[56px] bg-[#ea580c] rounded-t-lg relative group transition-all hover:brightness-105">
                                 <span class="absolute -top-7 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] font-sans px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-20">
                                     Realisasi: {{ $bar['realisasi'] }}kg
                                 </span>
