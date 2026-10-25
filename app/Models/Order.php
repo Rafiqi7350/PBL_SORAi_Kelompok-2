@@ -60,7 +60,7 @@ class Order extends Model
 
     public function shipmentConfirmation(): HasOne
     {
-        return $this->hasOne(ShipmentConfirmation::class)->latestOfMany();
+        return $this->hasOne(ShipmentConfirmation::class)->latest('created_at');
     }
 
     public function shipmentConfirmations(): HasMany
@@ -70,7 +70,7 @@ class Order extends Model
 
     public function payment(): HasOne
     {
-        return $this->hasOne(Payment::class)->latestOfMany();
+        return $this->hasOne(Payment::class)->latest('created_at');
     }
 
     public function payments(): HasMany
