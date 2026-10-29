@@ -26,7 +26,7 @@ class RegisterSupplierRequest extends FormRequest
             'password_confirmation' => ['required', 'string'],
             'company_name' => ['required', 'string', 'min:3', 'max:255'],
             'phone' => ['required', 'string', 'regex:/^[0-9]+$/', 'min:10', 'max:15'],
-            'commodity_id' => ['required', 'uuid', 'exists:commodities,id'],
+            'commodity_id' => ['required', 'uuid', 'exists:commodity_categories,id'],
             'max_capacity' => ['required', 'string', 'max:255'],
             'delivery_area' => ['required', 'string', 'max:255'],
             'nib_number' => ['nullable', 'string', 'regex:/^[0-9]+$/', 'max:20'],

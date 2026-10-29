@@ -230,7 +230,6 @@
                         <div>
                             <div class="flex items-center justify-between mb-1.5">
                                 <label for="phone" class="block text-gray-700">Nomor WhatsApp Operasional</label>
-                                <span class="text-[10px] text-gray-400 font-normal">Hanya angka (10–15 digit)</span>
                             </div>
                             <input type="tel"
                                    id="phone"
@@ -265,9 +264,9 @@
                                     @change="validateField('commodity_id')"
                                     required
                                     class="w-full px-4 py-3 rounded-xl bg-white text-gray-900 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#ea580c] border-0 shadow-sm cursor-pointer">
-                                <option value="" disabled>-- Pilih Komoditas --</option>
-                                @foreach($commodities as $commodity)
-                                    <option value="{{ $commodity->id }}">{{ $commodity->name }}</option>
+                                <option value="" disabled>-- Pilih Kategori Komoditas --</option>
+                                @foreach($categories as $category)
+                                    <option value="{{ $category->id }}">{{ $category->name }}</option>
                                 @endforeach
                             </select>
                             <template x-if="errors.commodity_id">
