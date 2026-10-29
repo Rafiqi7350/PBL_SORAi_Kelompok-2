@@ -39,7 +39,7 @@
             clearNotif() { this.notification = ''; },
             init() {
                 if (this.notification) {
-                    setTimeout(() => { this.notification = ''; }, 4000);
+                    setTimeout(() => { this.notification = ''; }, 3000);
                 }
             }
         }" 
@@ -92,11 +92,6 @@
                             </svg>
                             <span>Manajemen Pengguna</span>
                         </div>
-                        @if($pendingUsersCount > 0)
-                            <span class="bg-orange-500 text-white font-mono text-[10px] px-2 py-0.5 rounded-full font-bold shadow-sm animate-pulse">
-                                {{ $pendingUsersCount }}
-                            </span>
-                        @endif
                     </button>
 
                     <!-- Tab Master Data Komoditas -->
@@ -111,16 +106,13 @@
                             </svg>
                             <span>Master Data Komoditas</span>
                         </div>
+                        <svg class="w-4 h-4 transition-transform duration-200" :class="adminTab === 'master' ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
                     </button>
 
-                    <!-- Submenu Master Data -->
-                    <div class="pl-6 space-y-1 pt-1" x-show="adminTab === 'master' || window.location.pathname.includes('/admin/commodities') || window.location.pathname.includes('/admin/categories') || window.location.pathname.includes('/admin/units')">
-                        <a href="{{ route('admin.commodities.index') }}" class="flex items-center gap-2 text-[11px] font-bold py-2 px-3 rounded-xl transition text-slate-400 hover:text-white hover:bg-slate-800/40">
-                            <svg class="w-3.5 h-3.5 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                            </svg>
-                            <span>Daftar Komoditas</span>
-                        </a>
+                    <!-- Submenu Master Data (Hanya Kategori Acuan & Satuan Baku) -->
+                    <div class="pl-6 space-y-1 pt-1" x-show="adminTab === 'master' || window.location.pathname.includes('/admin/categories') || window.location.pathname.includes('/admin/units')">
                         <a href="{{ route('admin.categories.index') }}" class="flex items-center gap-2 text-[11px] font-bold py-2 px-3 rounded-xl transition text-slate-400 hover:text-white hover:bg-slate-800/40">
                             <svg class="w-3.5 h-3.5 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
@@ -182,19 +174,21 @@
         <!-- AREA KONTEN UTAMA SISI ADMIN (KANAN) -->
         <main class="flex-1 ml-64 p-8 overflow-y-auto space-y-6 min-w-0">
 
-            <!-- NOTIFICATION ALERT -->
+            <!-- FLOATING TOAST NOTIFICATION (TIDAK MENAMBAH BARIS KONTEN) -->
             <div 
                 x-show="notification" 
                 x-cloak
-                x-transition:leave="transition ease-in duration-300"
+                x-transition:enter="transition ease-out duration-300 transform"
+                x-transition:enter-start="opacity-0 -translate-y-2 scale-95"
+                x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+                x-transition:leave="transition ease-in duration-200 transform"
                 x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-                x-transition:leave-end="opacity-0 -translate-y-2 scale-98"
-                class="bg-emerald-50 text-emerald-800 border border-emerald-200 p-4 rounded-2xl text-xs font-bold flex justify-between items-center shadow-sm">
-                <div class="flex items-center gap-2">
-                    <span class="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center font-bold text-xs">✓</span>
-                    <span x-text="notification"></span>
+                x-transition:leave-end="opacity-0 -translate-y-2 scale-95"
+                class="fixed top-5 right-4 sm:right-8 z-50 max-w-sm sm:max-w-md w-full pointer-events-none">
+                <div class="bg-emerald-600 text-white p-4 rounded-2xl font-medium text-xs sm:text-sm flex items-center justify-between shadow-2xl pointer-events-auto">
+                    <span x-text="notification" class="tracking-tight"></span>
+                    <button type="button" @click="clearNotif()" class="font-bold text-base ml-3 hover:opacity-75 cursor-pointer leading-none p-1 rounded-md transition shrink-0" title="Tutup Notifikasi">✕</button>
                 </div>
-                <button @click="clearNotif()" class="font-bold text-base hover:text-rose-700 cursor-pointer">&times;</button>
             </div>
 
             <!-- ========================================================= -->
@@ -288,7 +282,7 @@
                             </div>
                             <div>
                                 <span class="text-xs font-semibold text-slate-400 block">Kategori Komoditas</span>
-                                <p class="text-2xl font-extrabold text-slate-900 leading-tight mt-0.5">{{ count($categories) }}</p>
+                                <p class="text-2xl font-extrabold text-slate-900 leading-tight mt-0.5">{{ $totalCategories }}</p>
                             </div>
                         </div>
                         <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-100/80">
@@ -307,21 +301,23 @@
                     <!-- LEFT COLUMN (MAIN CHARTS) -->
                     <div class="lg:col-span-8 space-y-6">
 
-                        <!-- CARD: TREN AKTIVITAS MINGGU INI -->
+                        <!-- CARD: TREN AKTIVITAS (LINE CHART DINAMIS) -->
                         <div class="bg-white p-6 rounded-[1.75rem] border border-gray-100 shadow-[0_10px_35px_rgba(0,0,0,0.03)] space-y-5">
                             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div>
-                                    <h3 class="text-base sm:text-lg font-bold text-slate-800 tracking-tight">Tren Aktivitas Minggu Ini</h3>
-                                    <p class="text-xs text-slate-400 font-medium">Monitoring aktivitas harian pengguna</p>
+                                    <h3 class="text-base sm:text-lg font-bold text-slate-800 tracking-tight" x-text="chartFilter === 'minggu' ? 'Tren Aktivitas Minggu Ini' : 'Tren Aktivitas Bulanan ({{ now()->year }})'">Tren Aktivitas Minggu Ini</h3>
+                                    <p class="text-xs text-slate-400 font-medium" x-text="chartFilter === 'minggu' ? 'Monitoring aktivitas pesanan & pendaftaran harian 7 hari terakhir' : 'Volume pertumbuhan aktivitas pendaftaran per bulan di tahun berjalan'">Monitoring aktivitas harian pengguna</p>
                                 </div>
                                 <div class="inline-flex p-1 bg-slate-100 rounded-xl self-start sm:self-auto text-xs font-semibold">
                                     <button 
+                                        type="button"
                                         @click="chartFilter = 'minggu'"
                                         :class="chartFilter === 'minggu' ? 'bg-[#ea580c] text-white shadow-sm' : 'text-slate-500 hover:text-slate-900'"
                                         class="px-3.5 py-1 rounded-lg transition cursor-pointer">
                                         Minggu
                                     </button>
                                     <button 
+                                        type="button"
                                         @click="chartFilter = 'bulan'"
                                         :class="chartFilter === 'bulan' ? 'bg-[#ea580c] text-white shadow-sm' : 'text-slate-500 hover:text-slate-900'"
                                         class="px-3.5 py-1 rounded-lg transition cursor-pointer">
@@ -340,52 +336,55 @@
                                         </linearGradient>
                                     </defs>
 
-                                    <!-- Grid lines & Y Axis -->
+                                    <!-- Grid lines & Dynamic Y Axis -->
                                     <line x1="40" y1="20" x2="680" y2="20" stroke="#f1f5f9" stroke-dasharray="4" stroke-width="1.5" />
-                                    <text x="25" y="24" class="text-[10px] fill-slate-300 font-sans" text-anchor="end">100</text>
+                                    <text x="25" y="24" class="text-[10px] fill-slate-300 font-sans" text-anchor="end" x-text="chartFilter === 'minggu' ? '{{ $maxWeekly }}' : '{{ $maxGrowth }}'"></text>
 
                                     <line x1="40" y1="60" x2="680" y2="60" stroke="#f1f5f9" stroke-dasharray="4" stroke-width="1.5" />
-                                    <text x="25" y="64" class="text-[10px] fill-slate-300 font-sans" text-anchor="end">80</text>
+                                    <text x="25" y="64" class="text-[10px] fill-slate-300 font-sans" text-anchor="end" x-text="chartFilter === 'minggu' ? '{{ max(1, round($maxWeekly * 0.75)) }}' : '{{ max(1, round($maxGrowth * 0.75)) }}'"></text>
 
                                     <line x1="40" y1="100" x2="680" y2="100" stroke="#f1f5f9" stroke-dasharray="4" stroke-width="1.5" />
-                                    <text x="25" y="104" class="text-[10px] fill-slate-300 font-sans" text-anchor="end">60</text>
+                                    <text x="25" y="104" class="text-[10px] fill-slate-300 font-sans" text-anchor="end" x-text="chartFilter === 'minggu' ? '{{ max(1, round($maxWeekly * 0.5)) }}' : '{{ max(1, round($maxGrowth * 0.5)) }}'"></text>
 
                                     <line x1="40" y1="140" x2="680" y2="140" stroke="#f1f5f9" stroke-dasharray="4" stroke-width="1.5" />
-                                    <text x="25" y="144" class="text-[10px] fill-slate-300 font-sans" text-anchor="end">40</text>
+                                    <text x="25" y="144" class="text-[10px] fill-slate-300 font-sans" text-anchor="end" x-text="chartFilter === 'minggu' ? '{{ max(1, round($maxWeekly * 0.25)) }}' : '{{ max(1, round($maxGrowth * 0.25)) }}'"></text>
 
-                                    <line x1="40" y1="180" x2="680" y2="180" stroke="#f1f5f9" stroke-dasharray="4" stroke-width="1.5" />
-                                    <text x="25" y="184" class="text-[10px] fill-slate-300 font-sans" text-anchor="end">20</text>
+                                    <line x1="40" y1="200" x2="680" y2="200" stroke="#e2e8f0" stroke-width="1.5" />
+                                    <text x="25" y="204" class="text-[10px] fill-slate-300 font-sans" text-anchor="end">0</text>
 
-                                    <line x1="40" y1="215" x2="680" y2="215" stroke="#e2e8f0" stroke-width="1.5" />
+                                    <!-- VIEW 1: MINGGUAN (7 HARI TERAKHIR) -->
+                                    <g x-show="chartFilter === 'minggu'" x-transition>
+                                        @if(!empty($weeklyCurve['area']))
+                                            <path d="{!! $weeklyCurve['area'] !!}" fill="url(#soraiOrangeGrad)" />
+                                            <path d="{!! $weeklyCurve['line'] !!}" fill="none" stroke="#ea580c" stroke-width="3" stroke-linecap="round" />
+                                        @endif
 
-                                    <!-- Area Fill under path -->
-                                    <path 
-                                        d="M40,175 C95,170 135,175 185,145 C235,115 275,105 325,160 C375,200 415,150 465,85 C515,35 555,85 605,95 C635,100 660,25 680,25 L680,215 L40,215 Z" 
-                                        fill="url(#soraiOrangeGrad)" 
-                                    />
+                                        @foreach($weeklySvgPoints as $pt)
+                                            <g class="cursor-pointer group">
+                                                <circle cx="{{ $pt['x'] }}" cy="{{ $pt['y'] }}" r="4.5" fill="#ffffff" stroke="#ea580c" stroke-width="2.5" class="group-hover:r-6.5 transition-all">
+                                                    <title>{{ $pt['date'] }} ({{ $pt['label'] }}): {{ $pt['count'] }} aktivitas</title>
+                                                </circle>
+                                                <text x="{{ $pt['x'] }}" y="224" class="text-[10px] fill-slate-400 font-bold font-sans" text-anchor="middle">{{ $pt['label'] }}</text>
+                                            </g>
+                                        @endforeach
+                                    </g>
 
-                                    <!-- Smooth Line Path -->
-                                    <path 
-                                        d="M40,175 C95,170 135,175 185,145 C235,115 275,105 325,160 C375,200 415,150 465,85 C515,35 555,85 605,95 C635,100 660,25 680,25" 
-                                        fill="none" 
-                                        stroke="#ea580c" 
-                                        stroke-width="3" 
-                                        stroke-linecap="round"
-                                    />
+                                    <!-- VIEW 2: BULANAN (12 BULAN TAHUN BERJALAN) -->
+                                    <g x-show="chartFilter === 'bulan'" x-cloak x-transition>
+                                        @if(!empty($monthlyCurve['area']))
+                                            <path d="{!! $monthlyCurve['area'] !!}" fill="url(#soraiOrangeGrad)" />
+                                            <path d="{!! $monthlyCurve['line'] !!}" fill="none" stroke="#ea580c" stroke-width="3" stroke-linecap="round" />
+                                        @endif
 
-                                    <!-- X-Axis Labels -->
-                                    <text x="50" y="232" class="text-[9px] fill-slate-400 font-bold font-sans" text-anchor="middle">JAN</text>
-                                    <text x="105" y="232" class="text-[9px] fill-slate-400 font-bold font-sans" text-anchor="middle">FEB</text>
-                                    <text x="160" y="232" class="text-[9px] fill-slate-400 font-bold font-sans" text-anchor="middle">MAR</text>
-                                    <text x="215" y="232" class="text-[9px] fill-slate-400 font-bold font-sans" text-anchor="middle">APR</text>
-                                    <text x="270" y="232" class="text-[9px] fill-slate-400 font-bold font-sans" text-anchor="middle">MEI</text>
-                                    <text x="325" y="232" class="text-[9px] fill-slate-400 font-bold font-sans" text-anchor="middle">JUN</text>
-                                    <text x="380" y="232" class="text-[9px] fill-slate-400 font-bold font-sans" text-anchor="middle">JUL</text>
-                                    <text x="435" y="232" class="text-[9px] fill-slate-400 font-bold font-sans" text-anchor="middle">AGU</text>
-                                    <text x="490" y="232" class="text-[9px] fill-slate-400 font-bold font-sans" text-anchor="middle">SEP</text>
-                                    <text x="545" y="232" class="text-[9px] fill-slate-400 font-bold font-sans" text-anchor="middle">OKT</text>
-                                    <text x="600" y="232" class="text-[9px] fill-slate-400 font-bold font-sans" text-anchor="middle">NOV</text>
-                                    <text x="660" y="232" class="text-[9px] fill-slate-400 font-bold font-sans" text-anchor="middle">DES</text>
+                                        @foreach($monthlySvgPoints as $pt)
+                                            <g class="cursor-pointer group">
+                                                <circle cx="{{ $pt['x'] }}" cy="{{ $pt['y'] }}" r="3.5" fill="#ffffff" stroke="#ea580c" stroke-width="2.5" class="group-hover:r-5.5 transition-all">
+                                                    <title>{{ $pt['label'] }}: {{ $pt['count'] }} pendaftaran</title>
+                                                </circle>
+                                                <text x="{{ $pt['x'] }}" y="224" class="text-[9px] fill-slate-400 font-bold font-sans" text-anchor="middle">{{ $pt['label'] }}</text>
+                                            </g>
+                                        @endforeach
+                                    </g>
                                 </svg>
                             </div>
                         </div>
@@ -393,11 +392,14 @@
                         <!-- TWO SUB-CARDS (ROW 2) -->
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
 
-                            <!-- SUB-CARD 1: PROYEK / KOMODITAS PER KATEGORI -->
+                            <!-- SUB-CARD 1: KOMODITAS PER KATEGORI (DINAMIS DARI DB) -->
                             <div class="bg-white p-6 rounded-[1.75rem] border border-gray-100 shadow-[0_10px_35px_rgba(0,0,0,0.03)] space-y-4">
-                                <div>
-                                    <h3 class="text-base font-bold text-slate-800 tracking-tight">Komoditas per Kategori</h3>
-                                    <p class="text-xs text-slate-400 font-medium">Distribusi komoditas berdasarkan kategori</p>
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h3 class="text-base font-bold text-slate-800 tracking-tight">Komoditas per Kategori</h3>
+                                        <p class="text-xs text-slate-400 font-medium">Distribusi komoditas acuan pangan</p>
+                                    </div>
+                                    <span class="text-xs font-mono font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full border border-orange-100">{{ $totalCommodities }} Komoditas</span>
                                 </div>
 
                                 <div class="space-y-3 pt-1">
@@ -408,72 +410,60 @@
                                     @forelse($categories as $idx => $cat)
                                         @php
                                             $color = $catColors[$idx % count($catColors)];
-                                            $percent = min(100, max(20, ($cat['totalCommodities'] ?? rand(2, 8)) * 12));
+                                            $percent = min(100, max(8, round((($cat['totalCommodities'] ?? 0) / $maxCommodityCount) * 100)));
                                         @endphp
                                         <div class="space-y-1">
                                             <div class="flex justify-between items-center text-xs font-semibold">
                                                 <span class="text-slate-700 truncate max-w-[150px]">{{ $cat['name'] }}</span>
-                                                <span class="text-slate-500 font-mono text-[11px]">{{ $cat['totalCommodities'] ?? rand(1, 6) }}</span>
+                                                <span class="text-slate-500 font-mono text-[11px]">{{ $cat['totalCommodities'] }} item</span>
                                             </div>
                                             <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
                                                 <div class="h-full {{ $color }} rounded-full transition-all duration-500" style="width: {{ $percent }}%;"></div>
                                             </div>
                                         </div>
                                     @empty
-                                        <div class="space-y-2">
-                                            <div class="flex justify-between items-center text-xs font-semibold">
-                                                <span class="text-slate-700">Bumbu Dapur</span>
-                                                <span class="text-slate-500 font-mono">5</span>
-                                            </div>
-                                            <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                <div class="h-full bg-[#ea580c] rounded-full" style="width: 75%;"></div>
-                                            </div>
-
-                                            <div class="flex justify-between items-center text-xs font-semibold pt-1">
-                                                <span class="text-slate-700">Beras & Umbi</span>
-                                                <span class="text-slate-500 font-mono">3</span>
-                                            </div>
-                                            <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                <div class="h-full bg-sky-500 rounded-full" style="width: 50%;"></div>
-                                            </div>
+                                        <div class="py-4 text-center text-xs text-slate-400">
+                                            Belum ada data kategori komoditas.
                                         </div>
                                     @endforelse
                                 </div>
                             </div>
 
-                            <!-- SUB-CARD 2: PERTUMBUHAN PENGGUNA -->
+                            <!-- SUB-CARD 2: PERTUMBUHAN PENGGUNA (BAR CHART BULANAN DINAMIS) -->
                             <div class="bg-white p-6 rounded-[1.75rem] border border-gray-100 shadow-[0_10px_35px_rgba(0,0,0,0.03)] space-y-4">
-                                <div>
-                                    <h3 class="text-base font-bold text-slate-800 tracking-tight">Pertumbuhan Pengguna</h3>
-                                    <p class="text-xs text-slate-400 font-medium">Jumlah pendaftaran per bulan</p>
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <h3 class="text-base font-bold text-slate-800 tracking-tight">Pertumbuhan Pengguna</h3>
+                                        <p class="text-xs text-slate-400 font-medium">Pendaftaran tahun {{ now()->year }}</p>
+                                    </div>
+                                    <span class="text-xs font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full">{{ $totalUsers }} Total</span>
                                 </div>
 
-                                <!-- VERTICAL BAR CHART SVG -->
+                                <!-- VERTICAL BAR CHART SVG DINAMIS -->
                                 <div class="pt-2">
                                     <svg viewBox="0 0 300 140" class="w-full h-auto">
                                         <line x1="20" y1="120" x2="290" y2="120" stroke="#e2e8f0" stroke-width="1.5" />
                                         
-                                        <!-- Bars -->
-                                        <rect x="30" y="70" width="14" height="50" rx="4" class="fill-orange-200" />
-                                        <rect x="52" y="50" width="14" height="70" rx="4" class="fill-orange-300" />
-                                        <rect x="74" y="80" width="14" height="40" rx="4" class="fill-orange-200" />
-                                        <rect x="96" y="40" width="14" height="80" rx="4" class="fill-orange-400" />
-                                        <rect x="118" y="60" width="14" height="60" rx="4" class="fill-orange-300" />
-                                        <rect x="140" y="30" width="14" height="90" rx="4" class="fill-[#ea580c]" />
-                                        <rect x="162" y="45" width="14" height="75" rx="4" class="fill-orange-400" />
-                                        <rect x="184" y="65" width="14" height="55" rx="4" class="fill-orange-300" />
-                                        <rect x="206" y="25" width="14" height="95" rx="4" class="fill-[#ea580c]" />
-                                        <rect x="228" y="35" width="14" height="85" rx="4" class="fill-orange-400" />
-                                        <rect x="250" y="55" width="14" height="65" rx="4" class="fill-orange-300" />
-                                        <rect x="272" y="20" width="14" height="100" rx="4" class="fill-[#ea580c]" />
+                                        @foreach($monthlyBars as $bar)
+                                            <g class="cursor-pointer group">
+                                                <rect 
+                                                    x="{{ $bar['x'] }}" 
+                                                    y="{{ $bar['y'] }}" 
+                                                    width="14" 
+                                                    height="{{ $bar['height'] }}" 
+                                                    rx="4" 
+                                                    class="{{ $bar['is_current'] ? 'fill-[#ea580c]' : ($bar['count'] > 0 ? 'fill-orange-400 hover:fill-[#ea580c]' : 'fill-orange-100') }} transition-all"
+                                                >
+                                                    <title>{{ $bar['label'] }}: {{ $bar['count'] }} pengguna baru</title>
+                                                </rect>
 
-                                        <!-- Labels -->
-                                        <text x="37" y="134" class="text-[7px] fill-slate-400 font-bold" text-anchor="middle">JAN</text>
-                                        <text x="81" y="134" class="text-[7px] fill-slate-400 font-bold" text-anchor="middle">MAR</text>
-                                        <text x="125" y="134" class="text-[7px] fill-slate-400 font-bold" text-anchor="middle">MEI</text>
-                                        <text x="169" y="134" class="text-[7px] fill-slate-400 font-bold" text-anchor="middle">JUL</text>
-                                        <text x="213" y="134" class="text-[7px] fill-slate-400 font-bold" text-anchor="middle">SEP</text>
-                                        <text x="257" y="134" class="text-[7px] fill-slate-400 font-bold" text-anchor="middle">NOV</text>
+                                                @if($bar['month_num'] % 2 !== 0)
+                                                    <text x="{{ $bar['x'] + 7 }}" y="134" class="text-[7.5px] {{ $bar['is_current'] ? 'fill-orange-600 font-extrabold' : 'fill-slate-400 font-bold' }}" text-anchor="middle">
+                                                        {{ $bar['label'] }}
+                                                    </text>
+                                                @endif
+                                            </g>
+                                        @endforeach
                                     </svg>
                                 </div>
                             </div>
@@ -485,11 +475,11 @@
                     <!-- RIGHT COLUMN (DONUT & RECENT LOGS) -->
                     <div class="lg:col-span-4 space-y-6">
 
-                        <!-- CARD: DISTRIBUSI USER (DONUT CHART) -->
+                        <!-- CARD: DISTRIBUSI USER (DONUT CHART DINAMIS) -->
                         <div class="bg-white p-6 rounded-[1.75rem] border border-gray-100 shadow-[0_10px_35px_rgba(0,0,0,0.03)] flex flex-col items-center">
                             <div class="w-full text-left">
                                 <h3 class="text-base font-bold text-slate-800 tracking-tight">Distribusi User</h3>
-                                <p class="text-xs text-slate-400 font-medium mb-3">Berdasarkan role</p>
+                                <p class="text-xs text-slate-400 font-medium mb-3">Berdasarkan role akun</p>
                             </div>
 
                             <!-- SVG DONUT CHART -->
@@ -499,69 +489,88 @@
                                     <circle cx="50" cy="50" r="38" fill="none" stroke="#f1f5f9" stroke-width="12" />
                                     
                                     <!-- Donut Segment 1: UMKM (Orange) -->
-                                    <circle 
-                                        cx="50" 
-                                        cy="50" 
-                                        r="38" 
-                                        fill="none" 
-                                        stroke="#ea580c" 
-                                        stroke-width="12" 
-                                        stroke-dasharray="160 240" 
-                                        stroke-linecap="round" 
-                                    />
+                                    @if($totalUmkm > 0)
+                                        <circle 
+                                            cx="50" 
+                                            cy="50" 
+                                            r="38" 
+                                            fill="none" 
+                                            stroke="#ea580c" 
+                                            stroke-width="12" 
+                                            stroke-dasharray="{{ $umkmDash }} 240" 
+                                            stroke-linecap="round" 
+                                            class="transition-all duration-700 ease-out"
+                                        />
+                                    @endif
 
                                     <!-- Donut Segment 2: Pemasok (Sky Blue) -->
-                                    <circle 
-                                        cx="50" 
-                                        cy="50" 
-                                        r="38" 
-                                        fill="none" 
-                                        stroke="#0284c7" 
-                                        stroke-width="12" 
-                                        stroke-dasharray="60 240" 
-                                        stroke-dashoffset="-165" 
-                                        stroke-linecap="round" 
-                                    />
+                                    @if($totalSuppliers > 0)
+                                        <circle 
+                                            cx="50" 
+                                            cy="50" 
+                                            r="38" 
+                                            fill="none" 
+                                            stroke="#0284c7" 
+                                            stroke-width="12" 
+                                            stroke-dasharray="{{ $supplierDash }} 240" 
+                                            stroke-dashoffset="{{ $supplierOffset }}" 
+                                            stroke-linecap="round" 
+                                            class="transition-all duration-700 ease-out"
+                                        />
+                                    @endif
                                 </svg>
 
                                 <!-- Center text -->
-                                <div class="absolute inset-0 flex flex-col items-center justify-center text-center">
+                                <div class="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
                                     <span class="text-[10px] font-semibold text-slate-400 block leading-none">Total Users</span>
-                                    <span class="text-2xl font-extrabold text-slate-900 mt-1 leading-none">{{ $totalUmkm + $totalSuppliers }}</span>
+                                    <span class="text-3xl font-extrabold text-slate-900 mt-1 leading-none">{{ $totalUmkm + $totalSuppliers }}</span>
+                                    <span class="text-[10px] text-emerald-600 font-bold mt-1">Terdaftar</span>
                                 </div>
                             </div>
 
                             <!-- Dot indicators -->
-                            <div class="flex items-center justify-center gap-2 mt-3">
-                                <span class="w-2.5 h-2.5 rounded-full bg-[#ea580c] shadow-sm" title="UMKM"></span>
-                                <span class="w-2.5 h-2.5 rounded-full bg-sky-500 shadow-sm" title="Pemasok"></span>
+                            <div class="flex items-center justify-center gap-4 mt-3">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-[#ea580c] shadow-sm" title="UMKM"></span>
+                                    <span class="text-xs font-bold text-slate-700">UMKM: {{ $totalUmkm }} ({{ $umkmPercent }}%)</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-sky-500 shadow-sm" title="Pemasok"></span>
+                                    <span class="text-xs font-bold text-slate-700">Pemasok: {{ $totalSuppliers }} ({{ $supplierPercent }}%)</span>
+                                </div>
                             </div>
                         </div>
 
-                        <!-- CARD: AKTIVITAS TERBARU (LOGS LIST) -->
+                        <!-- CARD: AKTIVITAS TERBARU (LOGS LIST DARI DATABASE) -->
                         <div class="bg-white p-6 rounded-[1.75rem] border border-gray-100 shadow-[0_10px_35px_rgba(0,0,0,0.03)] space-y-4">
-                            <div>
-                                <h3 class="text-base font-bold text-slate-800 tracking-tight">Aktivitas Terbaru</h3>
-                                <p class="text-xs text-slate-400 font-medium">Real-time updates</p>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-base font-bold text-slate-800 tracking-tight">Aktivitas Terbaru</h3>
+                                    <p class="text-xs text-slate-400 font-medium">Pendaftaran & status verifikasi</p>
+                                </div>
+                                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" title="Live Database"></span>
                             </div>
 
                             <!-- LOGS LIST -->
                             <div class="space-y-3 pt-1">
-                                @foreach(array_slice($systemLogs, 0, 4) as $log)
-                                    <div class="flex items-start gap-3 pb-3 border-b border-slate-100 last:border-0 last:pb-0">
-                                        <div class="w-9 h-9 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0 shadow-inner">
+                                @forelse($systemLogs as $log)
+                                    <div class="flex items-start gap-3 pb-3 border-b border-slate-100 last:border-0 last:pb-0" title="{{ $log['raw_time'] }}">
+                                        <div class="w-9 h-9 rounded-full {{ $log['role'] === 'supplier' ? 'bg-sky-100 text-sky-700' : ($log['role'] === 'umkm' ? 'bg-orange-100 text-[#ea580c]' : 'bg-slate-100 text-slate-700') }} flex items-center justify-center font-bold text-xs shrink-0 shadow-inner">
                                             {{ strtoupper(substr($log['actor'], 0, 2)) }}
                                         </div>
                                         <div class="overflow-hidden flex-1">
-                                            <h4 class="text-xs font-bold text-slate-900 leading-snug truncate">{{ $log['actor'] }}</h4>
-                                            <p class="text-[11px] text-slate-500 font-medium truncate">{{ $log['action'] }}</p>
-                                            <span class="text-[10px] text-slate-400 font-mono block mt-0.5 flex items-center gap-1">
-                                                <svg class="w-3 h-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                                {{ $log['timestamp'] }}
-                                            </span>
+                                            <div class="flex items-center justify-between gap-1">
+                                                <h4 class="text-xs font-bold text-slate-900 leading-snug truncate">{{ $log['actor'] }}</h4>
+                                                <span class="text-[10px] text-slate-400 font-medium whitespace-nowrap">{{ $log['timestamp'] }}</span>
+                                            </div>
+                                            <p class="text-[11px] text-slate-500 font-medium truncate mt-0.5">{{ $log['action'] }}</p>
                                         </div>
                                     </div>
-                                @endforeach
+                                @empty
+                                    <div class="py-4 text-center text-xs text-slate-400">
+                                        Belum ada aktivitas pendaftaran terbaru.
+                                    </div>
+                                @endforelse
                             </div>
 
                             <!-- FULL WIDTH CTA BUTTON -->
@@ -699,6 +708,12 @@
                             </tbody>
                         </table>
                     </div>
+
+                    @if($users->hasPages())
+                        <div class="p-4 border-t border-slate-100">
+                            {{ $users->links() }}
+                        </div>
+                    @endif
                 </div>
             </div>
 
@@ -836,7 +851,7 @@
                                     <span class="text-emerald-400">STATUS: AUDITED</span>
                                 </div>
                                 <p class="text-white font-bold">{{ $log['actor'] }}</p>
-                                <p class="text-slate-400 text-[11px]">{{ $log['action'] }}: <span class="text-amber-300">{{ $log['detail'] }}</span></p>
+                                <p class="text-slate-400 text-[11px]">{{ $log['action'] }}: <span class="text-amber-300">{{ $log['detail'] ?? ($log['status'] ?? 'Audited') }}</span></p>
                             </div>
                         @endforeach
                     </div>

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Commodity;
+use App\Models\CommodityCategory;
 use App\Models\SupplierProfile;
 use App\Models\UmkmProfile;
 use App\Models\User;
@@ -51,12 +51,11 @@ class LoginTest extends TestCase
         $response->assertSessionHas('success');
     }
 
-    public function test_supplier_user_can_login_and_is_redirected_to_supplier_catalog(): void
+    public function test_supplier_user_can_login_and_is_redirected_to_supplier_dashboard(): void
     {
-        $commodity = Commodity::create([
-            'name' => 'Bawang Merah',
-            'category' => 'Bumbu & Rempah',
-            'unit' => 'kg',
+        $category = CommodityCategory::create([
+            'name' => 'Bumbu & Rempah',
+            'slug' => 'bumbu-rempah',
         ]);
 
         $user = User::create([
@@ -68,7 +67,7 @@ class LoginTest extends TestCase
 
         SupplierProfile::create([
             'user_id' => $user->id,
-            'commodity_id' => $commodity->id,
+            'commodity_id' => $category->id,
             'company_name' => 'Kelompok Tani Subur',
             'owner_name' => 'Pak Tani',
             'phone' => '081234567899',
@@ -84,7 +83,7 @@ class LoginTest extends TestCase
         ]);
 
         $this->assertAuthenticatedAs($user);
-        $response->assertRedirect(route('supplier.katalog.index'));
+        $response->assertRedirect(route('supplier.dashboard'));
         $response->assertSessionHas('success');
     }
 

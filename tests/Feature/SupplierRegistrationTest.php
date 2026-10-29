@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Models\Commodity;
+use App\Models\CommodityCategory;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -50,10 +50,9 @@ class SupplierRegistrationTest extends TestCase
 
     public function test_new_supplier_can_register(): void
     {
-        $commodity = Commodity::create([
-            'name' => 'Cabai Rawit Merah',
-            'category' => 'Bumbu & Rempah',
-            'unit' => 'kg',
+        $category = CommodityCategory::create([
+            'name' => 'Bumbu & Rempah',
+            'slug' => 'bumbu-rempah',
         ]);
 
         $testEmail = 'supplier_'.uniqid().'@example.com';
@@ -64,7 +63,7 @@ class SupplierRegistrationTest extends TestCase
             'password_confirmation' => 'password123',
             'company_name' => 'Kelompok Tani Makmur',
             'phone' => '081234567890',
-            'commodity_id' => $commodity->id,
+            'commodity_id' => $category->id,
             'max_capacity' => '500 kg / Minggu',
             'delivery_area' => 'Malang Raya',
             'nib_number' => '9120003810',
@@ -87,7 +86,7 @@ class SupplierRegistrationTest extends TestCase
         $this->assertDatabaseHas('supplier_profiles', [
             'company_name' => 'Kelompok Tani Makmur',
             'phone' => '081234567890',
-            'commodity_id' => $commodity->id,
+            'commodity_id' => $category->id,
         ]);
 
         // Pending user cannot log in before admin verification

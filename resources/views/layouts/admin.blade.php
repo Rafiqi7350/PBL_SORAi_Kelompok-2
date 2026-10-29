@@ -76,38 +76,38 @@
                     </div>
                 </a>
 
-                <!-- Master Data Komoditas -->
-                <a 
-                    href="{{ route('admin.commodities.index') }}"
-                    class="w-full text-left px-3.5 py-3 rounded-xl font-bold text-xs transition flex items-center justify-between {{ request()->routeIs('admin.commodities.*') || request()->routeIs('admin.categories.*') || request()->routeIs('admin.units.*') || request()->query('tab') === 'master' ? 'bg-[#ea580c] text-white shadow-lg shadow-orange-950/40' : 'text-slate-400 hover:bg-slate-800/60 hover:text-white' }}">
-                    <div class="flex items-center gap-3">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                <!-- Master Data Komoditas Dropdown / Sub-menu -->
+                <div x-data="{ isMasterOpen: {{ request()->routeIs('admin.categories.*') || request()->routeIs('admin.units.*') || request()->query('tab') === 'master' ? 'true' : 'false' }} }" class="space-y-1">
+                    <button 
+                        type="button"
+                        @click="isMasterOpen = !isMasterOpen"
+                        class="w-full text-left px-3.5 py-3 rounded-xl font-bold text-xs transition flex items-center justify-between cursor-pointer {{ request()->routeIs('admin.categories.*') || request()->routeIs('admin.units.*') || request()->query('tab') === 'master' ? 'bg-[#ea580c] text-white shadow-lg shadow-orange-950/40' : 'text-slate-400 hover:bg-slate-800/60 hover:text-white' }}">
+                        <div class="flex items-center gap-3">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                            <span>Master Data Komoditas</span>
+                        </div>
+                        <svg class="w-4 h-4 transition-transform duration-200" :class="isMasterOpen ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
                         </svg>
-                        <span>Master Data Komoditas</span>
-                    </div>
-                </a>
+                    </button>
 
-                <!-- Submenu Master Data jika di halaman terkait -->
-                <div class="pl-6 space-y-1 pt-1">
-                    <a href="{{ route('admin.commodities.index') }}" class="flex items-center gap-2 text-[11px] font-bold py-2 px-3 rounded-xl transition {{ request()->routeIs('admin.commodities.*') ? 'text-orange-400 bg-orange-500/10' : 'text-slate-400 hover:text-white hover:bg-slate-800/40' }}">
-                        <svg class="w-3.5 h-3.5 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                        </svg>
-                        <span>Daftar Komoditas</span>
-                    </a>
-                    <a href="{{ route('admin.categories.index') }}" class="flex items-center gap-2 text-[11px] font-bold py-2 px-3 rounded-xl transition {{ request()->routeIs('admin.categories.*') ? 'text-orange-400 bg-orange-500/10' : 'text-slate-400 hover:text-white hover:bg-slate-800/40' }}">
-                        <svg class="w-3.5 h-3.5 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                        </svg>
-                        <span>Kategori Acuan</span>
-                    </a>
-                    <a href="{{ route('admin.units.index') }}" class="flex items-center gap-2 text-[11px] font-bold py-2 px-3 rounded-xl transition {{ request()->routeIs('admin.units.*') ? 'text-orange-400 bg-orange-500/10' : 'text-slate-400 hover:text-white hover:bg-slate-800/40' }}">
-                        <svg class="w-3.5 h-3.5 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 18h12l3-18H3zM9 6v18M15 6v18" />
-                        </svg>
-                        <span>Satuan Baku</span>
-                    </a>
+                    <!-- Submenu: Kategori Acuan & Satuan Baku -->
+                    <div class="pl-6 space-y-1 pt-1" x-show="isMasterOpen" x-transition>
+                        <a href="{{ route('admin.categories.index') }}" class="flex items-center gap-2 text-[11px] font-bold py-2 px-3 rounded-xl transition {{ request()->routeIs('admin.categories.*') ? 'text-orange-400 bg-orange-500/10' : 'text-slate-400 hover:text-white hover:bg-slate-800/40' }}">
+                            <svg class="w-3.5 h-3.5 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                            </svg>
+                            <span>Kategori Acuan</span>
+                        </a>
+                        <a href="{{ route('admin.units.index') }}" class="flex items-center gap-2 text-[11px] font-bold py-2 px-3 rounded-xl transition {{ request()->routeIs('admin.units.*') ? 'text-orange-400 bg-orange-500/10' : 'text-slate-400 hover:text-white hover:bg-slate-800/40' }}">
+                            <svg class="w-3.5 h-3.5 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 18h12l3-18H3zM9 6v18M15 6v18" />
+                            </svg>
+                            <span>Satuan Baku</span>
+                        </a>
+                    </div>
                 </div>
 
                 <!-- Monitoring Sistem -->
