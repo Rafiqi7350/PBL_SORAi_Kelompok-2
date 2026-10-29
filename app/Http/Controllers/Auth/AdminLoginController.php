@@ -18,7 +18,7 @@ class AdminLoginController extends Controller
     public function create(): View|RedirectResponse
     {
         if (Auth::check() && Auth::user()->role === 'admin') {
-            return redirect()->route('admin.commodities.index');
+            return redirect()->route('admin.dashboard');
         }
 
         return view('admin.auth.login', [
@@ -84,7 +84,7 @@ class AdminLoginController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('admin.commodities.index'))
+        return redirect()->intended(route('admin.dashboard'))
             ->with('success', 'Selamat datang di Control Panel Administrator SORAi!');
     }
 
