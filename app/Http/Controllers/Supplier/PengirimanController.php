@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Supplier;
 
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\Partnership;
 use App\Models\Payment;
 use App\Models\ShipmentConfirmation;
 use Illuminate\Http\Request;
@@ -15,21 +16,18 @@ class PengirimanController extends Controller
     public function index(Request $request)
     {
         $supplier = Auth::user()?->supplierProfile;
+        $supplierPartnershipIds = $supplier ? Partnership::where('supplier_id', $supplier->id)->pluck('id') : collect();
 
         $tab = $request->input('tab', 'all');
         $search = $request->input('search');
 
         $query = Order::with([
-            'partnership.umkm.user',
+            'partnership.umkm',
             'items.supplierProduct.commodity',
             'shipmentConfirmations',
             'payments',
         ])
-            ->whereHas('partnership', function ($q) use ($supplier) {
-                if ($supplier) {
-                    $q->where('supplier_id', $supplier->id);
-                }
-            })
+            ->whereIn('partnership_id', $supplierPartnershipIds)
             ->latest();
 
         if ($search) {
@@ -71,26 +69,23 @@ class PengirimanController extends Controller
 
         $orders = $query->paginate(15)->withQueryString();
 
-        $baseQuery = Order::whereHas('partnership', function ($q) use ($supplier) {
-            if ($supplier) {
-                $q->where('supplier_id', $supplier->id);
-            }
-        });
+        // 1 SINGLE KONSOLIDASI QUERY untuk menghitung seluruh tab status pengiriman
+        $counts = DB::table('orders')
+            ->whereIn('partnership_id', $supplierPartnershipIds)
+            ->selectRaw("
+                COUNT(*) as count_all,
+                COUNT(CASE WHEN order_status IN ('".Order::STATUS_PENDING."', '".Order::STATUS_CONFIRMED."', 'pending', 'confirmed') THEN 1 END) as count_pending,
+                COUNT(CASE WHEN order_status IN ('".Order::STATUS_SHIPPED."', '".Order::STATUS_PARTIALLY_SHIPPED."', '".Order::STATUS_WAITING_BACKORDER_APPROVAL."', 'DIKIRIM') THEN 1 END) as count_shipping,
+                COUNT(CASE WHEN order_status IN ('".Order::STATUS_COMPLETED."', '".Order::STATUS_COMPLETED_PARTIAL."', 'BARANG_DITERIMA') THEN 1 END) as count_completed,
+                COUNT(CASE WHEN order_status IN ('".Order::STATUS_BACKORDER_PENDING."', '".Order::STATUS_WAITING_BACKORDER_APPROVAL."') THEN 1 END) as count_backorder
+            ")
+            ->first();
 
-        $countAll = (clone $baseQuery)->count();
-        $countPending = (clone $baseQuery)->whereIn('order_status', [Order::STATUS_PENDING, Order::STATUS_CONFIRMED, 'pending', 'confirmed'])->count();
-        $countShipping = (clone $baseQuery)->whereIn('order_status', [Order::STATUS_SHIPPED, Order::STATUS_PARTIALLY_SHIPPED, Order::STATUS_WAITING_BACKORDER_APPROVAL, 'DIKIRIM'])->count();
-        $countBackorder = (clone $baseQuery)->where(function ($q) {
-            $q->whereIn('order_status', [Order::STATUS_BACKORDER_PENDING, Order::STATUS_WAITING_BACKORDER_APPROVAL])
-                ->orWhereHas('items', function ($iq) {
-                    $iq->where('quantity_remaining', '>', 0)
-                        ->orWhere('fulfillment_item_status', 'backorder');
-                })
-                ->orWhereHas('shipmentConfirmations', function ($sq) {
-                    $sq->where('backorder_action', 'create_backorder');
-                });
-        })->count();
-        $countCompleted = (clone $baseQuery)->whereIn('order_status', [Order::STATUS_COMPLETED, Order::STATUS_COMPLETED_PARTIAL, 'BARANG_DITERIMA'])->count();
+        $countAll = (int) ($counts->count_all ?? 0);
+        $countPending = (int) ($counts->count_pending ?? 0);
+        $countShipping = (int) ($counts->count_shipping ?? 0);
+        $countCompleted = (int) ($counts->count_completed ?? 0);
+        $countBackorder = (int) ($counts->count_backorder ?? 0);
 
         return view('supplier.pengiriman.index', compact(
             'orders',

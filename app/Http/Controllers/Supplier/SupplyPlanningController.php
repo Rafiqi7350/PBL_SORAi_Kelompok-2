@@ -53,7 +53,7 @@ class SupplyPlanningController extends Controller
             $query->where('period_month_year', $periodFilter);
         }
 
-        $allPlans = (clone $query)->latest()->get();
+        $allPlans = (clone $query)->latest()->paginate(10)->withQueryString();
 
         // Ambil semua daftar tanpa filter untuk statistik & agregasi
         $totalBasePlans = SupplyPlan::with(['partnership.umkm'])

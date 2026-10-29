@@ -1,100 +1,115 @@
 @extends('layouts.supplier')
 
 @section('content')
-<div class="p-6 sm:p-8 space-y-6" x-data="supplierPengirimanPage()">
+<div class="space-y-6 w-full" x-data="supplierPengirimanPage()">
 
-        <!-- HEADER TITLE & SUBTITLE (CLEAN & MINIMALIST SESUAI BUILDMATCH) -->
+    <!-- HEADER TITLE & SUBTITLE -->
     <div class="space-y-1">
-        <h1 class="text-2xl font-bold text-gray-900 tracking-tight">
-            Verifikasi Proyek
+        <span class="text-xs font-mono font-bold uppercase text-[#ea580c] tracking-widest block">
+            MONITORING LOGISTIK & PROYEK
+        </span>
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight uppercase">
+            Verifikasi Proyek & Pengiriman
         </h1>
-        <p class="text-xs text-gray-400">
-            Pantau status progres pekerjaan proyek aktif dan pelepasan dana dari escrow ke mitra.
+        <p class="text-xs sm:text-sm text-gray-500">
+            Pantau status progres pekerjaan proyek aktif, pengiriman subuh, dan pelepasan dana dari escrow ke mitra.
         </p>
     </div>
 
-    <!-- 3 METRIC STAT CARDS (SESUAI GAMBAR REFERENSI) -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+    <!-- 3 METRIC STAT CARDS -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-5 sm:gap-6">
         <!-- 1. Proyek Aktif -->
-        <div class="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6 flex items-center gap-4 shadow-xs">
-            <div class="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center text-[#ea580c] shrink-0">
-                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+        <div class="bg-white rounded-2xl border border-gray-100 p-6 sm:p-7 flex items-center gap-5 shadow-xs hover:border-gray-200 transition">
+            <div class="w-14 h-14 rounded-2xl bg-orange-50 flex items-center justify-center text-[#ea580c] shrink-0">
+                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
             </div>
-            <div>
-                <span class="text-xs font-medium text-gray-500">Proyek Aktif</span>
-                <h3 class="text-2xl font-bold text-gray-900 mt-0.5">{{ $countPending + $countShipping }}</h3>
+            <div class="min-w-0 flex-1">
+                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider block">Proyek Aktif</span>
+                <h3 class="text-3xl sm:text-4xl font-extrabold text-gray-900 mt-0.5 tracking-tight">{{ $countPending + $countShipping }}</h3>
+                <span class="text-xs text-orange-600 font-semibold mt-1 inline-flex items-center gap-1">
+                    ● Perlu Diproses / Dikirim
+                </span>
             </div>
         </div>
 
         <!-- 2. Selesai -->
-        <div class="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6 flex items-center gap-4 shadow-xs">
-            <div class="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
-                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+        <div class="bg-white rounded-2xl border border-gray-100 p-6 sm:p-7 flex items-center gap-5 shadow-xs hover:border-gray-200 transition">
+            <div class="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0">
+                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
             </div>
-            <div>
-                <span class="text-xs font-medium text-gray-500">Selesai</span>
-                <h3 class="text-2xl font-bold text-gray-900 mt-0.5">{{ $countCompleted }}</h3>
+            <div class="min-w-0 flex-1">
+                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider block">Selesai</span>
+                <h3 class="text-3xl sm:text-4xl font-extrabold text-gray-900 mt-0.5 tracking-tight">{{ $countCompleted }}</h3>
+                <span class="text-xs text-emerald-600 font-semibold mt-1 inline-flex items-center gap-1">
+                    ✓ Pesanan Tuntas Diterima
+                </span>
             </div>
         </div>
 
         <!-- 3. Dibatalkan / Refund -->
-        <div class="bg-white rounded-2xl border border-gray-100 p-5 sm:p-6 flex items-center gap-4 shadow-xs">
-            <div class="w-12 h-12 rounded-xl bg-rose-50 flex items-center justify-center text-rose-500 shrink-0">
-                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+        <div class="bg-white rounded-2xl border border-gray-100 p-6 sm:p-7 flex items-center gap-5 shadow-xs hover:border-gray-200 transition">
+            <div class="w-14 h-14 rounded-2xl bg-rose-50 flex items-center justify-center text-rose-500 shrink-0">
+                <svg class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
             </div>
-            <div>
-                <span class="text-xs font-medium text-gray-500">Dibatalkan / Refund</span>
-                <h3 class="text-2xl font-bold text-gray-900 mt-0.5">{{ $countBackorder }}</h3>
+            <div class="min-w-0 flex-1">
+                <span class="text-xs font-bold text-gray-500 uppercase tracking-wider block">Dibatalkan / Refund</span>
+                <h3 class="text-3xl sm:text-4xl font-extrabold text-gray-900 mt-0.5 tracking-tight">{{ $countBackorder }}</h3>
+                <span class="text-xs text-rose-500 font-semibold mt-1 inline-flex items-center gap-1">
+                    ✕ Penyesuaian & Pembatalan
+                </span>
             </div>
         </div>
     </div>
 
     <!-- MAIN CONTAINER CARD: DAFTAR PROYEK & KONTRAK -->
-    <div class="bg-white rounded-2xl border border-gray-100 p-6 sm:p-7 space-y-5 shadow-xs">
+    <div class="bg-white rounded-2xl border border-gray-100 p-6 sm:p-8 space-y-6 shadow-xs">
 
         <!-- TITLE -->
-        <div>
-            <h2 class="text-sm font-bold text-gray-900">Daftar Proyek & Kontrak</h2>
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-gray-100">
+            <div>
+                <h2 class="text-base sm:text-lg font-extrabold text-gray-900 tracking-tight">Daftar Proyek & Kontrak</h2>
+                <p class="text-xs text-gray-500 mt-0.5">Kelola alur konfirmasi pengiriman pesanan komoditas dan status penerimaan mitra UMKM.</p>
+            </div>
         </div>
 
-        <!-- FILTER PILLS (PERSIS SESUAI GAMBAR REFERENSI) -->
+        <!-- FILTER PILLS -->
         <div class="flex flex-wrap items-center gap-2 pb-1">
             <!-- 1. Menunggu Verifikasi (Perlu Dikirim) -->
             <a href="{{ route('supplier.pengiriman.index', ['tab' => 'pending']) }}"
-               class="rounded-full px-3.5 py-1.5 text-xs transition flex items-center gap-2 font-medium {{ $tab === 'pending' ? 'bg-[#ea580c] text-white shadow-xs' : 'border border-gray-200 text-gray-600 hover:bg-gray-50' }}">
+               class="rounded-full px-4 py-2 text-xs transition flex items-center gap-2 font-bold {{ $tab === 'pending' ? 'bg-[#ea580c] text-white shadow-xs' : 'border border-gray-200 text-gray-600 hover:bg-gray-50' }}">
                 <span>Menunggu Verifikasi</span>
-                <span class="rounded-full text-[10px] w-4 h-4 flex items-center justify-center font-bold font-mono {{ $tab === 'pending' ? 'bg-white text-[#ea580c]' : 'bg-gray-100 text-gray-600' }}">
+                <span class="rounded-full text-[10px] px-1.5 py-0.5 min-w-[20px] flex items-center justify-center font-bold font-mono {{ $tab === 'pending' ? 'bg-white text-[#ea580c]' : 'bg-gray-100 text-gray-700' }}">
                     {{ $countPending }}
                 </span>
             </a>
 
             <!-- 2. Semua Proyek -->
             <a href="{{ route('supplier.pengiriman.index', ['tab' => 'all']) }}"
-               class="rounded-full px-3.5 py-1.5 text-xs transition flex items-center gap-1.5 font-medium {{ $tab === 'all' ? 'bg-[#ea580c] text-white shadow-xs' : 'border border-gray-200 text-gray-600 hover:bg-gray-50' }}">
+               class="rounded-full px-4 py-2 text-xs transition flex items-center gap-1.5 font-bold {{ $tab === 'all' ? 'bg-[#ea580c] text-white shadow-xs' : 'border border-gray-200 text-gray-600 hover:bg-gray-50' }}">
                 <span>Semua Proyek ({{ $countAll }})</span>
             </a>
 
             <!-- 3. Berjalan -->
             <a href="{{ route('supplier.pengiriman.index', ['tab' => 'shipping']) }}"
-               class="rounded-full px-3.5 py-1.5 text-xs transition flex items-center gap-1.5 font-medium {{ $tab === 'shipping' ? 'bg-[#ea580c] text-white shadow-xs' : 'border border-gray-200 text-gray-600 hover:bg-gray-50' }}">
+               class="rounded-full px-4 py-2 text-xs transition flex items-center gap-1.5 font-bold {{ $tab === 'shipping' ? 'bg-[#ea580c] text-white shadow-xs' : 'border border-gray-200 text-gray-600 hover:bg-gray-50' }}">
                 <span>Berjalan ({{ $countShipping }})</span>
             </a>
 
             <!-- 4. Selesai -->
             <a href="{{ route('supplier.pengiriman.index', ['tab' => 'completed']) }}"
-               class="rounded-full px-3.5 py-1.5 text-xs transition flex items-center gap-1.5 font-medium {{ $tab === 'completed' ? 'bg-[#ea580c] text-white shadow-xs' : 'border border-gray-200 text-gray-600 hover:bg-gray-50' }}">
+               class="rounded-full px-4 py-2 text-xs transition flex items-center gap-1.5 font-bold {{ $tab === 'completed' ? 'bg-[#ea580c] text-white shadow-xs' : 'border border-gray-200 text-gray-600 hover:bg-gray-50' }}">
                 <span>Selesai ({{ $countCompleted }})</span>
             </a>
 
             <!-- 5. Dibatalkan -->
             <a href="{{ route('supplier.pengiriman.index', ['tab' => 'backorder']) }}"
-               class="rounded-full px-3.5 py-1.5 text-xs transition flex items-center gap-1.5 font-medium {{ $tab === 'backorder' ? 'bg-[#ea580c] text-white shadow-xs' : 'border border-gray-200 text-gray-600 hover:bg-gray-50' }}">
+               class="rounded-full px-4 py-2 text-xs transition flex items-center gap-1.5 font-bold {{ $tab === 'backorder' ? 'bg-[#ea580c] text-white shadow-xs' : 'border border-gray-200 text-gray-600 hover:bg-gray-50' }}">
                 <span>Dibatalkan ({{ $countBackorder }})</span>
             </a>
         </div>
@@ -109,20 +124,20 @@
                 <p class="text-xs text-gray-500 font-medium">Tidak ada data proyek atau pesanan dengan filter ini.</p>
             </div>
         @else
-                        <!-- TABEL DAFTAR PESANAN & PENGIRIMAN (CLEAN & ESENSIAL) -->
-            <div class="overflow-x-auto">
-                <table class="w-full text-xs text-left">
-                    <thead class="text-[11px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
+            <!-- TABEL DAFTAR PESANAN & PENGIRIMAN -->
+            <div class="overflow-x-auto rounded-xl border border-gray-100">
+                <table class="w-full text-left border-collapse">
+                    <thead class="bg-gray-50/80 text-[11px] font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100">
                         <tr>
-                            <th class="py-3 px-4 font-semibold">Komoditas & ID</th>
-                            <th class="py-3 px-4 font-semibold">Pemesan (UMKM)</th>
-                            <th class="py-3 px-4 font-semibold">Kuantitas</th>
-                            <th class="py-3 px-4 font-semibold">Total Tagihan</th>
-                            <th class="py-3 px-4 font-semibold">Status</th>
-                            <th class="py-3 px-4 font-semibold text-center">Aksi</th>
+                            <th class="py-3.5 px-5 font-bold">Komoditas & ID</th>
+                            <th class="py-3.5 px-5 font-bold">Pemesan (UMKM)</th>
+                            <th class="py-3.5 px-5 font-bold">Kuantitas</th>
+                            <th class="py-3.5 px-5 font-bold">Total Tagihan</th>
+                            <th class="py-3.5 px-5 font-bold">Status</th>
+                            <th class="py-3.5 px-5 font-bold text-center">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100">
+                    <tbody class="divide-y divide-gray-100 bg-white">
                         @foreach($orders as $order)
                             @php
                                 $firstItem = $order->items->first();
@@ -138,110 +153,110 @@
                                 $approvalStatus = $batch1?->backorder_approval_status ?? 'pending';
                             @endphp
 
-                            <tr class="hover:bg-gray-50/50 transition">
+                            <tr class="hover:bg-gray-50/60 transition">
                                 <!-- 1. KOMODITAS & ID -->
-                                <td class="py-4 px-4 space-y-0.5">
-                                    <div class="flex items-center gap-1.5 flex-wrap">
-                                        <span class="font-semibold text-gray-900 text-xs">
+                                <td class="py-4.5 px-5 space-y-1">
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="font-bold text-gray-900 text-sm capitalize">
                                             {{ strtolower($commodityName) }}
                                         </span>
                                         @if($order->order_status === 'waiting_backorder_approval')
-                                            <span class="text-[10px] text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded font-medium">
+                                            <span class="text-[10px] text-amber-800 bg-amber-50 border border-amber-200/60 px-2 py-0.5 rounded-md font-bold">
                                                 ● Perlu Validasi
                                             </span>
                                         @elseif($hasBackorderFlow)
-                                            <span class="text-[10px] text-[#ea580c] bg-orange-50 px-1.5 py-0.2 rounded font-medium">
+                                            <span class="text-[10px] text-[#ea580c] bg-orange-50 border border-orange-200/60 px-2 py-0.5 rounded-md font-bold">
                                                 {{ $batch1->backorder_action === 'no_backorder' ? 'Parsial' : 'Split' }}
                                             </span>
                                         @endif
                                     </div>
-                                    <span class="text-[10px] text-gray-400 font-mono block">
+                                    <span class="text-xs text-gray-400 font-mono font-medium block">
                                         #ORD-{{ strtolower(substr($order->id, 0, 7)) }}
                                     </span>
                                 </td>
 
                                 <!-- 2. PEMESAN (UMKM) -->
-                                <td class="py-4 px-4 space-y-0.5">
-                                    <span class="text-xs font-semibold text-gray-900 block">
+                                <td class="py-4.5 px-5 space-y-0.5">
+                                    <span class="text-sm font-bold text-gray-900 block">
                                         {{ $order->partnership?->umkm?->restaurant_name ?? 'Dapur UMKM' }}
                                     </span>
-                                    <span class="text-[11px] text-gray-400 block font-normal">
+                                    <span class="text-xs text-gray-500 block">
                                         {{ $order->partnership?->umkm?->owner_name ?? 'Mitra UMKM' }}
                                     </span>
                                 </td>
 
                                 <!-- 3. KUANTITAS & PEMENUHAN -->
-                                <td class="py-4 px-4 whitespace-nowrap space-y-0.5">
-                                    <div class="text-xs font-semibold text-gray-800 font-mono">
+                                <td class="py-4.5 px-5 whitespace-nowrap space-y-0.5">
+                                    <div class="text-sm font-bold text-gray-900 font-mono">
                                         {{ number_format($deliveredQty, 0) }}/{{ number_format($orderedQty, 0) }} {{ $unit }}
                                     </div>
                                     @if($remainingQty > 0)
-                                        <span class="text-[10px] text-amber-600 font-mono block">
+                                        <span class="text-xs text-amber-600 font-mono font-medium block">
                                             Sisa: {{ number_format($remainingQty, 0) }} {{ $unit }}
                                         </span>
                                     @else
-                                        <span class="text-[10px] text-gray-400 font-mono block">
-                                            Terkirim penuh
+                                        <span class="text-xs text-emerald-600 font-mono font-medium block">
+                                            ✓ Terkirim penuh
                                         </span>
                                     @endif
                                 </td>
 
                                 <!-- 4. TOTAL TAGIHAN -->
-                                <td class="py-4 px-4 whitespace-nowrap space-y-0.5">
-                                    <span class="font-bold text-gray-900 font-mono text-xs block">
+                                <td class="py-4.5 px-5 whitespace-nowrap space-y-0.5">
+                                    <span class="font-extrabold text-gray-900 font-mono text-sm block">
                                         Rp {{ number_format($order->total_amount, 0, ',', '.') }}
                                     </span>
                                     @php
                                         $allPaid = $order->payments->isNotEmpty() && $order->payments->every(fn($p) => $p->isPaid());
                                     @endphp
-                                    <span class="text-[10px] font-mono {{ $allPaid ? 'text-emerald-600 font-semibold' : 'text-gray-400' }}">
+                                    <span class="text-xs font-mono {{ $allPaid ? 'text-emerald-600 font-bold' : 'text-gray-400 font-medium' }}">
                                         {{ $allPaid ? '✓ Lunas' : 'Tagihan Terbit' }}
                                     </span>
                                 </td>
 
                                 <!-- 5. STATUS -->
-                                <td class="py-4 px-4 whitespace-nowrap">
+                                <td class="py-4.5 px-5 whitespace-nowrap">
                                     @if(in_array($order->order_status, ['pending', 'confirmed', 'MENUNGGU_KONFIRMASI_BARANG']))
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium text-amber-700 bg-amber-50">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200/50">
+                                            <span class="w-2 h-2 rounded-full bg-amber-500"></span>
                                             Perlu Kirim
                                         </span>
                                     @elseif($order->order_status === 'waiting_backorder_approval')
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium text-amber-800 bg-amber-100">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse"></span>
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-amber-800 bg-amber-100 border border-amber-300/50">
+                                            <span class="w-2 h-2 rounded-full bg-amber-600 animate-pulse"></span>
                                             Validasi UMKM
                                         </span>
                                     @elseif(in_array($order->order_status, ['shipped', 'DIKIRIM', 'partially_shipped']))
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium text-blue-600 bg-blue-50">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-blue-700 bg-blue-50 border border-blue-200/50">
+                                            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
                                             Berjalan
                                         </span>
                                     @elseif($order->order_status === 'backorder_pending')
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium text-purple-700 bg-purple-50">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200/50">
+                                            <span class="w-2 h-2 rounded-full bg-purple-500"></span>
                                             Backorder
                                         </span>
                                     @elseif(in_array($order->order_status, ['completed', 'completed_partial', 'BARANG_DITERIMA']))
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium text-emerald-700 bg-emerald-50">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/50">
+                                            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                                             Selesai
                                         </span>
                                     @elseif($order->order_status === 'cancelled')
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium text-rose-700 bg-rose-50">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200/50">
+                                            <span class="w-2 h-2 rounded-full bg-rose-500"></span>
                                             Dibatalkan
                                         </span>
                                     @else
-                                        <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium text-gray-600 bg-gray-50">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold text-gray-700 bg-gray-50 border border-gray-200">
+                                            <span class="w-2 h-2 rounded-full bg-gray-400"></span>
                                             {{ ucfirst($order->order_status) }}
                                         </span>
                                     @endif
                                 </td>
 
                                 <!-- 6. AKSI (TOMBOL UTAMA & TOMBOL MODAL DETAIL) -->
-                                <td class="py-4 px-4 text-center whitespace-nowrap">
-                                    <div class="flex items-center justify-center gap-1.5">
+                                <td class="py-4.5 px-5 text-center whitespace-nowrap">
+                                    <div class="flex items-center justify-center gap-2">
                                         @if(in_array($order->order_status, ['pending', 'confirmed', 'MENUNGGU_KONFIRMASI_BARANG']))
                                             <button type="button"
                                                     @click="openKirimModal({
@@ -253,7 +268,7 @@
                                                         orderedQty: {{ $orderedQty }},
                                                         price: {{ (float) ($firstItem?->unit_price ?? 0) }}
                                                     })"
-                                                    class="bg-[#ea580c] hover:bg-[#c2410c] text-white px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-xs transition cursor-pointer">
+                                                    class="bg-[#ea580c] hover:bg-[#c2410c] text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs hover:shadow transition cursor-pointer">
                                                 Cek & Kirim
                                             </button>
                                         @elseif($hasBackorderFlow && $approvalStatus === 'approved' && $batch1 && $batch1->shipped_at === null)
@@ -267,7 +282,7 @@
                                                         qty: {{ (float) ($batch1->shipped_quantity ?? 0) }},
                                                         action: '{{ $batch1->backorder_action }}'
                                                     })"
-                                                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-xs transition cursor-pointer">
+                                                    class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs hover:shadow transition cursor-pointer">
                                                 Berangkatkan
                                             </button>
                                         @elseif($batch1 && $batch1->backorder_action === 'create_backorder' && $remainingQty > 0)
@@ -280,7 +295,7 @@
                                                         unit: '{{ $unit }}',
                                                         remainingQty: {{ $remainingQty }}
                                                     })"
-                                                    class="bg-[#ea580c] hover:bg-[#c2410c] text-white px-3.5 py-1.5 rounded-full text-xs font-semibold shadow-xs transition cursor-pointer">
+                                                    class="bg-[#ea580c] hover:bg-[#c2410c] text-white px-4 py-2 rounded-xl text-xs font-bold shadow-xs hover:shadow transition cursor-pointer">
                                                 Kirim Sisa
                                             </button>
                                         @endif
@@ -329,7 +344,7 @@
                                                         @endforeach
                                                     ]
                                                 })"
-                                                class="border border-gray-200 text-gray-700 hover:bg-gray-50 px-3.5 py-1.5 rounded-full text-xs font-medium transition cursor-pointer">
+                                                class="border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 px-4 py-2 rounded-xl text-xs font-bold shadow-xs transition cursor-pointer">
                                             Detail
                                         </button>
                                     </div>

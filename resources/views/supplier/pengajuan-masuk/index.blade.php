@@ -177,6 +177,12 @@
                     </div>
                 @endforeach
             </div>
+
+            @if($pendingPartnerships->hasPages())
+                <div class="pt-4">
+                    {{ $pendingPartnerships->links() }}
+                </div>
+            @endif
         @endif
     </div>
 
