@@ -16,7 +16,6 @@ class KatalogSupplierController extends Controller
 {
     private function getActiveSupplierProfile()
     {
-        // Jika belum login ATAU login sebagai non-supplier, auto-login ke demo supplier
         if (! Auth::check() || Auth::user()->role !== 'supplier') {
             $dummySupplierUser = User::where('role', 'supplier')->first();
             if ($dummySupplierUser) {
@@ -55,13 +54,20 @@ class KatalogSupplierController extends Controller
 
         $products = $query->latest()->paginate(10)->withQueryString();
 
-        // Statistics
-        $totalProducts = SupplierProduct::where('supplier_id', $supplier->id)->count();
-        $stokTersedia = SupplierProduct::where('supplier_id', $supplier->id)->where('stock_status', 'Tersedia')->count();
-        $stokTerbatas = SupplierProduct::where('supplier_id', $supplier->id)->where('stock_status', 'Stok Terbatas')->count();
-        $stokHabis = SupplierProduct::where('supplier_id', $supplier->id)->where('stock_status', 'Stok Habis')->count();
+        // Statistics (Single query with conditional aggregation)
+        $stockCounts = SupplierProduct::where('supplier_id', $supplier->id)
+            ->selectRaw("
+                COUNT(*) as total,
+                COUNT(CASE WHEN stock_status = 'Tersedia' THEN 1 END) as tersedia,
+                COUNT(CASE WHEN stock_status = 'Stok Terbatas' THEN 1 END) as terbatas,
+                COUNT(CASE WHEN stock_status = 'Stok Habis' THEN 1 END) as habis
+            ")
+            ->first();
 
-        $allCommodities = Commodity::orderBy('name')->get();
+        $totalProducts = (int) ($stockCounts->total ?? 0);
+        $stokTersedia = (int) ($stockCounts->tersedia ?? 0);
+        $stokTerbatas = (int) ($stockCounts->terbatas ?? 0);
+        $stokHabis = (int) ($stockCounts->habis ?? 0);
 
         return view('supplier.katalog.index', compact(
             'supplier',
@@ -70,7 +76,6 @@ class KatalogSupplierController extends Controller
             'stokTersedia',
             'stokTerbatas',
             'stokHabis',
-            'allCommodities',
             'search',
             'statusFilter'
         ));

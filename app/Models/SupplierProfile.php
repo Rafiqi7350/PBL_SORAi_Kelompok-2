@@ -34,7 +34,12 @@ class SupplierProfile extends Model
 
     public function commodity(): BelongsTo
     {
-        return $this->belongsTo(Commodity::class, 'commodity_id');
+        return $this->belongsTo(CommodityCategory::class, 'commodity_id');
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(CommodityCategory::class, 'commodity_id');
     }
 
     public function products(): HasMany

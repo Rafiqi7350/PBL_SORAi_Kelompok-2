@@ -80,15 +80,32 @@ class Order extends Model
 
     public function hasBackorder(): bool
     {
-        return $this->order_status === self::STATUS_BACKORDER_PENDING
-            || $this->items->sum('quantity_remaining') > 0
-            || $this->shipmentConfirmations()->where('backorder_action', 'create_backorder')->exists();
+        if ($this->order_status === self::STATUS_BACKORDER_PENDING) {
+            return true;
+        }
+
+        if ($this->relationLoaded('items') ? $this->items->sum('quantity_remaining') > 0 : $this->items()->sum('quantity_remaining') > 0) {
+            return true;
+        }
+
+        if ($this->relationLoaded('shipmentConfirmations')) {
+            return $this->shipmentConfirmations->contains('backorder_action', 'create_backorder');
+        }
+
+        return $this->shipmentConfirmations()->where('backorder_action', 'create_backorder')->exists();
     }
 
     public function isNoBackorder(): bool
     {
-        return $this->shipmentConfirmations()->where('backorder_action', 'no_backorder')->exists()
-            || $this->order_status === self::STATUS_COMPLETED_PARTIAL;
+        if ($this->order_status === self::STATUS_COMPLETED_PARTIAL) {
+            return true;
+        }
+
+        if ($this->relationLoaded('shipmentConfirmations')) {
+            return $this->shipmentConfirmations->contains('backorder_action', 'no_backorder');
+        }
+
+        return $this->shipmentConfirmations()->where('backorder_action', 'no_backorder')->exists();
     }
 
     public function getTotalOrderedQuantityAttribute(): float

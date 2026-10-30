@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RegisterSupplierRequest;
-use App\Models\Commodity;
+use App\Models\CommodityCategory;
 use App\Models\SupplierProfile;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -19,9 +19,9 @@ class SupplierRegisterController extends Controller
      */
     public function create(): View
     {
-        $commodities = Commodity::orderBy('name')->get();
+        $categories = CommodityCategory::orderBy('name')->get();
 
-        return view('auth.form-supplier', compact('commodities'));
+        return view('auth.form-supplier', compact('categories'));
     }
 
     /**

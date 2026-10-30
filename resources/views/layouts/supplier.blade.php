@@ -42,65 +42,28 @@
                     Dashboard & Analisis
                 </a>
 
-                <a href="{{ route('supplier.pengajuan-masuk.index') }}" class="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition
+                <a href="{{ route('supplier.pengajuan-masuk.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition
                     {{ request()->routeIs('supplier.pengajuan-masuk.*') ? 'bg-[#ea580c] text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
-                    <div class="flex items-center gap-3">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        Pengajuan Masuk
-                    </div>
-                    @php
-                        $pendingCount = auth()->user()?->supplierProfile?->partnerships()
-                            ->where('status', 'pending')->count() ?? 0;
-                    @endphp
-                    @if($pendingCount > 0)
-                        <span class="{{ request()->routeIs('supplier.pengajuan-masuk.*') ? 'bg-white text-[#ea580c]' : 'bg-[#ea580c] text-white' }} text-[10px] font-black px-2 py-0.5 rounded-full">
-                            {{ $pendingCount }}
-                        </span>
-                    @endif
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Pengajuan Masuk
                 </a>
 
-                @php
-                    $pendingOrdersCount = auth()->user()?->supplierProfile
-                        ? \App\Models\Order::whereHas('partnership', fn($q) => $q->where('supplier_id', auth()->user()->supplierProfile->id))
-                            ->whereIn('order_status', ['pending', 'confirmed', 'MENUNGGU_KONFIRMASI_BARANG'])->count()
-                        : 0;
-                @endphp
-                <a href="{{ route('supplier.pengiriman.index') }}" class="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition
+                <a href="{{ route('supplier.pengiriman.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition
                     {{ request()->routeIs('supplier.pengiriman.*') ? 'bg-[#ea580c] text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
-                    <div class="flex items-center gap-3">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
-                        Pesanan & Pengiriman
-                    </div>
-                    @if($pendingOrdersCount > 0)
-                        <span class="{{ request()->routeIs('supplier.pengiriman.*') ? 'bg-white text-[#ea580c]' : 'bg-[#ea580c] text-white' }} text-[10px] font-black px-2 py-0.5 rounded-full">
-                            {{ $pendingOrdersCount }}
-                        </span>
-                    @endif
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+                    Pesanan & Pengiriman
                 </a>
 
                 <a href="{{ route('supplier.katalog.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition
                     {{ request()->routeIs('supplier.katalog.*') ? 'bg-[#ea580c] text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
-                    Kelola Stok (CRUD)
+                    Kelola Stok
                 </a>
 
-                @php
-                    $pendingSupplyPlansCount = auth()->user()?->supplierProfile
-                        ? \App\Models\SupplyPlan::whereHas('partnership', fn($q) => $q->where('supplier_id', auth()->user()->supplierProfile->id))
-                            ->where('supplier_confirmation_status', 'MENUNGGU_KONFIRMASI')->count()
-                        : 0;
-                @endphp
-                <a href="{{ route('supplier.supply-planning.index') }}" class="flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition
+                <a href="{{ route('supplier.supply-planning.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition
                     {{ request()->routeIs('supplier.supply-planning.*') ? 'bg-[#ea580c] text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
-                    <div class="flex items-center gap-3">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-                        Supply Planning
-                    </div>
-                    @if($pendingSupplyPlansCount > 0)
-                        <span class="{{ request()->routeIs('supplier.supply-planning.*') ? 'bg-white text-[#ea580c]' : 'bg-[#ea580c] text-white' }} text-[10px] font-black px-2 py-0.5 rounded-full">
-                            {{ $pendingSupplyPlansCount }}
-                        </span>
-                    @endif
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    Supply Planning
                 </a>
 
                 <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
@@ -132,9 +95,7 @@
         </div>
     </aside>
 
-    <main class="flex-1 ml-64 p-8 md:p-10 min-w-0">
-        @include('partials.flash-notification')
-
+    <main class="flex-1 ml-64 p-6 sm:p-8 min-w-0">
         @yield('content')
     </main>
 

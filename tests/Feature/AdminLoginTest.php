@@ -22,7 +22,7 @@ class AdminLoginTest extends TestCase
         $response->assertSee('admin@sorai.id');
     }
 
-    public function test_admin_user_can_login_and_is_redirected_to_admin_commodities(): void
+    public function test_admin_user_can_login_and_is_redirected_to_admin_dashboard(): void
     {
         $admin = User::create([
             'email' => 'admin@sorai.id',
@@ -37,7 +37,7 @@ class AdminLoginTest extends TestCase
         ]);
 
         $this->assertAuthenticatedAs($admin);
-        $response->assertRedirect(route('admin.commodities.index'));
+        $response->assertRedirect(route('admin.dashboard'));
         $response->assertSessionHas('success');
     }
 
@@ -138,6 +138,6 @@ class AdminLoginTest extends TestCase
 
         $response = $this->actingAs($admin)->get('/admin/login');
 
-        $response->assertRedirect(route('admin.commodities.index'));
+        $response->assertRedirect(route('admin.dashboard'));
     }
 }

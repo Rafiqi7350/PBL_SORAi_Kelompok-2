@@ -22,6 +22,8 @@ use App\Http\Middleware\EnsureUserIsSupplier;
 use App\Http\Middleware\EnsureUserIsUmkm;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/favicon.ico', fn () => response()->file(public_path('favicon.ico')));
+
 Route::get('/', function () {
     return view('landing.index');
 });

@@ -60,7 +60,7 @@
                     <p class="font-mono text-[11px] text-gray-500 truncate">{{ $activeUser->email }}</p>
                     <div class="flex gap-2 pt-1">
                         @if($activeUser->role === 'supplier')
-                            <a href="{{ route('supplier.katalog.index') }}" class="flex-1 bg-black text-white text-center py-1.5 rounded-full font-bold text-[11px]">
+                            <a href="{{ route('supplier.dashboard') }}" class="flex-1 bg-black text-white text-center py-1.5 rounded-full font-bold text-[11px]">
                                 Ke Dashboard Pemasok →
                             </a>
                         @elseif($activeUser->role === 'umkm')

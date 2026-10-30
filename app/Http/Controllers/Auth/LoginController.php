@@ -104,12 +104,12 @@ class LoginController extends Controller
         if ($user->role === 'supplier') {
             $displayName = $user->supplierProfile?->company_name ?? 'Mitra Pemasok';
 
-            return redirect()->intended(route('supplier.katalog.index'))
+            return redirect()->intended(route('supplier.dashboard'))
                 ->with('success', "Selamat datang kembali, {$displayName}!");
         }
 
         if ($user->role === 'admin') {
-            return redirect()->intended(route('admin.commodities.index'))
+            return redirect()->intended(route('admin.dashboard'))
                 ->with('success', 'Selamat datang di Panel Admin SORAi!');
         }
 

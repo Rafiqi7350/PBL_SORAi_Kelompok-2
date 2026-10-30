@@ -37,9 +37,10 @@ class PengajuanMasukController extends Controller
             ->where('supplier_id', $supplier->id)
             ->where('status', 'pending')
             ->latest()
-            ->get();
+            ->paginate(9)
+            ->withQueryString();
 
-        $totalPending = $pendingPartnerships->count();
+        $totalPending = $pendingPartnerships->total();
 
         return view('supplier.pengajuan-masuk.index', compact(
             'supplier',

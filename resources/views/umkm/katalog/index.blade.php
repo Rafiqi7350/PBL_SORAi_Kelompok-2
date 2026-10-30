@@ -13,13 +13,8 @@
             ratingInputOrder: null,
             stars: 5,
             reviewText: '',
-            notificationMsg: @json(session('success') ?? ''),
-            init() {
-                var self = this;
-                if (this.notificationMsg) {
-                    setTimeout(function() { self.notificationMsg = ''; }, 4000);
-                }
-            },
+            notificationMsg: '',
+            init() {},
             pendingValidationCount: {{ $pendingValidationCount ?? 0 }},
             pendingBackorderCount: {{ $pendingBackorderCount ?? 0 }},
             pendingBackorderApprovalCount: {{ $pendingBackorderApprovalCount ?? 0 }},
@@ -338,7 +333,7 @@
                 this.notificationMsg = msg;
                 setTimeout(function() {
                     if (self.notificationMsg === msg) self.notificationMsg = '';
-                }, 5000);
+                }, 3000);
             }
         };
     }
@@ -346,22 +341,20 @@
 
 <div x-data="umkmCatalogPage()" class="pb-12">
 
-    <!-- FLOATING NOTIFIKASI TOAST -->
-    <div x-cloak x-show="notificationMsg" x-transition class="fixed top-20 right-4 sm:right-8 z-50 max-w-md w-full">
-        <div class="bg-emerald-600 text-white p-4 rounded-2xl font-medium text-xs flex justify-between items-center shadow-xl">
-            <span x-text="notificationMsg"></span>
-            <button type="button" @click="notificationMsg = ''" class="font-bold text-base ml-2 hover:opacity-75 cursor-pointer">✕</button>
+    <!-- FLOATING NOTIFIKASI TOAST (CLIENT-SIDE) -->
+    <div x-cloak x-show="notificationMsg"
+         x-transition:enter="transition ease-out duration-300 transform"
+         x-transition:enter-start="opacity-0 -translate-y-2 scale-95"
+         x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+         x-transition:leave="transition ease-in duration-200 transform"
+         x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+         x-transition:leave-end="opacity-0 -translate-y-2 scale-95"
+         class="fixed top-5 right-4 sm:right-8 z-50 max-w-sm sm:max-w-md w-full pointer-events-none">
+        <div class="bg-emerald-600 text-white p-4 rounded-2xl font-medium text-xs sm:text-sm flex items-center justify-between shadow-2xl pointer-events-auto">
+            <span x-text="notificationMsg" class="tracking-tight"></span>
+            <button type="button" @click="notificationMsg = ''" class="font-bold text-base ml-3 hover:opacity-75 cursor-pointer leading-none p-1 rounded-md transition shrink-0">✕</button>
         </div>
     </div>
-
-    @if(session('error'))
-        <div x-data="{ showError: true }" x-init="setTimeout(() => showError = false, 4500)" x-cloak x-show="showError" x-transition class="fixed top-20 right-4 sm:right-8 z-50 max-w-md w-full">
-            <div class="bg-rose-600 text-white p-4 rounded-2xl font-medium text-xs flex justify-between items-center shadow-xl">
-                <span>{{ session('error') }}</span>
-                <button type="button" @click="showError = false" class="font-bold text-base ml-2 hover:opacity-75 cursor-pointer">✕</button>
-            </div>
-        </div>
-    @endif
 
     <!-- ========================================================= -->
     <!-- TAB 1: KATALOG BAHAN BAKU                                -->
@@ -1248,21 +1241,6 @@
 
             @php
                 $umkmProfile = auth()->user()?->umkmProfile;
-                $dbOrders = $umkmProfile
-                    ? \App\Models\Order::with(['partnership.supplier', 'items.supplierProduct.commodity', 'shipmentConfirmations'])
-                        ->whereHas('partnership', fn($q) => $q->where('umkm_id', $umkmProfile->id))
-                        ->whereIn('order_status', [
-                            'MENUNGGU_KONFIRMASI_BARANG',
-                            'DIKIRIM',
-                            'shipped',
-                            'partially_shipped',
-                            'backorder_pending',
-                            'BARANG_DITERIMA',
-                            'completed',
-                            'completed_partial',
-                        ])
-                        ->latest()->get()
-                    : collect();
             @endphp
 
             @if($dbOrders->isEmpty())
@@ -1503,6 +1481,12 @@
                         </tbody>
                     </table>
                 </div>
+
+                @if(isset($dbOrders) && method_exists($dbOrders, 'hasPages') && $dbOrders->hasPages())
+                    <div class="p-4 border-t border-gray-100">
+                        {{ $dbOrders->links() }}
+                    </div>
+                @endif
             @endif
         </div>
 
@@ -1916,6 +1900,12 @@
                         </div>
                     @endforeach
                 </div>
+
+                @if(isset($backorderOrders) && method_exists($backorderOrders, 'hasPages') && $backorderOrders->hasPages())
+                    <div class="pt-4">
+                        {{ $backorderOrders->links() }}
+                    </div>
+                @endif
             @endif
         </div>
 
@@ -2238,6 +2228,12 @@
                         </tbody>
                     </table>
                 </div>
+
+                @if(isset($batchInvoices) && method_exists($batchInvoices, 'hasPages') && $batchInvoices->hasPages())
+                    <div class="p-4 border-t border-gray-100">
+                        {{ $batchInvoices->links() }}
+                    </div>
+                @endif
             @endif
         </div>
 
@@ -2367,37 +2363,220 @@
             </div>
         </div>
 
-        <!-- VISUAL DIAGRAM TREN PENGADAAN (BAR CHART) -->
-        <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6">
-            <div class="flex justify-between items-center border-b border-gray-100 pb-3">
-                <div>
-                    <h3 class="font-bold text-lg text-gray-900">Grafik Tren Pengadaan Rutin (Kg/Bulan)</h3>
-                    <p class="text-xs text-gray-500">Realisasi pasok dari Kelompok Tani Poultry Malang</p>
+        <!-- VISUAL DIAGRAM TREN PENGADAAN (LINE CHART) & DISTRIBUSI KONTRAK (DONUT CHART) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch" x-data="{ chartMetric: 'volume' }">
+
+            <!-- KOLOM KIRI (lg:col-span-8): WAVE LINE CHART TREN PENGADAAN -->
+            <div class="lg:col-span-8 bg-white p-6 sm:p-7 rounded-3xl shadow-sm border border-gray-100 flex flex-col justify-between space-y-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-bold text-lg text-gray-900 tracking-tight">Tren Pengadaan & Realisasi Pasokan</h3>
+                            <span class="text-[10px] font-mono font-bold bg-orange-50 text-orange-600 border border-orange-100 px-2 py-0.5 rounded-full">B2B Analytics</span>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-0.5">Pemantauan realisasi volume pasokan komoditas bulanan dari kontrak kemitraan aktif</p>
+                    </div>
+
+                    <!-- Metric Filter Pill -->
+                    <div class="inline-flex items-center p-1 bg-gray-100/80 rounded-xl text-xs font-bold self-start sm:self-auto">
+                        <button type="button"
+                                @click="chartMetric = 'volume'"
+                                :class="chartMetric === 'volume' ? 'bg-[#ea580c] text-white shadow-xs' : 'text-gray-500 hover:text-gray-900'"
+                                class="px-3 py-1.5 rounded-lg transition cursor-pointer">
+                            Volume (Kg)
+                        </button>
+                        <button type="button"
+                                @click="chartMetric = 'biaya'"
+                                :class="chartMetric === 'biaya' ? 'bg-[#ea580c] text-white shadow-xs' : 'text-gray-500 hover:text-gray-900'"
+                                class="px-3 py-1.5 rounded-lg transition cursor-pointer">
+                            Biaya (Rp)
+                        </button>
+                    </div>
                 </div>
-                <span class="text-xs font-mono font-semibold text-orange-600">B2B Analytics</span>
+
+                <!-- WAVE SVG LINE CHART -->
+                <div class="relative w-full overflow-hidden pt-2">
+                    <svg viewBox="0 0 700 240" class="w-full h-auto overflow-visible">
+                        <defs>
+                            <linearGradient id="umkmWaveGrad" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#ea580c" stop-opacity="0.28" />
+                                <stop offset="100%" stop-color="#ea580c" stop-opacity="0.0" />
+                            </linearGradient>
+                            <linearGradient id="umkmLineGrad" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stop-color="#f97316" />
+                                <stop offset="100%" stop-color="#ea580c" />
+                            </linearGradient>
+                        </defs>
+
+                        <!-- Horizontal Grid Lines & Y-Axis Labels -->
+                        <line x1="45" y1="20" x2="685" y2="20" stroke="#f1f5f9" stroke-dasharray="4" stroke-width="1.5" />
+                        <text x="35" y="24" class="text-[10px] fill-gray-400 font-mono" text-anchor="end" x-text="chartMetric === 'volume' ? '500kg' : '15jt'"></text>
+
+                        <line x1="45" y1="65" x2="685" y2="65" stroke="#f1f5f9" stroke-dasharray="4" stroke-width="1.5" />
+                        <text x="35" y="69" class="text-[10px] fill-gray-400 font-mono" text-anchor="end" x-text="chartMetric === 'volume' ? '400kg' : '12jt'"></text>
+
+                        <line x1="45" y1="110" x2="685" y2="110" stroke="#f1f5f9" stroke-dasharray="4" stroke-width="1.5" />
+                        <text x="35" y="114" class="text-[10px] fill-gray-400 font-mono" text-anchor="end" x-text="chartMetric === 'volume' ? '300kg' : '9jt'"></text>
+
+                        <line x1="45" y1="155" x2="685" y2="155" stroke="#f1f5f9" stroke-dasharray="4" stroke-width="1.5" />
+                        <text x="35" y="159" class="text-[10px] fill-gray-400 font-mono" text-anchor="end" x-text="chartMetric === 'volume' ? '200kg' : '6jt'"></text>
+
+                        <line x1="45" y1="200" x2="685" y2="200" stroke="#e2e8f0" stroke-width="1.5" />
+                        <text x="35" y="204" class="text-[10px] fill-gray-400 font-mono" text-anchor="end">0</text>
+
+                        <!-- Area Fill Under Path -->
+                        <path
+                            d="M45,160 C110,150 160,135 220,115 C280,95 330,120 390,85 C450,50 510,75 570,45 C620,25 655,35 685,30 L685,200 L45,200 Z"
+                            fill="url(#umkmWaveGrad)"
+                        />
+
+                        <!-- Smooth Wave Line Path -->
+                        <path
+                            d="M45,160 C110,150 160,135 220,115 C280,95 330,120 390,85 C450,50 510,75 570,45 C620,25 655,35 685,30"
+                            fill="none"
+                            stroke="url(#umkmLineGrad)"
+                            stroke-width="3.5"
+                            stroke-linecap="round"
+                        />
+
+                        <!-- Data Points (Circles) with Tooltips -->
+                        <g class="cursor-pointer group">
+                            <circle cx="45" cy="160" r="4" fill="#ffffff" stroke="#ea580c" stroke-width="2.5" class="group-hover:r-6 transition-all" />
+                        </g>
+                        <g class="cursor-pointer group">
+                            <circle cx="150" cy="138" r="4" fill="#ffffff" stroke="#ea580c" stroke-width="2.5" class="group-hover:r-6 transition-all" />
+                        </g>
+                        <g class="cursor-pointer group">
+                            <circle cx="260" cy="102" r="4" fill="#ffffff" stroke="#ea580c" stroke-width="2.5" class="group-hover:r-6 transition-all" />
+                        </g>
+                        <g class="cursor-pointer group">
+                            <circle cx="370" cy="92" r="4" fill="#ffffff" stroke="#ea580c" stroke-width="2.5" class="group-hover:r-6 transition-all" />
+                        </g>
+                        <g class="cursor-pointer group">
+                            <circle cx="480" cy="62" r="4" fill="#ffffff" stroke="#ea580c" stroke-width="2.5" class="group-hover:r-6 transition-all" />
+                        </g>
+                        <g class="cursor-pointer group">
+                            <circle cx="585" cy="42" r="5" fill="#ea580c" stroke="#ffffff" stroke-width="2.5" class="animate-pulse" />
+                        </g>
+                        <g class="cursor-pointer group">
+                            <circle cx="685" cy="30" r="4" fill="#ffffff" stroke="#ea580c" stroke-width="2.5" class="group-hover:r-6 transition-all" />
+                        </g>
+
+                        <!-- X-Axis Labels -->
+                        <text x="45" y="222" class="text-[10px] fill-gray-400 font-bold font-sans" text-anchor="middle">MEI</text>
+                        <text x="150" y="222" class="text-[10px] fill-gray-400 font-bold font-sans" text-anchor="middle">JUN</text>
+                        <text x="260" y="222" class="text-[10px] fill-gray-400 font-bold font-sans" text-anchor="middle">JUL</text>
+                        <text x="370" y="222" class="text-[10px] fill-gray-400 font-bold font-sans" text-anchor="middle">AGU</text>
+                        <text x="480" y="222" class="text-[10px] fill-gray-400 font-bold font-sans" text-anchor="middle">SEP</text>
+                        <text x="585" y="222" class="text-[10px] fill-orange-600 font-extrabold font-sans" text-anchor="middle">OKT (AKTIF)</text>
+                        <text x="685" y="222" class="text-[10px] fill-gray-400 font-bold font-sans" text-anchor="middle">EST. NOV</text>
+                    </svg>
+                </div>
+
+                <!-- Footer Summary Line Chart -->
+                <div class="flex items-center justify-between text-xs text-gray-500 pt-2 border-t border-gray-100 flex-wrap gap-2">
+                    <span class="inline-flex items-center gap-1.5 font-medium">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        Realisasi Pasokan: <strong class="text-gray-900 font-semibold">380 Kg</strong> bulan ini (100% tepat waktu sebelum 07.00 WIB)
+                    </span>
+                    <span class="text-[11px] font-mono text-gray-400">Target Bulan Depan: 420 Kg</span>
+                </div>
             </div>
 
-            <div class="h-48 flex items-end justify-between gap-4 pt-8 px-4 border-b border-gray-100 pb-2">
-                @foreach([
-                    ['month' => 'Mei', 'value' => 200],
-                    ['month' => 'Jun', 'value' => 280],
-                    ['month' => 'Jul', 'value' => 350],
-                    ['month' => 'Agu', 'value' => 320],
-                    ['month' => 'Sep', 'value' => 410],
-                    ['month' => 'Okt (Aktif)', 'value' => 380]
-                ] as $bar)
-                    <div class="flex-1 flex flex-col items-center gap-2 h-full justify-end">
-                        <div class="w-full flex items-end justify-center h-full">
-                            <div style="height: {{ ($bar['value'] / 450) * 100 }}%" class="w-2/3 bg-[#ea580c] rounded-t-lg relative group transition-all hover:bg-[#c2410c]">
-                                <span class="absolute -top-7 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] font-mono px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition whitespace-nowrap">
-                                    {{ $bar['value'] }}kg
-                                </span>
-                            </div>
-                        </div>
-                        <span class="text-xs font-medium text-gray-600">{{ $bar['month'] }}</span>
+            <!-- KOLOM KANAN (lg:col-span-4): DONUT / PIE CHART DISTRIBUSI KONTRAK AKTIF -->
+            <div class="lg:col-span-4 bg-white p-6 sm:p-7 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center justify-between space-y-4">
+                <div class="w-full text-left">
+                    <h3 class="text-base font-bold text-slate-900 tracking-tight">Distribusi Kontrak</h3>
+                    <p class="text-xs text-slate-400 font-medium">Berdasarkan status kemitraan</p>
+                </div>
+
+                @php
+                    $safeActive = max(1, $activeContractsCount ?? 2);
+                    $safePending = max(0, $pendingContractsCount ?? 0);
+                    $totalC = max(1, $safeActive + $safePending);
+                    $circumference = 240;
+
+                    if ($safePending > 0) {
+                        $activeRatio = $safeActive / $totalC;
+                        $pendingRatio = $safePending / $totalC;
+                        $activeDash = max(30, round($activeRatio * ($circumference - 30)));
+                        $pendingDash = max(20, round($pendingRatio * ($circumference - 30)));
+                        $pendingOffset = -($activeDash + 15);
+                    } else {
+                        $activeDash = 230;
+                        $pendingDash = 0;
+                        $pendingOffset = 0;
+                    }
+                @endphp
+
+                <!-- SVG DONUT / PIE CHART -->
+                <div class="relative w-48 h-48 sm:w-52 sm:h-52 flex items-center justify-center my-2">
+                    <svg viewBox="0 0 100 100" class="w-full h-full transform -rotate-90">
+                        <!-- Background Track -->
+                        <circle cx="50" cy="50" r="38" fill="none" stroke="#f1f5f9" stroke-width="12" />
+
+                        <!-- Donut Segment 1: Kontrak Aktif (Oranye #ea580c) -->
+                        <circle
+                            cx="50"
+                            cy="50"
+                            r="38"
+                            fill="none"
+                            stroke="#ea580c"
+                            stroke-width="12"
+                            stroke-dasharray="{{ $activeDash }} {{ $circumference }}"
+                            stroke-linecap="round"
+                            class="transition-all duration-700 ease-out"
+                        />
+
+                        <!-- Donut Segment 2: Menunggu Review / Pending (Biru Langit #0284c7) -->
+                        @if($safePending > 0)
+                            <circle
+                                cx="50"
+                                cy="50"
+                                r="38"
+                                fill="none"
+                                stroke="#0284c7"
+                                stroke-width="12"
+                                stroke-dasharray="{{ $pendingDash }} {{ $circumference }}"
+                                stroke-dashoffset="{{ $pendingOffset }}"
+                                stroke-linecap="round"
+                                class="transition-all duration-700 ease-out"
+                            />
+                        @endif
+                    </svg>
+
+                    <!-- Center Text: Total Kontrak Aktif -->
+                    <div class="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none">
+                        <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase block leading-none">Total Kontrak</span>
+                        <span class="text-3xl sm:text-4xl font-extrabold text-slate-900 mt-1 leading-none tracking-tight">{{ $activeContractsCount ?? 2 }}</span>
+                        <span class="text-[10px] text-orange-600 font-extrabold uppercase tracking-wide mt-1">Aktif Berjalan</span>
                     </div>
-                @endforeach
+                </div>
+
+                <!-- Dot Indicators (Persis Seperti Gambar Referensi) -->
+                <div class="w-full pt-1 border-t border-gray-100 space-y-2.5">
+                    <div class="flex items-center justify-center gap-5">
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-[#ea580c] shadow-xs" title="Kontrak Aktif"></span>
+                            <span class="text-xs font-bold text-slate-700">Aktif ({{ $activeContractsCount ?? 2 }})</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-2.5 h-2.5 rounded-full bg-[#0284c7] shadow-xs" title="Menunggu Validasi"></span>
+                            <span class="text-xs font-semibold text-slate-500">Menunggu ({{ $pendingContractsCount ?? 0 }})</span>
+                        </div>
+                    </div>
+
+                    <!-- Mini Komoditas Chips Kontrak Aktif -->
+                    <div class="flex items-center justify-center gap-1.5 flex-wrap pt-1">
+                        @foreach(array_slice($activeContractCommodities ?? ['Daging Ayam' => 1, 'Bumbu Dapur' => 1], 0, 3, true) as $cName => $cQty)
+                            <span class="text-[10px] font-semibold bg-gray-50 border border-gray-200/60 text-gray-600 px-2.5 py-0.5 rounded-full truncate max-w-[140px]">
+                                {{ $cName }}
+                            </span>
+                        @endforeach
+                    </div>
+                </div>
             </div>
+
         </div>
 
         <!-- HISTORI TRANSAKSI & RATING -->

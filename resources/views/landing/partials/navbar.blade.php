@@ -25,11 +25,11 @@
                         Dashboard UMKM
                     </a>
                 @elseif(auth()->user()->role === 'supplier')
-                    <a href="{{ route('supplier.katalog.index') }}" class="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 transition-all cursor-pointer shadow-xs">
+                    <a href="{{ route('supplier.dashboard') }}" class="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 transition-all cursor-pointer shadow-xs">
                         Dashboard Pemasok
                     </a>
                 @elseif(auth()->user()->role === 'admin')
-                    <a href="{{ route('admin.commodities.index') }}" class="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-black transition-all cursor-pointer shadow-xs">
+                    <a href="{{ route('admin.dashboard') }}" class="px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-slate-900 hover:bg-black transition-all cursor-pointer shadow-xs">
                         Panel Admin
                     </a>
                 @endif
@@ -68,7 +68,7 @@
                         Dashboard UMKM
                     </a>
                 @elseif(auth()->user()->role === 'supplier')
-                    <a href="{{ route('supplier.katalog.index') }}" @click="mobileMenuOpen = false" class="w-full py-2.5 rounded-xl text-center text-sm font-bold text-white bg-slate-900">
+                    <a href="{{ route('supplier.dashboard') }}" @click="mobileMenuOpen = false" class="w-full py-2.5 rounded-xl text-center text-sm font-bold text-white bg-slate-900">
                         Dashboard Pemasok
                     </a>
                 @endif
