@@ -56,4 +56,9 @@ class SupplierProfile extends Model
     {
         return $this->hasManyThrough(SupplyPlan::class, Partnership::class, 'supplier_id', 'partnership_id');
     }
+
+    public function orderReviews(): HasMany
+    {
+        return $this->hasMany(OrderReview::class, 'supplier_id');
+    }
 }

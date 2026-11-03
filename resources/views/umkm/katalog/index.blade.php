@@ -13,6 +13,8 @@
             ratingInputOrder: null,
             stars: 5,
             reviewText: '',
+            showReviewModal: false,
+            isSubmittingReview: false,
             notificationMsg: '',
             init() {},
             pendingValidationCount: {{ $pendingValidationCount ?? 0 }},
@@ -356,23 +358,69 @@
 
             saveRating: function() {
                 if (!this.ratingInputOrder) return;
-                var targetId = this.ratingInputOrder.id;
-                var currentStars = this.stars;
-                var currentReview = this.reviewText;
-                this.orders = this.orders.map(function(o) {
-                    return o.id === targetId ? Object.assign({}, o, { rating: currentStars, review: currentReview }) : o;
+                var self = this;
+                var orderId = this.ratingInputOrder.id;
+                var currentStars = parseInt(this.stars) || 5;
+                var currentReview = (this.reviewText || '').trim();
+
+                if (!currentReview) {
+                    alert('Mohon tuliskan ulasan kualitas bahan baku & pengiriman.');
+                    return;
+                }
+
+                self.isSubmittingReview = true;
+                var token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') 
+                         || '{{ csrf_token() }}';
+
+                fetch('/umkm/pemesanan/' + orderId + '/ulasan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': token
+                    },
+                    body: JSON.stringify({
+                        rating: currentStars,
+                        review: currentReview
+                    })
+                })
+                .then(function(res) {
+                    return res.json().then(function(data) {
+                        if (!res.ok) {
+                            throw data;
+                        }
+                        return data;
+                    });
+                })
+                .then(function(resData) {
+                    self.isSubmittingReview = false;
+                    self.showReviewModal = false;
+                    self.ratingInputOrder = null;
+                    self.notify(resData.message || '✓ Ulasan & Rating berhasil disimpan!');
+                    setTimeout(function() {
+                        window.location.href = '{{ route("umkm.katalog.index", ["tab" => "pemesanan", "subtab" => "rating"]) }}';
+                    }, 400);
+                })
+                .catch(function(err) {
+                    self.isSubmittingReview = false;
+                    var msg = err.message || (err.errors ? Object.values(err.errors).flat().join(', ') : 'Gagal menyimpan ulasan.');
+                    alert('Gagal: ' + msg);
                 });
-                this.notify('✓ Ulasan & Rating ' + currentStars + ' Bintang berhasil tersimpan untuk pesanan ' + targetId + '!');
-                this.ratingInputOrder = null;
-                this.reviewText = '';
-                this.stars = 5;
             },
 
             openRatingForOrder: function(ord) {
                 this.ratingInputOrder = ord;
-                this.stars = ord.rating || 5;
+                this.stars = ord.rating ? parseInt(ord.rating) : 5;
                 this.reviewText = ord.review || '';
+                this.showReviewModal = true;
                 this.orderSubTab = 'rating';
+            },
+
+            closeReviewModal: function() {
+                this.showReviewModal = false;
+                this.ratingInputOrder = null;
+                this.reviewText = '';
+                this.stars = 5;
             },
 
             sendSupplyPlan: function() {
@@ -1180,6 +1228,11 @@
                 class="pb-3 relative transition flex items-center gap-2 cursor-pointer"
                 :class="orderSubTab === 'rating' ? 'text-gray-900 font-extrabold' : 'text-gray-500 hover:text-gray-900'">
                 <span>Rating & Ulasan</span>
+                @if(isset($reviewOrders) && $reviewOrders->isNotEmpty())
+                    <span class="bg-orange-100 text-[#ea580c] text-[10px] px-2 py-0.5 rounded-full font-mono font-bold">
+                        {{ $reviewOrders->count() }}
+                    </span>
+                @endif
                 <template x-if="orderSubTab === 'rating'">
                     <span class="absolute bottom-0 left-0 w-full h-1 bg-[#ea580c] rounded-t-full"></span>
                 </template>
@@ -2327,90 +2380,196 @@
         <!-- SUB-TAB 4: RATING & ULASAN -->
         <div x-show="orderSubTab === 'rating'" class="space-y-6">
 
-            <!-- FORM BERI ULASAN AKTIF -->
-            <template x-if="ratingInputOrder">
-                <div class="bg-white p-6 sm:p-7 rounded-3xl border-2 border-[#ea580c] space-y-4 shadow-xl">
-                    <div class="flex justify-between items-center border-b border-gray-100 pb-3">
+            <!-- MODAL FORMULIR RATING & ULASAN (ALPINE.JS / POPUP) -->
+            <div x-cloak x-show="showReviewModal" class="fixed inset-0 bg-black/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+                <div @click.away="closeReviewModal()" class="bg-white max-w-lg w-full rounded-[2rem] p-6 sm:p-7 space-y-5 shadow-2xl border border-gray-100">
+                    <div class="flex justify-between items-start border-b border-gray-100 pb-3">
                         <div>
-                            <span class="text-xs font-mono font-bold text-[#ea580c] uppercase">FORM PENILAIAN MUTU PASOKAN</span>
-                            <h4 class="font-extrabold text-lg text-gray-900" x-text="'Beri Ulasan Pasokan: ' + ratingInputOrder.id"></h4>
-                            <p class="text-xs text-gray-500" x-text="'Pemasok: ' + ratingInputOrder.supplierName + ' (' + ratingInputOrder.commodity + ')'"></p>
+                            <span class="text-xs font-mono font-bold text-[#ea580c] uppercase tracking-wider block">FORM PENILAIAN MUTU PASOKAN</span>
+                            <h4 class="font-extrabold text-lg text-gray-900 mt-0.5" x-text="ratingInputOrder ? 'Ulas Pesanan: ' + (ratingInputOrder.code || ratingInputOrder.id) : 'Beri Ulasan Pasokan'"></h4>
+                            <p class="text-xs text-gray-500 mt-0.5" x-text="ratingInputOrder ? 'Pemasok: ' + (ratingInputOrder.supplierName || '-') + ' (' + (ratingInputOrder.commodity || '-') + ')' : ''"></p>
                         </div>
-                        <button type="button" @click="ratingInputOrder = null" class="text-gray-400 hover:text-gray-700 font-bold text-lg cursor-pointer">✕</button>
+                        <button type="button" @click="closeReviewModal()" class="text-gray-400 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 font-bold text-lg cursor-pointer transition">✕</button>
                     </div>
 
                     <form @submit.prevent="saveRating()" class="space-y-4 text-xs font-semibold">
+                        @csrf
                         <div>
-                            <label class="block mb-2 text-gray-700">Pilih Skor Bintang Kepuasan (1-5 Bintang):</label>
-                            <div class="flex gap-2">
+                            <label class="block mb-2 text-gray-700 font-bold">Pilih Skor Bintang Kepuasan (1-5 Bintang): <span class="text-rose-500">*</span></label>
+                            <div class="flex items-center gap-2">
                                 <template x-for="star in [1, 2, 3, 4, 5]" :key="'star-' + star">
                                     <button 
                                         type="button" 
                                         @click="stars = star" 
-                                        class="p-2.5 rounded-2xl border transition text-2xl cursor-pointer"
+                                        class="p-2.5 rounded-2xl border transition text-2xl cursor-pointer hover:scale-105"
                                         :class="star <= stars ? 'border-amber-400 bg-amber-50 text-amber-500' : 'border-gray-200 bg-gray-50 text-gray-300'">
                                         ★
                                     </button>
                                 </template>
+                                <span class="ml-2 text-sm font-extrabold text-amber-600 font-mono" x-text="stars + '.0 / 5.0'"></span>
                             </div>
                         </div>
 
                         <div>
-                            <label class="block mb-1.5 text-gray-700">Tulis Ulasan Kualitas Bahan Baku & Ketepatan Pengiriman:</label>
+                            <label class="block mb-1.5 text-gray-700 font-bold">Tulis Ulasan Kualitas Bahan Baku & Ketepatan Pengiriman: <span class="text-rose-500">*</span></label>
                             <textarea 
                                 rows="3" 
                                 x-model="reviewText" 
                                 required 
-                                placeholder="Contoh: Kualitas daging sangat segar dan datang tepat waktu sebelum subuh..." 
-                                class="w-full p-3.5 rounded-2xl bg-[#f1f2f4] text-gray-900 font-medium placeholder-gray-400 border-0 focus:outline-none focus:ring-2 focus:ring-[#ea580c]"></textarea>
+                                maxlength="1000"
+                                placeholder="Contoh: Kualitas daging sangat segar, higienis, dan pengiriman tepat waktu sesuai standar dapur kami..." 
+                                class="w-full p-3.5 rounded-2xl bg-gray-50 text-gray-900 font-medium placeholder-gray-400 border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#ea580c] focus:border-transparent transition"></textarea>
+                            <div class="flex justify-between text-[11px] text-gray-400 mt-1">
+                                <span>Wajib diisi</span>
+                                <span x-text="(reviewText.length || 0) + ' / 1000 karakter'"></span>
+                            </div>
                         </div>
 
-                        <div class="flex justify-end gap-3 pt-1">
-                            <button type="button" @click="ratingInputOrder = null" class="px-5 py-2.5 rounded-full border border-gray-200 text-gray-700 font-bold hover:bg-gray-50 cursor-pointer">
+                        <div class="flex justify-end gap-3 pt-2 border-t border-gray-100">
+                            <button type="button" @click="closeReviewModal()" class="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-bold hover:bg-gray-50 transition cursor-pointer">
                                 Batal
                             </button>
-                            <button type="submit" class="bg-[#ea580c] hover:bg-[#c2410c] text-white px-7 py-2.5 rounded-full font-extrabold shadow-sm transition cursor-pointer">
-                                Simpan Ulasan →
+                            <button type="submit" 
+                                    :disabled="isSubmittingReview"
+                                    class="bg-[#ea580c] hover:bg-[#c2410c] text-white px-7 py-2.5 rounded-xl font-extrabold shadow-sm transition cursor-pointer disabled:opacity-50">
+                                <span x-show="!isSubmittingReview">Simpan Ulasan →</span>
+                                <span x-show="isSubmittingReview">Menyimpan...</span>
                             </button>
                         </div>
                     </form>
                 </div>
-            </template>
+            </div>
 
-            <!-- RIWAYAT ULASAN -->
-            <div class="bg-white rounded-3xl border border-gray-100 overflow-hidden p-6 space-y-4 shadow-sm">
-                <div class="flex justify-between items-center border-b border-gray-100 pb-3">
+            <!-- RIWAYAT ULASAN & DAFTAR PESANAN SELESAI DARI DATABASE -->
+            <div class="bg-white rounded-3xl border border-gray-100 overflow-hidden p-6 sm:p-7 space-y-5 shadow-xs">
+                <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-gray-100 pb-4">
                     <div>
-                        <h3 class="font-bold text-lg text-gray-900">Riwayat Ulasan & Rating Pemasok</h3>
-                        <p class="text-xs text-gray-500">Evaluasi mutu bahan baku yang telah diterima dan diselesaikan oleh Dapur UMKM Anda.</p>
+                        <span class="font-mono text-[10px] font-bold text-[#ea580c] uppercase tracking-wider block">
+                            EVALUASI MUTU BAHAN BAKU PASOKAN
+                        </span>
+                        <h3 class="font-extrabold text-xl text-gray-900 mt-0.5">Rating & Ulasan Pemasok</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">
+                            Daftar pesanan kemitraan yang pembayarannya telah lunas. Berikan evaluasi mutu komoditas untuk menjaga standar kualitas dapur UMKM Anda.
+                        </p>
                     </div>
+                    <span class="bg-orange-50 border border-orange-200 text-[#ea580c] font-mono font-bold text-xs px-3.5 py-1.5 rounded-full w-fit">
+                        {{ $reviewOrders->count() }} Pesanan Lunas
+                    </span>
                 </div>
 
-                <div class="space-y-3">
-                    <template x-for="ord in orders.filter(o => o.paymentStatus === 'PAID')" :key="'review-list-' + ord.id">
-                        <div class="bg-gray-50 p-4 rounded-2xl space-y-2 border border-gray-100">
-                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                                <div>
-                                    <h4 class="font-bold text-gray-900 text-sm" x-text="ord.supplierName"></h4>
-                                    <span class="text-[11px] text-gray-500 font-mono" x-text="ord.id + ' • ' + ord.commodity + ' (' + ord.approvedQty + ' ' + ord.unit + ')'"></span>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <div class="flex text-amber-400 text-sm">
-                                        <template x-for="s in [1, 2, 3, 4, 5]" :key="'score-' + ord.id + '-' + s">
-                                            <span :class="s <= (ord.rating || 5) ? 'text-amber-400' : 'text-gray-300'">★</span>
-                                        </template>
+                <div class="space-y-4">
+                    @forelse($reviewOrders as $ord)
+                        @php
+                            $supplier = $ord->partnership?->supplier;
+                            $firstItem = $ord->items?->first();
+                            $commodity = $firstItem?->supplierProduct?->commodity;
+                            $commodityName = $commodity?->name ?? 'Komoditas Pasokan';
+                            $quantity = $firstItem?->quantity ?? $ord->total_ordered_quantity ?? 0;
+                            $unit = $commodity?->unit ?? 'kg';
+                            $orderCode = 'ORD-' . strtoupper(substr($ord->id, 0, 8));
+                            $review = $ord->review;
+                            $hasReview = !is_null($review);
+                            $ratingVal = $hasReview ? (int) $review->rating : 0;
+                            $reviewTextVal = $hasReview ? $review->review : '';
+                        @endphp
+                        <div class="bg-gray-50/70 hover:bg-gray-50 p-5 rounded-2xl space-y-3 border border-gray-200/70 transition shadow-2xs">
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                <div class="space-y-1">
+                                    <div class="flex items-center gap-2">
+                                        <h4 class="font-extrabold text-gray-900 text-sm">
+                                            {{ $supplier?->company_name ?? 'Pemasok Mitra' }}
+                                        </h4>
+                                        <span class="text-[10px] px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 font-semibold font-mono">
+                                            Lunas
+                                        </span>
                                     </div>
+                                    <div class="text-xs text-gray-600 flex flex-wrap items-center gap-1.5 font-mono">
+                                        <span class="font-bold text-[#ea580c]">{{ $orderCode }}</span>
+                                        <span class="text-gray-400">•</span>
+                                        <span class="font-semibold text-gray-800">{{ $commodityName }}</span>
+                                        <span class="text-gray-500 font-normal">({{ number_format((float) $quantity, 1) }} {{ $unit }})</span>
+                                        @if($ord->order_date)
+                                            <span class="text-gray-400">•</span>
+                                            <span class="text-gray-500 text-[11px]">{{ \Carbon\Carbon::parse($ord->order_date)->format('d M Y') }}</span>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center gap-3">
+                                    <!-- RATING BINTANG (1-5 ATAU KOSONG/ABU-ABU) -->
+                                    <div class="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-2xs">
+                                        <div class="flex text-sm">
+                                            @for($s = 1; $s <= 5; $s++)
+                                                <span class="{{ $s <= $ratingVal ? 'text-amber-400' : 'text-gray-200' }}">★</span>
+                                            @endfor
+                                        </div>
+                                        @if($hasReview)
+                                            <span class="text-xs font-mono font-bold text-amber-700 ml-1">
+                                                {{ $ratingVal }}.0 / 5
+                                            </span>
+                                        @else
+                                            <span class="text-[10px] font-medium text-gray-400 ml-1">
+                                                (Belum Diulas)
+                                            </span>
+                                        @endif
+                                    </div>
+
+                                    <!-- TOMBOL AKSI: EDIT / ULAS -->
                                     <button 
                                         type="button" 
-                                        @click="openRatingForOrder(ord)" 
-                                        class="text-[10px] font-bold text-[#ea580c] hover:underline cursor-pointer ml-2">
-                                        Edit / Ulas
+                                        @click="openRatingForOrder({
+                                            id: '{{ $ord->id }}',
+                                            code: '{{ $orderCode }}',
+                                            supplierName: '{{ addslashes($supplier?->company_name ?? 'Pemasok Mitra') }}',
+                                            commodity: '{{ addslashes($commodityName . ' (' . number_format((float) $quantity, 1) . ' ' . $unit . ')') }}',
+                                            rating: {{ $ratingVal > 0 ? $ratingVal : 5 }},
+                                            review: {{ json_encode($reviewTextVal) }}
+                                        })"
+                                        class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-white hover:bg-[#ea580c] text-gray-700 hover:text-white border border-gray-200 hover:border-[#ea580c] text-xs font-bold transition shadow-2xs cursor-pointer">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                        <span>{{ $hasReview ? 'Edit Ulasan' : 'Beri Ulasan' }}</span>
                                     </button>
                                 </div>
                             </div>
-                            <p class="text-xs text-gray-600 italic bg-white p-3 rounded-xl border border-gray-100" x-text="'&ldquo;' + (ord.review || 'Transaksi pasokan selesai dengan baik.') + '&rdquo;'"></p>
+
+                            <!-- ISI TEKS ULASAN -->
+                            @if($hasReview && filled($reviewTextVal))
+                                <div class="bg-white p-3.5 rounded-xl border border-gray-100 flex items-start gap-2">
+                                    <span class="text-[#ea580c] font-serif text-lg leading-none select-none">&ldquo;</span>
+                                    <div class="flex-1">
+                                        <p class="text-xs text-gray-700 font-medium leading-relaxed">
+                                            {{ $reviewTextVal }}
+                                        </p>
+                                        @if($review->updated_at)
+                                            <span class="text-[10px] text-gray-400 block mt-1.5 font-mono">
+                                                Terakhir diperbarui: {{ $review->updated_at->locale('id')->diffForHumans() }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <span class="text-[#ea580c] font-serif text-lg leading-none select-none self-end">&rdquo;</span>
+                                </div>
+                            @else
+                                <div class="bg-white/60 p-3.5 rounded-xl border border-dashed border-gray-200 flex items-center justify-between">
+                                    <span class="text-xs text-gray-400 italic">
+                                        Belum ada ulasan untuk kualitas bahan baku pesanan ini.
+                                    </span>
+                                    <span class="text-[11px] font-bold text-[#ea580c]">
+                                        Silakan klik tombol "Beri Ulasan"
+                                    </span>
+                                </div>
+                            @endif
                         </div>
-                    </template>
+                    @empty
+                        <div class="text-center py-12 bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                            <div class="w-12 h-12 mx-auto rounded-full bg-orange-50 flex items-center justify-center text-[#ea580c] mb-3">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                            </div>
+                            <h4 class="text-sm font-bold text-gray-900">Belum Ada Pesanan yang Selesai Dibayar</h4>
+                            <p class="text-xs text-gray-500 max-w-md mx-auto mt-1">
+                                Pesanan yang telah diselesaikan pembayarannya akan muncul di sini untuk Anda berikan ulasan dan rating mutu pasokan.
+                            </p>
+                        </div>
+                    @endforelse
                 </div>
             </div>
 

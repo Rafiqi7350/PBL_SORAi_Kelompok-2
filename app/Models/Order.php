@@ -58,6 +58,16 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    public function orderItems(): HasMany
+    {
+        return $this->hasMany(OrderItem::class);
+    }
+
+    public function review(): HasOne
+    {
+        return $this->hasOne(OrderReview::class, 'order_id');
+    }
+
     public function shipmentConfirmation(): HasOne
     {
         return $this->hasOne(ShipmentConfirmation::class)->latest('created_at');

@@ -16,6 +16,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class KatalogController extends Controller
 {
@@ -347,6 +348,22 @@ class KatalogController extends Controller
             ->paginate(10, ['*'], 'invoices_page')
             ->withQueryString() : new LengthAwarePaginator([], 0, 10);
 
+        // Ambil daftar pesanan lunas untuk tab Rating & Ulasan (UMKM yang sedang login)
+        $reviewOrders = ($umkm && $partnershipIds->isNotEmpty()) ? Order::with([
+            'partnership.supplier',
+            'items.supplierProduct.commodity',
+            'review',
+            'payments',
+        ])
+            ->whereIn('partnership_id', $partnershipIds)
+            ->where(function ($q) {
+                $q->whereHas('payments', function ($pq) {
+                    $pq->whereIn(DB::raw("UPPER(COALESCE(payment_status, ''))"), ['PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS', 'LUNAS']);
+                })->orWhereIn('order_status', ['completed', 'BARANG_DITERIMA', 'completed_partial']);
+            })
+            ->latest('created_at')
+            ->get() : collect();
+
         // Hitung statistik pesanan dalam 1 query agregasi terkonsolidasi (Pesanan Aktif, Selesai, Dibatalkan)
         if ($umkm && $partnershipIds->isNotEmpty()) {
             $orderCounts = Order::whereIn('partnership_id', $partnershipIds)
@@ -420,6 +437,7 @@ class KatalogController extends Controller
             'pendingContractsCount',
             'totalContractsCount',
             'activeContractCommodities',
+            'reviewOrders',
         ));
     }
 
