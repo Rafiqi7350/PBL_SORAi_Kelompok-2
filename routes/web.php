@@ -9,6 +9,7 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PendingRegistrationController;
 use App\Http\Controllers\Auth\SupplierRegisterController;
 use App\Http\Controllers\Auth\UmkmRegisterController;
+use App\Http\Controllers\MidtransWebhookController;
 use App\Http\Controllers\Supplier\KatalogSupplierController;
 use App\Http\Controllers\Supplier\PengajuanMasukController;
 use App\Http\Controllers\Supplier\PengirimanController as SupplierPengirimanController;
@@ -21,6 +22,9 @@ use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\EnsureUserIsSupplier;
 use App\Http\Middleware\EnsureUserIsUmkm;
 use Illuminate\Support\Facades\Route;
+
+/* Midtrans Webhook Notification Route (Exempt from CSRF) */
+Route::post('/midtrans/notification', [MidtransWebhookController::class, 'handleNotification'])->name('midtrans.notification');
 
 Route::get('/favicon.ico', fn () => response()->file(public_path('favicon.ico')));
 
@@ -65,6 +69,8 @@ Route::prefix('umkm')->name('umkm.')->middleware(EnsureUserIsUmkm::class)->group
     Route::post('/pemesanan/{order}/terima-backorder', [PemesananController::class, 'terimaBackorder'])->name('pemesanan.terima-backorder');
     Route::post('/pemesanan/{order}/tolak-backorder', [PemesananController::class, 'tolakBackorder'])->name('pemesanan.tolak-backorder');
     Route::post('/pemesanan/pembayaran/{payment}/bayar', [PemesananController::class, 'bayarInvoice'])->name('pemesanan.bayar-invoice');
+    Route::post('/pemesanan/pembayaran/{payment}/snap-token', [PemesananController::class, 'getSnapToken'])->name('pemesanan.snap-token');
+    Route::post('/pemesanan/pembayaran/{payment}/sync-status', [PemesananController::class, 'syncPaymentStatus'])->name('pemesanan.sync-status');
 });
 
 /* Supplier Routes */

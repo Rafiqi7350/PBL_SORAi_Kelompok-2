@@ -8,6 +8,9 @@ use App\Models\OrderItem;
 use App\Models\PartnershipDeliverySchedule;
 use App\Models\Payment;
 use App\Models\ShipmentConfirmation;
+use App\Services\MidtransService;
+use Exception;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +18,10 @@ use Illuminate\Support\Facades\Storage;
 
 class PemesananController extends Controller
 {
+    public function __construct(
+        protected MidtransService $midtransService
+    ) {}
+
     /**
      * Tampilkan daftar pesanan UMKM yang sedang login.
      * Mengarahkan ke tab Pesanan & Pengiriman di portal UMKM.
@@ -247,12 +254,63 @@ class PemesananController extends Controller
             if (! $hasUnpaidPayments && in_array($order->order_status, [Order::STATUS_COMPLETED, 'BARANG_DITERIMA'])) {
                 // Semua batch sudah lunas dan barang sudah diterima
                 return redirect()->route('umkm.katalog.index', ['tab' => 'pemesanan', 'subtab' => 'rating'])
-                    ->with('success', "✓ Pembayaran {$invText} ({$batchText}) sebesar Rp ".number_format($payment->amount, 0, ',', '.').' berhasil lunas via Midtrans! Seluruh tagihan pesanan telah selesai dibayar.');
+                    ->with('success', "Pembayaran {$invText} ({$batchText}) sebesar Rp ".number_format($payment->amount, 0, ',', '.').' berhasil lunas via Midtrans. Seluruh tagihan pesanan telah selesai dibayar.');
             }
         }
 
         return redirect()->route('umkm.katalog.index', ['tab' => 'pemesanan', 'subtab' => 'payment'])
-            ->with('success', "✓ Pembayaran {$invText} ({$batchText}) sebesar Rp ".number_format($payment->amount, 0, ',', '.').' berhasil lunas via Midtrans!');
+            ->with('success', "Pembayaran {$invText} ({$batchText}) sebesar Rp ".number_format($payment->amount, 0, ',', '.').' berhasil lunas via Midtrans.');
+    }
+
+    /**
+     * Dapatkan Snap Token dari Midtrans untuk pembayaran invoice batch.
+     */
+    public function getSnapToken(Payment $payment): JsonResponse
+    {
+        if ($payment->isPaid()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tagihan invoice ini sudah berstatus lunas.',
+            ], 400);
+        }
+
+        if (empty(config('midtrans.server_key'))) {
+            return response()->json([
+                'success' => false,
+                'is_mock' => true,
+                'message' => 'MIDTRANS_SERVER_KEY belum disetel di file .env. Anda dapat menggunakan simulator cepat atau memasukkan kunci Midtrans Sandbox.',
+            ]);
+        }
+
+        try {
+            $snapToken = $this->midtransService->createSnapToken($payment);
+
+            return response()->json([
+                'success' => true,
+                'snap_token' => $snapToken,
+                'client_key' => config('midtrans.client_key'),
+            ]);
+        } catch (Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal membuat transaksi Midtrans: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Sinkronisasi status pembayaran langsung ke API Midtrans.
+     */
+    public function syncPaymentStatus(Payment $payment)
+    {
+        try {
+            $result = $this->midtransService->syncTransactionStatus($payment);
+            $status = $result['payment_status'] ?? $payment->payment_status;
+
+            return redirect()->back()->with('success', "Status pembayaran Midtrans berhasil disinkronkan: {$status}");
+        } catch (Exception $e) {
+            return redirect()->back()->with('error', 'Gagal menyinkronkan status dengan Midtrans: '.$e->getMessage());
+        }
     }
 
     /**
