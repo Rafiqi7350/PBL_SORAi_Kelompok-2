@@ -13,6 +13,7 @@ use App\Http\Controllers\MidtransWebhookController;
 use App\Http\Controllers\Supplier\KatalogSupplierController;
 use App\Http\Controllers\Supplier\PengajuanMasukController;
 use App\Http\Controllers\Supplier\PengirimanController as SupplierPengirimanController;
+use App\Http\Controllers\Supplier\RiwayatTransaksiController;
 use App\Http\Controllers\Supplier\SupplierDashboardController;
 use App\Http\Controllers\Supplier\SupplyPlanningController as SupplierSupplyPlanningController;
 use App\Http\Controllers\Umkm\CollaborativeSupplyPlanningController;
@@ -71,6 +72,7 @@ Route::prefix('umkm')->name('umkm.')->middleware(EnsureUserIsUmkm::class)->group
     Route::post('/pemesanan/pembayaran/{payment}/bayar', [PemesananController::class, 'bayarInvoice'])->name('pemesanan.bayar-invoice');
     Route::post('/pemesanan/pembayaran/{payment}/snap-token', [PemesananController::class, 'getSnapToken'])->name('pemesanan.snap-token');
     Route::post('/pemesanan/pembayaran/{payment}/sync-status', [PemesananController::class, 'syncPaymentStatus'])->name('pemesanan.sync-status');
+    Route::post('/pemesanan/{orderId}/ulasan', [PemesananController::class, 'storeOrUpdateReview'])->name('pemesanan.ulasan');
 });
 
 /* Supplier Routes */
@@ -97,6 +99,8 @@ Route::prefix('supplier')->name('supplier.')->middleware(EnsureUserIsSupplier::c
     Route::post('/pengiriman/{order}/kirim', [SupplierPengirimanController::class, 'prosesKirim'])->name('pengiriman.kirim');
     Route::post('/pengiriman/{order}/kirim-batch1', [SupplierPengirimanController::class, 'kirimBatch1'])->name('pengiriman.kirim-batch1');
     Route::post('/pengiriman/{order}/kirim-backorder', [SupplierPengirimanController::class, 'kirimBackorder'])->name('pengiriman.kirim-backorder');
+
+    Route::get('/riwayat-transaksi', [RiwayatTransaksiController::class, 'index'])->name('riwayat-transaksi.index');
 });
 
 /* Admin Protected Routes (Master Data Komoditas, Kategori, Satuan Baku, User Moderasi) */

@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Umkm;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\OrderItem;
+use App\Models\OrderReview;
 use App\Models\PartnershipDeliverySchedule;
 use App\Models\Payment;
 use App\Models\ShipmentConfirmation;
 use App\Services\MidtransService;
 use Exception;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -448,5 +450,62 @@ class PemesananController extends Controller
 
         return redirect()->route('umkm.katalog.index', ['tab' => 'pemesanan', 'subtab' => 'backorder'])
             ->with('success', $msg);
+    }
+
+    /**
+     * Menyimpan atau mengupdate rating bintang dan pesan teks ulasan pesanan oleh UMKM.
+     */
+    public function storeOrUpdateReview(Request $request, $orderId): JsonResponse|RedirectResponse
+    {
+        $validated = $request->validate([
+            'rating' => 'required|integer|min:1|max:5',
+            'review' => 'required|string|max:1000',
+        ]);
+
+        $order = Order::with('partnership.supplier')->findOrFail($orderId);
+
+        $user = Auth::user();
+        $umkm = $user?->umkmProfile;
+
+        // Validasi kepemilikan pesanan
+        if ($umkm && $order->partnership?->umkm_id !== $umkm->id) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Anda tidak memiliki hak akses untuk memberikan ulasan pada pesanan ini.',
+                ], 403);
+            }
+
+            return redirect()->back()->with('error', 'Anda tidak memiliki hak akses untuk memberikan ulasan pada pesanan ini.');
+        }
+
+        $umkmId = $umkm?->id ?? $order->partnership?->umkm_id;
+        $supplierId = $order->partnership?->supplier_id;
+
+        $review = OrderReview::updateOrCreate(
+            ['order_id' => $order->id],
+            [
+                'umkm_id' => $umkmId,
+                'supplier_id' => $supplierId,
+                'rating' => (int) $validated['rating'],
+                'review' => trim($validated['review']),
+            ]
+        );
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => '✓ Ulasan & Rating '.$review->rating.' Bintang berhasil disimpan!',
+                'data' => [
+                    'order_id' => $order->id,
+                    'rating' => $review->rating,
+                    'review' => $review->review,
+                    'updated_at' => $review->updated_at?->format('d/m/Y H:i'),
+                ],
+            ]);
+        }
+
+        return redirect()->route('umkm.katalog.index', ['tab' => 'pemesanan', 'subtab' => 'rating'])
+            ->with('success', '✓ Ulasan & Rating '.$review->rating.' Bintang berhasil disimpan!');
     }
 }

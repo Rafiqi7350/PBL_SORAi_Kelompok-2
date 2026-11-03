@@ -35,4 +35,9 @@ class UmkmProfile extends Model
     {
         return $this->hasManyThrough(SupplyPlan::class, Partnership::class, 'umkm_id', 'partnership_id');
     }
+
+    public function orderReviews(): HasMany
+    {
+        return $this->hasMany(OrderReview::class, 'umkm_id');
+    }
 }
