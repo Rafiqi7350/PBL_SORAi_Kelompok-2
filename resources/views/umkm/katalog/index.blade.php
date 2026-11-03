@@ -268,11 +268,73 @@
             payingInvoice: null,
             payingOrder: null,
             selectedPaymentMethod: 'BCA Virtual Account',
+            isLoadingSnap: false,
+            loadingInvoiceId: null,
 
             openBatchInvoicePayment: function(inv) {
                 this.payingInvoice = inv;
                 this.selectedPaymentMethod = 'BCA Virtual Account';
             },
+
+            payBatchInvoiceSnap: function(inv) {
+                var self = this;
+                self.isLoadingSnap = true;
+                self.loadingInvoiceId = inv.id;
+
+                fetch('/umkm/pemesanan/pembayaran/' + inv.id + '/snap-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                        'Accept': 'application/json'
+                    }
+                })
+                .then(function(res) {
+                    return res.json();
+                })
+                .then(function(data) {
+                    self.isLoadingSnap = false;
+                    self.loadingInvoiceId = null;
+
+                    if (!data.success) {
+                        if (data.is_mock) {
+                            // Midtrans belum disetel, buka fallback simulator cepat
+                            self.openBatchInvoicePayment(inv);
+                            return;
+                        }
+                        alert(data.message || 'Gagal memproses transaksi Midtrans.');
+                        return;
+                    }
+
+                    if (typeof window.snap === 'undefined') {
+                        alert('Midtrans Snap SDK tidak termuat. Membuka opsi simulator lokal.');
+                        self.openBatchInvoicePayment(inv);
+                        return;
+                    }
+
+                    window.snap.pay(data.snap_token, {
+                        onSuccess: function(result) {
+                            window.location.href = "{{ route('umkm.katalog.index', ['tab' => 'pemesanan', 'subtab' => 'payment']) }}";
+                        },
+                        onPending: function(result) {
+                            window.location.href = "{{ route('umkm.katalog.index', ['tab' => 'pemesanan', 'subtab' => 'payment']) }}";
+                        },
+                        onError: function(result) {
+                            alert('Pembayaran via Midtrans gagal atau dibatalkan.');
+                        },
+                        onClose: function() {
+                            self.notify('Jendela pembayaran ditutup. Klik tombol bayar kembali untuk melanjutkan atau memilih metode pembayaran lain.');
+                        }
+                    });
+                })
+                .catch(function(err) {
+                    self.isLoadingSnap = false;
+                    self.loadingInvoiceId = null;
+                    console.error('Midtrans fetch error:', err);
+                    self.openBatchInvoicePayment(inv);
+                });
+            },
+
 
             openMidtransPayment: function(order) {
                 this.payingOrder = order;
@@ -289,7 +351,7 @@
                 this.payingOrder = null;
                 this.ratingInputOrder = finishedOrder;
                 this.orderSubTab = 'rating';
-                this.notify('✓ Pembayaran Midtrans berhasil lunas! Silakan berikan ulasan & rating.');
+                this.notify('Pembayaran Midtrans berhasil lunas. Silakan berikan ulasan dan rating.');
             },
 
             saveRating: function() {
@@ -2184,8 +2246,11 @@
                                     </td>
                                     <td class="p-3.5 whitespace-nowrap">
                                         @if($isPaid)
-                                            <span class="bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
-                                                <span>✓ LUNAS</span>
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/70">
+                                                <svg class="w-3 h-3 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                                                </svg>
+                                                <span>Lunas</span>
                                             </span>
                                             @if($inv->paid_at || $inv->transaction_time)
                                                 <span class="block text-[10px] text-gray-400 mt-1 font-mono">
@@ -2193,34 +2258,56 @@
                                                 </span>
                                             @endif
                                         @else
-                                            <span class="bg-rose-100 text-rose-800 px-2.5 py-1 rounded-full text-[10px] font-bold inline-flex items-center gap-1">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping"></span>
-                                                BELUM DIBAYAR
+                                            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-amber-50 text-amber-800 border border-amber-200/70">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                                <span>Menunggu Pembayaran</span>
                                             </span>
                                         @endif
                                     </td>
                                     <td class="p-3.5 text-center whitespace-nowrap">
                                         @if(! $isPaid)
-                                            <button 
-                                                type="button"
-                                                @click="openBatchInvoicePayment({
-                                                    id: '{{ $inv->id }}',
-                                                    invoiceNumber: '{{ $inv->invoice_number }}',
-                                                    batch: {{ $inv->shipment_batch }},
-                                                    batchName: '{{ $batchBadge }}',
-                                                    orderCode: '{{ strtoupper(substr($inv->order_id, 0, 8)) }}',
-                                                    supplierName: '{{ addslashes($invOrder?->partnership?->supplier?->company_name ?? 'Pemasok') }}',
-                                                    commodity: '{{ addslashes($commodityName) }}',
-                                                    quantity: '{{ number_format((float) ($inv->quantity_billed ?: 0), 1) }} {{ $unit }}',
-                                                    amount: {{ (float) $inv->amount }}
-                                                })" 
-                                                class="bg-[#ea580c] hover:bg-[#c2410c] text-white px-4 py-2 rounded-full font-bold text-[11px] shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5 mx-auto">
-                                                <span>Bayar {{ $batchBadge }} →</span>
-                                            </button>
+                                            <div class="flex items-center justify-center gap-1.5 mx-auto">
+                                                <button 
+                                                    type="button"
+                                                    @click="openBatchInvoicePayment({
+                                                        id: '{{ $inv->id }}',
+                                                        invoiceNumber: '{{ $inv->invoice_number }}',
+                                                        batch: {{ $inv->shipment_batch }},
+                                                        batchName: '{{ $batchBadge }}',
+                                                        orderCode: '{{ strtoupper(substr($inv->order_id, 0, 8)) }}',
+                                                        supplierName: '{{ addslashes($invOrder?->partnership?->supplier?->company_name ?? 'Pemasok') }}',
+                                                        commodity: '{{ addslashes($commodityName) }}',
+                                                        quantity: '{{ number_format((float) ($inv->quantity_billed ?: 0), 1) }} {{ $unit }}',
+                                                        amount: {{ (float) $inv->amount }}
+                                                    })" 
+                                                    id="btn-bayar-batch"
+                                                    class="bg-[#ea580c] hover:bg-[#c2410c] text-white px-3.5 py-1.5 rounded-lg font-semibold text-[11px] shadow-xs hover:shadow transition cursor-pointer inline-flex items-center justify-center gap-1.5">
+                                                    <svg class="w-3.5 h-3.5 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                                                    </svg>
+                                                    <span>Bayar Tagihan</span>
+                                                </button>
+
+                                                <form action="{{ route('umkm.pemesanan.sync-status', $inv) }}" method="POST" class="inline">
+                                                    @csrf
+                                                    <button type="submit" title="Sinkronkan status transaksi dari server Midtrans" class="bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold transition inline-flex items-center gap-1 cursor-pointer">
+                                                        <svg class="w-3 h-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                                        <span>Cek Status</span>
+                                                    </button>
+                                                </form>
+                                            </div>
                                         @else
-                                            <span class="text-emerald-700 font-bold text-[11px] inline-flex items-center gap-1">
-                                                ✓ Lunas via {{ $inv->payment_method ?? 'Midtrans' }}
-                                            </span>
+                                            <div class="inline-flex flex-col items-center">
+                                                <span class="text-emerald-700 font-semibold text-[11px] inline-flex items-center gap-1">
+                                                    <svg class="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                    <span>Lunas via {{ $inv->payment_method ?? 'Midtrans' }}</span>
+                                                </span>
+                                                @if($inv->midtrans_transaction_id)
+                                                    <span class="text-[9px] text-gray-400 font-mono mt-0.5">Ref: {{ $inv->midtrans_transaction_id }}</span>
+                                                @endif
+                                            </div>
                                         @endif
                                     </td>
                                 </tr>
@@ -2983,21 +3070,26 @@
     </div>
 
     <!-- ========================================================= -->
-    <!-- MODAL MIDTRANS PAYMENT SIMULATOR (BATCH INVOICE)          -->
+    <!-- MODAL RINCIAN PEMBAYARAN MIDTRANS (BATCH INVOICE)         -->
     <!-- ========================================================= -->
-    <div x-cloak x-show="payingInvoice" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div @click.away="payingInvoice = null" class="bg-white max-w-md w-full rounded-3xl p-6 sm:p-7 space-y-5 shadow-2xl border border-gray-100">
+    <div x-cloak x-show="payingInvoice" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div @click.away="payingInvoice = null" class="bg-white max-w-md w-full rounded-2xl p-6 space-y-5 shadow-xl border border-gray-100">
             <div class="flex justify-between items-start border-b border-gray-100 pb-3">
-                <div>
-                    <span class="text-xs font-bold text-[#ea580c] uppercase font-mono">MIDTRANS PAYMENT GATEWAY</span>
-                    <h3 class="text-xl font-extrabold text-gray-900 mt-0.5">Pembayaran Tagihan Batch</h3>
-                    <p class="text-xs text-gray-500 font-mono mt-0.5" x-text="'No. Invoice: ' + payingInvoice?.invoiceNumber"></p>
+                <div class="space-y-0.5">
+                    <div class="inline-flex items-center gap-1.5 text-[10px] font-bold text-[#ea580c] uppercase font-mono tracking-wider">
+                        <svg class="w-3.5 h-3.5 text-[#ea580c]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        <span>Midtrans Secure Payment</span>
+                    </div>
+                    <h3 class="text-lg font-bold text-gray-900">Rincian Tagihan Pembayaran</h3>
+                    <p class="text-xs text-gray-500 font-mono" x-text="'No. Invoice: ' + payingInvoice?.invoiceNumber"></p>
                 </div>
-                <button type="button" @click="payingInvoice = null" class="text-gray-400 hover:text-gray-700 cursor-pointer p-1 rounded-lg hover:bg-gray-100 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                <button type="button" @click="payingInvoice = null" class="text-gray-400 hover:text-gray-700 cursor-pointer p-1.5 rounded-lg hover:bg-gray-100 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
 
             <!-- DETAIL INVOICE BATCH -->
-            <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2 text-xs font-mono">
+            <div class="bg-gray-50/80 p-4 rounded-xl border border-gray-200/70 space-y-2.5 text-xs font-mono">
                 <div class="flex justify-between text-gray-600">
                     <span>Kloter Pengiriman:</span>
                     <span class="font-bold text-[#ea580c]" x-text="payingInvoice?.batchName"></span>
@@ -3007,82 +3099,75 @@
                     <span class="font-bold text-gray-800" x-text="'#ORD-' + payingInvoice?.orderCode"></span>
                 </div>
                 <div class="flex justify-between text-gray-600">
-                    <span>Pemasok:</span>
+                    <span>Mitra Pemasok:</span>
                     <span class="font-bold text-gray-900" x-text="payingInvoice?.supplierName"></span>
                 </div>
                 <div class="flex justify-between text-gray-600">
-                    <span>Kuantitas Batch:</span>
+                    <span>Komoditas & Kuantitas:</span>
                     <span class="font-bold text-gray-900" x-text="payingInvoice?.commodity + ' (' + payingInvoice?.quantity + ')'"></span>
                 </div>
-                <div class="flex justify-between text-base text-[#ea580c] font-black pt-2 border-t border-gray-200">
-                    <span>Total Tagihan Batch:</span>
+                <div class="flex justify-between text-sm text-[#ea580c] font-black pt-2.5 border-t border-gray-200">
+                    <span class="text-gray-800 font-bold">Total Pembayaran:</span>
                     <span x-text="'Rp ' + (payingInvoice?.amount ? payingInvoice.amount.toLocaleString('id-ID') : 0)"></span>
                 </div>
             </div>
 
-            <form :action="`/umkm/pemesanan/pembayaran/${payingInvoice?.id}/bayar`" method="POST" class="space-y-4">
+            <form :action="`/umkm/pemesanan/pembayaran/${payingInvoice?.id}/bayar`" method="POST" class="space-y-3.5">
                 @csrf
                 <input type="hidden" name="payment_method" :value="selectedPaymentMethod">
 
-                <div class="space-y-2 text-xs font-semibold">
-                    <span class="block text-gray-600 text-[11px]">Pilih Metode Pembayaran Midtrans:</span>
-                    <div class="grid grid-cols-3 gap-2">
-                        <button type="button"
-                                @click="selectedPaymentMethod = 'Midtrans BCA Virtual Account'"
-                                :class="selectedPaymentMethod === 'Midtrans BCA Virtual Account' ? 'border-[#ea580c] bg-orange-50 text-[#ea580c]' : 'border-gray-200 bg-[#f1f2f4] text-gray-800'"
-                                class="p-2.5 rounded-xl border text-center font-bold cursor-pointer transition text-xs">
-                            BCA VA
-                        </button>
-                        <button type="button"
-                                @click="selectedPaymentMethod = 'Midtrans Mandiri Virtual Account'"
-                                :class="selectedPaymentMethod === 'Midtrans Mandiri Virtual Account' ? 'border-[#ea580c] bg-orange-50 text-[#ea580c]' : 'border-gray-200 bg-[#f1f2f4] text-gray-800'"
-                                class="p-2.5 rounded-xl border text-center font-bold cursor-pointer transition text-xs">
-                            Mandiri VA
-                        </button>
-                        <button type="button"
-                                @click="selectedPaymentMethod = 'Midtrans QRIS'"
-                                :class="selectedPaymentMethod === 'Midtrans QRIS' ? 'border-[#ea580c] bg-orange-50 text-[#ea580c]' : 'border-gray-200 bg-[#f1f2f4] text-gray-800'"
-                                class="p-2.5 rounded-xl border text-center font-bold cursor-pointer transition text-xs">
-                            QRIS
-                        </button>
-                    </div>
+                <!-- INFO PEMBAYARAN MIDTRANS RESMI -->
+                <div class="bg-gray-50 border border-gray-200/80 rounded-xl p-3 flex items-start gap-2.5 text-xs text-gray-600">
+                    <svg class="w-4 h-4 text-gray-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <p class="text-[11px] text-gray-600 leading-relaxed">Metode pembayaran (QRIS, Virtual Account BCA, Mandiri, BNI, BRI, e-Wallet, dll) dapat dipilih langsung di jendela resmi Midtrans.</p>
                 </div>
 
-                <div class="flex items-center gap-2 pt-1">
-                    <button type="button" @click="payingInvoice = null" class="w-1/3 bg-gray-100 hover:bg-gray-200 text-gray-700 py-3.5 rounded-full font-bold text-xs transition cursor-pointer">
-                        Batal
+                <div class="space-y-2 pt-1">
+                    <button type="button" 
+                            @click="payingInvoice ? payBatchInvoiceSnap(payingInvoice) : null; payingInvoice = null;"
+                            class="w-full bg-[#ea580c] hover:bg-[#c2410c] text-white py-3 rounded-xl font-semibold text-xs shadow-xs hover:shadow transition cursor-pointer flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                        </svg>
+                        <span>Lanjut ke Pembayaran Midtrans</span>
+                        <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                     </button>
-                    <button type="submit" class="w-2/3 bg-[#ea580c] hover:bg-[#c2410c] text-white py-3.5 rounded-full font-bold text-xs shadow-md transition cursor-pointer flex items-center justify-center gap-1.5">
-                        <span>Bayar Batch Ini via Midtrans</span><svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button type="button" @click="payingInvoice = null" class="w-1/3 bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer">
+                            Batal
+                        </button>
+                        <button type="submit" id="btn-simulasi-bayar" class="w-2/3 bg-gray-50 hover:bg-gray-100 text-gray-600 border border-gray-200 py-2.5 rounded-xl font-semibold text-[11px] transition cursor-pointer">
+                            Simulasi Offline (Demo)
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>
     </div>
 
     <!-- MODAL FALLBACK UNTUK MOCK ORDER DEMO -->
-    <div x-cloak x-show="payingOrder" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div @click.away="payingOrder = null" class="bg-white max-w-md w-full rounded-3xl p-6 sm:p-7 space-y-5 shadow-2xl border border-gray-100">
+    <div x-cloak x-show="payingOrder" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div @click.away="payingOrder = null" class="bg-white max-w-md w-full rounded-2xl p-6 space-y-5 shadow-xl border border-gray-100">
             <div class="flex justify-between items-start border-b border-gray-100 pb-3">
-                <div>
-                    <span class="text-xs font-bold text-[#ea580c] uppercase font-mono">MIDTRANS PAYMENT GATEWAY</span>
-                    <h3 class="text-xl font-extrabold text-gray-900">Pembayaran Tagihan Pasokan</h3>
+                <div class="space-y-0.5">
+                    <span class="text-[10px] font-bold text-[#ea580c] uppercase font-mono tracking-wider">MIDTRANS PAYMENT GATEWAY</span>
+                    <h3 class="text-lg font-bold text-gray-900">Pembayaran Tagihan Pasokan</h3>
                 </div>
-                <button type="button" @click="payingOrder = null" class="text-gray-400 hover:text-gray-700 cursor-pointer p-1 rounded-lg hover:bg-gray-100 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                <button type="button" @click="payingOrder = null" class="text-gray-400 hover:text-gray-700 cursor-pointer p-1.5 rounded-lg hover:bg-gray-100 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
             </div>
 
-            <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2 text-xs font-mono">
+            <div class="bg-gray-50/80 p-4 rounded-xl border border-gray-200/70 space-y-2.5 text-xs font-mono">
                 <div class="flex justify-between text-gray-600"><span>No. Order:</span><span class="font-bold text-[#ea580c]" x-text="payingOrder?.id"></span></div>
                 <div class="flex justify-between text-gray-600"><span>Pemasok:</span><span class="font-bold text-gray-900" x-text="payingOrder?.supplierName"></span></div>
                 <div class="flex justify-between text-gray-600"><span>Komoditas:</span><span class="font-bold text-gray-900" x-text="payingOrder?.commodity"></span></div>
-                <div class="flex justify-between text-base text-[#ea580c] font-bold pt-2 border-t border-gray-200">
-                    <span>Total Tagihan:</span>
+                <div class="flex justify-between text-sm text-[#ea580c] font-black pt-2.5 border-t border-gray-200">
+                    <span class="text-gray-800 font-bold">Total Tagihan:</span>
                     <span x-text="'Rp ' + (payingOrder?.total ? payingOrder.total.toLocaleString('id-ID') : 0)"></span>
                 </div>
             </div>
 
-            <button type="button" @click="simulateMidtransSuccess()" class="w-full bg-[#ea580c] hover:bg-[#c2410c] text-white py-3.5 rounded-full font-bold text-xs shadow-md transition cursor-pointer">
-                Simulasi Pembayaran Berhasil (Sukses)
+            <button type="button" @click="simulateMidtransSuccess()" class="w-full bg-[#ea580c] hover:bg-[#c2410c] text-white py-3 rounded-xl font-semibold text-xs shadow-xs hover:shadow transition cursor-pointer">
+                Simulasi Pembayaran Berhasil (Demo)
             </button>
         </div>
     </div>

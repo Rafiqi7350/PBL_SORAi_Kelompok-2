@@ -14,6 +14,7 @@ use App\Models\SupplierProfile;
 use App\Models\SupplyPlan;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 
 class KatalogController extends Controller
@@ -306,7 +307,7 @@ class KatalogController extends Controller
             })
             ->latest('created_at')
             ->paginate(10, ['*'], 'backorders_page')
-            ->withQueryString() : new \Illuminate\Pagination\LengthAwarePaginator([], 0, 10);
+            ->withQueryString() : new LengthAwarePaginator([], 0, 10);
 
         // Ambil daftar pesanan aktif & pengiriman untuk UMKM ini (dengan pagination)
         $dbOrders = ($umkm && $partnershipIds->isNotEmpty()) ? Order::with([
@@ -327,7 +328,7 @@ class KatalogController extends Controller
             ])
             ->latest()
             ->paginate(10, ['*'], 'orders_page')
-            ->withQueryString() : new \Illuminate\Pagination\LengthAwarePaginator([], 0, 10);
+            ->withQueryString() : new LengthAwarePaginator([], 0, 10);
 
         // Hitung jumlah tagihan batch yang belum dibayar dalam 1 query count efisien
         $pendingPaymentCount = ($umkm && $partnershipIds->isNotEmpty()) ? Payment::whereHas('order', function ($q) use ($partnershipIds) {
@@ -344,7 +345,7 @@ class KatalogController extends Controller
         })
             ->latest('created_at')
             ->paginate(10, ['*'], 'invoices_page')
-            ->withQueryString() : new \Illuminate\Pagination\LengthAwarePaginator([], 0, 10);
+            ->withQueryString() : new LengthAwarePaginator([], 0, 10);
 
         // Hitung statistik pesanan dalam 1 query agregasi terkonsolidasi (Pesanan Aktif, Selesai, Dibatalkan)
         if ($umkm && $partnershipIds->isNotEmpty()) {
