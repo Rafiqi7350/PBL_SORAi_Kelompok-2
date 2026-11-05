@@ -38,10 +38,12 @@ class MidtransWebhookController extends Controller
         } catch (Exception $e) {
             Log::error('Midtrans Webhook Error: '.$e->getMessage(), ['payload' => $payload]);
 
+            $statusCode = str_contains($e->getMessage(), 'signature') ? 403 : 400;
+
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
-            ], 400);
+            ], $statusCode);
         }
     }
 }

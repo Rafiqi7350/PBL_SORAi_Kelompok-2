@@ -98,6 +98,20 @@ class KatalogSupplierController extends Controller
             return redirect()->back()->with('error', 'Profil Pemasok tidak ditemukan.');
         }
 
+        $messages = [
+            'commodity_name.required' => 'Nama komoditas bahan baku wajib diisi.',
+            'category_id.required' => 'Kategori komoditas wajib dipilih.',
+            'unit.required' => 'Satuan komoditas wajib dipilih.',
+            'price.required' => 'Harga satuan komoditas wajib diisi.',
+            'price.numeric' => 'Harga satuan harus berupa angka.',
+            'price.min' => 'Harga dan stok minimal bernilai 0.',
+            'stock_capacity.required' => 'Kapasitas pasokan stok wajib diisi.',
+            'stock_status.required' => 'Status stok wajib dipilih.',
+            'image.image' => 'File harus berupa gambar dengan format JPG, JPEG, PNG, atau WEBP.',
+            'image.mimes' => 'Format file foto tidak didukung. Harap unggah format JPG, JPEG, PNG, atau WEBP.',
+            'image.max' => 'Ukuran file foto melebihi batas maksimal 2MB.',
+        ];
+
         $validated = $request->validate([
             'category_id' => 'required|string',
             'commodity_name' => 'required|string|max:255',
@@ -110,8 +124,8 @@ class KatalogSupplierController extends Controller
             'quality_grade' => 'nullable|string|max:100',
             'is_halal_certified' => 'nullable|boolean',
             'description' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
-        ]);
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+        ], $messages);
 
         $category = CommodityCategory::find($request->input('category_id'));
         $categoryName = $category ? $category->name : $request->input('category_id');
@@ -190,6 +204,20 @@ class KatalogSupplierController extends Controller
 
         $product = SupplierProduct::where('supplier_id', $supplier->id)->findOrFail($id);
 
+        $messages = [
+            'commodity_name.required' => 'Nama komoditas bahan baku wajib diisi.',
+            'category_id.required' => 'Kategori komoditas wajib dipilih.',
+            'unit.required' => 'Satuan komoditas wajib dipilih.',
+            'price.required' => 'Harga satuan komoditas wajib diisi.',
+            'price.numeric' => 'Harga satuan harus berupa angka.',
+            'price.min' => 'Harga dan stok minimal bernilai 0.',
+            'stock_capacity.required' => 'Kapasitas pasokan stok wajib diisi.',
+            'stock_status.required' => 'Status stok wajib dipilih.',
+            'image.image' => 'File harus berupa gambar dengan format JPG, JPEG, PNG, atau WEBP.',
+            'image.mimes' => 'Format file foto tidak didukung. Harap unggah format JPG, JPEG, PNG, atau WEBP.',
+            'image.max' => 'Ukuran file foto melebihi batas maksimal 2MB.',
+        ];
+
         $validated = $request->validate([
             'category_id' => 'required|string',
             'commodity_name' => 'required|string|max:255',
@@ -202,8 +230,8 @@ class KatalogSupplierController extends Controller
             'quality_grade' => 'nullable|string|max:100',
             'is_halal_certified' => 'nullable|boolean',
             'description' => 'nullable|string',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:5120',
-        ]);
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,webp|max:2048',
+        ], $messages);
 
         $category = CommodityCategory::find($request->input('category_id'));
         $categoryName = $category ? $category->name : $request->input('category_id');

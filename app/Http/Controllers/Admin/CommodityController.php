@@ -160,6 +160,12 @@ class CommodityController extends Controller
     public function destroy($id)
     {
         $commodity = Commodity::findOrFail($id);
+
+        if ($commodity->supplierProducts()->exists() || $commodity->supplierProfiles()->exists()) {
+            return redirect()->route('admin.commodities.index')
+                ->with('error', 'Komoditas "'.$commodity->name.'" tidak dapat dihapus karena sedang aktif digunakan pada katalog atau profil pemasok.');
+        }
+
         $name = $commodity->name;
         $commodity->delete();
 

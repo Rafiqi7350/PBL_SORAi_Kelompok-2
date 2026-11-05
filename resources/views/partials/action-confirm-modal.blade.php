@@ -186,8 +186,8 @@
             const spoofedMethod = methodInput ? methodInput.value.toUpperCase() : '';
             const formMethod = (form.getAttribute('method') || 'GET').toUpperCase();
 
-            // Lewatkan form login atau register agar proses input kredensial berjalan langsung
-            if (action.includes('/login') || action.includes('/register')) {
+            // Lewatkan form login, register, atau master data admin agar berjalan langsung tanpa konfirmasi ganda
+            if (action.includes('/login') || action.includes('/register') || action.includes('/admin/categories') || action.includes('/admin/units')) {
                 return;
             }
 

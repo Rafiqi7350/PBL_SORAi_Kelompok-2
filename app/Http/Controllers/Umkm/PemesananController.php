@@ -40,12 +40,24 @@ class PemesananController extends Controller
     public function terbitkan(Request $request)
     {
         $request->validate([
-            'schedule_id' => 'required|exists:partnership_delivery_schedules,id',
+            'schedule_id' => ['required', 'uuid', 'exists:partnership_delivery_schedules,id'],
         ]);
 
         $schedule = PartnershipDeliverySchedule::with(['partnership.supplier', 'supplierProduct'])->findOrFail($request->input('schedule_id'));
         $partnership = $schedule->partnership;
         $product = $schedule->supplierProduct;
+
+        $isContractActive = $partnership && in_array(strtolower((string) $partnership->status), ['active', 'approved', 'disetujui']);
+        if (! $isContractActive) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Transaksi hanya diizinkan pada kontrak kemitraan aktif.',
+                ], 422);
+            }
+
+            return redirect()->back()->with('error', 'Transaksi hanya diizinkan pada kontrak kemitraan aktif.');
+        }
 
         if (! $product) {
             return redirect()->back()->with('error', 'Komoditas pada jadwal pengiriman ini tidak ditemukan.');

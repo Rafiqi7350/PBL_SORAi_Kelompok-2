@@ -34,7 +34,7 @@
                     <select name="category_id" required class="w-full px-4 py-3 bg-[#f1f2f4] border-0 rounded-xl font-medium text-xs text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#ea580c] transition cursor-pointer">
                         <option value="" disabled>-- Pilih Kategori --</option>
                         @foreach($categories as $category)
-                            <option value="{{ $category->id }}" {{ (old('category_id') == $category->id || strtolower($category->name) == strtolower(old('category_id', $currentCategory))) ? 'selected' : '' }}>
+                            <option value="{{ $category->id }}" {{ (old('category_id') == $category->id || strtolower($category->name) == strtolower(old('category_id', $currentCategory)) || (string)$product->commodity?->category_id === (string)$category->id) ? 'selected' : '' }}>
                                 {{ $category->name }}
                             </option>
                         @endforeach
@@ -72,7 +72,7 @@
 
                 <div>
                     <label class="block text-xs font-bold text-gray-700 mb-1.5">Harga Grosir (Rp per Satuan) <span class="text-rose-500">*</span></label>
-                    <input type="number" step="100" name="price" value="{{ old('price', $product->price) }}" required class="w-full px-4 py-3 bg-[#f1f2f4] border-0 rounded-xl font-medium text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ea580c] transition">
+                    <input type="number" step="100" min="0" name="price" value="{{ old('price', $product->price) }}" required class="w-full px-4 py-3 bg-[#f1f2f4] border-0 rounded-xl font-medium text-xs text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#ea580c] transition">
                     @error('price')
                         <p class="text-xs text-rose-600 font-medium mt-1">{{ $message }}</p>
                     @enderror
@@ -160,7 +160,7 @@
                             "
                             class="block w-full text-xs text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-bold file:bg-orange-50 file:text-[#ea580c] hover:file:bg-orange-100 cursor-pointer"
                         />
-                        <p class="text-[11px] font-medium text-gray-400">Pilih file baru jika ingin mengganti foto komoditas (JPG, PNG, WEBP, maks. 5MB). Biarkan kosong jika ingin tetap menggunakan foto saat ini.</p>
+                        <p class="text-[11px] font-medium text-gray-400">Pilih file baru jika ingin mengganti foto komoditas (JPG, PNG, WEBP, maks. 2MB). Biarkan kosong jika ingin tetap menggunakan foto saat ini.</p>
                         @error('image')
                             <p class="text-xs text-rose-600 font-medium mt-1">{{ $message }}</p>
                         @enderror
@@ -179,7 +179,7 @@
                 <a href="{{ route('supplier.katalog.index') }}" class="px-6 py-3 rounded-full font-bold text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 transition">
                     Batal
                 </a>
-                <button type="submit" class="px-8 py-3 rounded-full font-bold text-xs bg-[#ea580c] hover:bg-[#c2410c] text-white shadow-sm hover:shadow-md transition cursor-pointer flex items-center gap-1">
+                <button type="submit" data-cy="btn-submit-katalog" class="px-8 py-3 rounded-full font-bold text-xs bg-[#ea580c] hover:bg-[#c2410c] text-white shadow-sm hover:shadow-md transition cursor-pointer flex items-center gap-1">
                     <span>Simpan Perubahan →</span>
                 </button>
             </div>

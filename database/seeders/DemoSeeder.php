@@ -80,6 +80,16 @@ class DemoSeeder extends Seeder
             ['password' => Hash::make('password'), 'role' => 'umkm', 'status' => 'active']
         );
 
+        User::firstOrCreate(
+            ['email' => 'pending@sorai.id'],
+            ['password' => Hash::make('password'), 'role' => 'umkm', 'status' => 'pending']
+        );
+
+        User::firstOrCreate(
+            ['email' => 'rejected@sorai.id'],
+            ['password' => Hash::make('password'), 'role' => 'umkm', 'status' => 'rejected']
+        );
+
         $umkm = UmkmProfile::firstOrCreate(
             ['user_id' => $umkmUser->id],
             [

@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>SORAI - Kelola Stok Komoditas Pemasok</title>
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -102,6 +103,7 @@
     </aside>
 
     <main class="flex-1 ml-64 p-6 sm:p-8 min-w-0">
+        @include('partials.flash-notification')
         @yield('content')
     </main>
 

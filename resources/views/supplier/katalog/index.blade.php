@@ -14,7 +14,7 @@
             </h1>
         </div>
         <div>
-            <a href="{{ route('supplier.katalog.create') }}" class="inline-flex items-center gap-2 bg-[#ea580c] hover:bg-[#c2410c] active:scale-[0.98] text-white font-bold text-xs py-3 px-5 rounded-full shadow-sm hover:shadow-md transition">
+            <a href="{{ route('supplier.katalog.create') }}" data-cy="btn-tambah-komoditas" class="inline-flex items-center gap-2 bg-[#ea580c] hover:bg-[#c2410c] active:scale-[0.98] text-white font-bold text-xs py-3 px-5 rounded-full shadow-sm hover:shadow-md transition">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                 </svg>
@@ -87,9 +87,23 @@
                                     Rp {{ number_format($product->price, 0, ',', '.') }}<span class="text-xs text-gray-500 font-normal">/{{ $product->commodity->unit }}</span>
                                 </td>
 
-                                <!-- Kapasitas Pasok -->
+                                <!-- Kapasitas Pasok & Quick Stock Toggle -->
                                 <td class="py-4 px-6 font-mono text-xs font-semibold text-gray-700">
-                                    {{ $product->stock_capacity ?? '-' }}
+                                    <div class="space-y-1">
+                                        <p>{{ $product->stock_capacity ?? '-' }}</p>
+                                        <form method="POST" action="{{ route('supplier.katalog.quick-stock', $product->id) }}" class="inline">
+                                            @csrf
+                                            @method('PATCH')
+                                            <input type="hidden" name="stock_status" value="{{ $product->stock_status === 'Tersedia' ? 'Stok Habis' : 'Tersedia' }}">
+                                            <button type="submit"
+                                                    data-cy="quick-stock-btn"
+                                                    class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold border transition cursor-pointer {{ $product->stock_status === 'Tersedia' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' }}"
+                                                    title="Klik untuk ubah cepat status stok">
+                                                <span class="w-1.5 h-1.5 rounded-full {{ $product->stock_status === 'Tersedia' ? 'bg-emerald-500' : 'bg-rose-500' }}"></span>
+                                                <span>{{ $product->stock_status === 'Tersedia' ? 'TERSEDIA' : 'HABIS' }}</span>
+                                            </button>
+                                        </form>
+                                    </div>
                                 </td>
 
                                 <!-- Aksi CRUD -->

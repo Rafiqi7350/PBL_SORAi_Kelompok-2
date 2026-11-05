@@ -29,12 +29,12 @@
 
     <div 
         x-data="{
-            adminTab: '{{ $currentTab }}',
+            adminTab: '{{ request()->query('tab', ($errors->any() ? 'master' : $currentTab)) }}',
             chartFilter: 'minggu',
             userSearch: '',
             userFilterRole: 'ALL',
-            isCategoryModalOpen: false,
-            isUnitModalOpen: false,
+            isCategoryModalOpen: {{ $errors->any() && old('symbol') === null ? 'true' : 'false' }},
+            isUnitModalOpen: {{ $errors->any() && old('symbol') !== null ? 'true' : 'false' }},
             notification: '{{ session('success') ?? session('warning') ?? '' }}',
             clearNotif() { this.notification = ''; },
             init() {
@@ -173,6 +173,21 @@
 
         <!-- AREA KONTEN UTAMA SISI ADMIN (KANAN) -->
         <main class="flex-1 ml-64 p-8 overflow-y-auto space-y-6 min-w-0">
+
+            <!-- Flash Validation Errors -->
+            @if($errors->any())
+                <div class="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-2xl shadow-sm space-y-1 mb-6">
+                    <div class="flex items-center gap-2 font-bold text-xs uppercase">
+                        <span class="w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center text-[10px]">✕</span>
+                        Terdapat Kesalahan Pengisian Formulir:
+                    </div>
+                    <ul class="list-disc list-inside text-xs font-semibold pl-6 space-y-0.5">
+                        @foreach($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
 
             <!-- FLOATING TOAST NOTIFICATION (TIDAK MENAMBAH BARIS KONTEN) -->
             <div 
@@ -726,10 +741,6 @@
                         <span class="text-xs font-bold text-orange-600 uppercase tracking-wider">STANDARISASI DATA SISTEM</span>
                         <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Master Data Komoditas & Satuan</h2>
                     </div>
-                    <a href="{{ route('admin.commodities.index') }}" class="bg-[#ea580c] hover:bg-orange-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition self-start sm:self-auto flex items-center gap-2">
-                        <span>🌾 Ke Tabel Komoditas Lengkap</span>
-                        <span>&rarr;</span>
-                    </a>
                 </div>
 
                 <!-- TABEL MASTER KATEGORI -->
@@ -756,7 +767,7 @@
                                     <p class="text-[11px] text-slate-500 font-medium">{{ $cat['description'] }}</p>
                                     <span class="text-[10px] text-slate-400 block pt-1 font-semibold">Dipakai oleh {{ $cat['totalCommodities'] }} Komoditas</span>
                                 </div>
-                                <form action="{{ route('admin.categories.destroy', $cat['id']) }}" method="POST" class="inline">
+                                <form data-no-confirm="true" action="{{ route('admin.categories.destroy', $cat['id']) }}" method="POST" class="inline">
                                     @csrf
                                     @method('DELETE')
                                     <button type="submit" class="text-rose-500 hover:text-rose-700 font-bold p-1 cursor-pointer" title="Hapus Kategori">
@@ -804,7 +815,7 @@
                                         <td class="p-3 text-orange-600 font-extrabold font-mono">{{ $u['symbol'] }}</td>
                                         <td class="p-3 text-slate-600">{{ $u['type'] }}</td>
                                         <td class="p-3 text-center">
-                                            <form action="{{ route('admin.units.destroy', $u['id']) }}" method="POST" class="inline">
+                                            <form data-no-confirm="true" action="{{ route('admin.units.destroy', $u['id']) }}" method="POST" class="inline">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="text-rose-500 hover:text-rose-700 font-bold p-1 cursor-pointer" title="Hapus Satuan">
@@ -873,7 +884,7 @@
                         <button type="button" @click="isCategoryModalOpen = false" class="text-slate-400 hover:text-slate-700 font-bold text-xl leading-none cursor-pointer">&times;</button>
                     </div>
 
-                    <form action="{{ route('admin.categories.store') }}" method="POST" class="space-y-4 text-xs font-bold">
+                    <form novalidate data-no-confirm="true" action="{{ route('admin.categories.store') }}" method="POST" class="space-y-4 text-xs font-bold">
                         @csrf
                         <div>
                             <label class="block text-slate-700 mb-1">Nama Kategori Komoditas:</label>
@@ -881,9 +892,13 @@
                                 type="text" 
                                 name="name" 
                                 required 
+                                value="{{ old('name') }}"
                                 placeholder="Contoh: Bumbu Dapur" 
                                 class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500" 
                             />
+                            @error('name')
+                                <p class="text-xs text-rose-600 font-bold mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
                         <div>
                             <label class="block text-slate-700 mb-1">Deskripsi Ringkas:</label>
@@ -926,7 +941,7 @@
                         <button type="button" @click="isUnitModalOpen = false" class="text-slate-400 hover:text-slate-700 font-bold text-xl leading-none cursor-pointer">&times;</button>
                     </div>
 
-                    <form action="{{ route('admin.units.store') }}" method="POST" class="space-y-4 text-xs font-bold">
+                    <form novalidate data-no-confirm="true" action="{{ route('admin.units.store') }}" method="POST" class="space-y-4 text-xs font-bold">
                         @csrf
                         <div>
                             <label class="block text-slate-700 mb-1">Nama Satuan:</label>
@@ -934,9 +949,13 @@
                                 type="text" 
                                 name="name" 
                                 required 
+                                value="{{ old('name') }}"
                                 placeholder="Contoh: Kilogram" 
                                 class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500" 
                             />
+                            @error('name')
+                                <p class="text-xs text-rose-600 font-bold mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
                         <div>
                             <label class="block text-slate-700 mb-1">Simbol / Singkatan Unit:</label>
@@ -944,9 +963,13 @@
                                 type="text" 
                                 name="symbol" 
                                 required 
+                                value="{{ old('symbol') }}"
                                 placeholder="Contoh: kg" 
                                 class="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-900 focus:outline-none focus:ring-2 focus:ring-orange-500" 
                             />
+                            @error('symbol')
+                                <p class="text-xs text-rose-600 font-bold mt-1">{{ $message }}</p>
+                            @enderror
                         </div>
                         <div>
                             <label class="block text-slate-700 mb-1">Deskripsi / Tipe Ukuran:</label>
