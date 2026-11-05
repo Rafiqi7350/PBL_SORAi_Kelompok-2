@@ -19,8 +19,12 @@ class CommodityUnitController extends Controller
     {
         $request->validate([
             'name' => 'required|string|max:50|unique:commodity_units,name',
-            'symbol' => 'nullable|string|max:20',
+            'symbol' => 'required|string|max:20',
             'description' => 'nullable|string',
+        ], [
+            'name.required' => 'Nama satuan baku wajib diisi.',
+            'name.unique' => 'Nama satuan baku sudah terdaftar.',
+            'symbol.required' => 'Simbol satuan baku wajib diisi.',
         ]);
 
         CommodityUnit::create([
@@ -29,7 +33,7 @@ class CommodityUnitController extends Controller
             'description' => $request->description,
         ]);
 
-        return redirect()->route('admin.units.index')
+        return redirect('/admin?tab=master')
             ->with('success', 'Satuan baku baru berhasil ditambahkan!');
     }
 
@@ -49,16 +53,22 @@ class CommodityUnitController extends Controller
             'description' => $request->description,
         ]);
 
-        return redirect()->route('admin.units.index')
+        return redirect('/admin?tab=master')
             ->with('success', 'Satuan baku berhasil diperbarui!');
     }
 
     public function destroy($id)
     {
         $unit = CommodityUnit::findOrFail($id);
+
+        if (\App\Models\Commodity::where('unit', $unit->name)->orWhere('unit', $unit->symbol)->exists()) {
+            return redirect('/admin?tab=master')
+                ->with('error', 'Satuan baku "'.$unit->name.'" tidak dapat dihapus karena masih digunakan oleh komoditas master.');
+        }
+
         $unit->delete();
 
-        return redirect()->route('admin.units.index')
+        return redirect('/admin?tab=master')
             ->with('success', 'Satuan baku berhasil dihapus.');
     }
 }

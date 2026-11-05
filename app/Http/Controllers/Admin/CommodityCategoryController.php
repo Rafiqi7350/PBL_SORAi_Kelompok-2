@@ -21,6 +21,9 @@ class CommodityCategoryController extends Controller
         $request->validate([
             'name' => 'required|string|max:100|unique:commodity_categories,name',
             'description' => 'nullable|string',
+        ], [
+            'name.required' => 'Nama kategori wajib diisi.',
+            'name.unique' => 'Nama kategori sudah terdaftar.',
         ]);
 
         CommodityCategory::create([
@@ -29,7 +32,7 @@ class CommodityCategoryController extends Controller
             'description' => $request->description,
         ]);
 
-        return redirect()->route('admin.categories.index')
+        return redirect('/admin?tab=master')
             ->with('success', 'Kategori komoditas baru berhasil ditambahkan!');
     }
 
@@ -48,16 +51,22 @@ class CommodityCategoryController extends Controller
             'description' => $request->description,
         ]);
 
-        return redirect()->route('admin.categories.index')
+        return redirect('/admin?tab=master')
             ->with('success', 'Kategori komoditas berhasil diperbarui!');
     }
 
     public function destroy($id)
     {
         $category = CommodityCategory::findOrFail($id);
+
+        if (\App\Models\Commodity::where('category', $category->name)->exists()) {
+            return redirect('/admin?tab=master')
+                ->with('error', 'Kategori "'.$category->name.'" tidak dapat dihapus karena masih digunakan oleh komoditas master.');
+        }
+
         $category->delete();
 
-        return redirect()->route('admin.categories.index')
+        return redirect('/admin?tab=master')
             ->with('success', 'Kategori komoditas berhasil dihapus.');
     }
 }

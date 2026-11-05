@@ -99,8 +99,18 @@ class PengirimanController extends Controller
         ));
     }
 
+    protected function authorizeSupplierOrder(Order $order): void
+    {
+        $supplier = Auth::user()?->supplierProfile;
+        if (! $supplier || ($order->partnership && $order->partnership->supplier_id !== $supplier->id)) {
+            abort(403, 'Akses Ditolak: Anda tidak memiliki izin untuk mengelola pesanan milik pemasok lain.');
+        }
+    }
+
     public function prosesKirim(Request $request, Order $order)
     {
+        $this->authorizeSupplierOrder($order);
+
         $order->load(['items.supplierProduct', 'shipmentConfirmations']);
 
         $totalOrdered = $order->items->sum('quantity');
@@ -271,6 +281,8 @@ class PengirimanController extends Controller
 
     public function kirimBatch1(Request $request, Order $order)
     {
+        $this->authorizeSupplierOrder($order);
+
         $order->load(['items.supplierProduct', 'shipmentConfirmations']);
 
         $batch1 = $order->shipmentConfirmations->firstWhere('shipment_batch', 1);
@@ -344,6 +356,8 @@ class PengirimanController extends Controller
 
     public function kirimBackorder(Request $request, Order $order)
     {
+        $this->authorizeSupplierOrder($order);
+
         $order->load(['items.supplierProduct', 'shipmentConfirmations']);
 
         $totalRemaining = $order->items->sum('quantity_remaining');
