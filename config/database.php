@@ -99,6 +99,9 @@ return [
             'search_path' => 'public',
             'schema' => 'public',
             'sslmode' => 'require',
+            'options' => [
+                PDO::ATTR_EMULATE_PREPARES => true,
+            ],
         ],
 
         'sqlsrv' => [

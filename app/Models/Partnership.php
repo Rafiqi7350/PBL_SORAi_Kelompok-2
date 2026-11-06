@@ -18,7 +18,27 @@ class Partnership extends Model
         'supplier_id',
         'submission_details',
         'status',
+        'term_of_payment_days',
+        'credit_limit',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'term_of_payment_days' => 'integer',
+            'credit_limit' => 'decimal:2',
+        ];
+    }
+
+    public function reliabilityScores(): HasMany
+    {
+        return $this->hasMany(UmkmReliabilityScore::class, 'partnership_id');
+    }
+
+    public function latestReliabilityScore(): HasOne
+    {
+        return $this->hasOne(UmkmReliabilityScore::class, 'partnership_id')->latest('calculated_at');
+    }
 
     public function umkm(): BelongsTo
     {

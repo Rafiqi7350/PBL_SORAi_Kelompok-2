@@ -5,7 +5,7 @@ test('test_webhook_rejects_invalid_signature', function () {
         'order_id' => 'ORDER-123',
         'status_code' => '200',
         'gross_amount' => '150000.00',
-        'signature_key' => 'invalid_signature_key'
+        'signature_key' => 'invalid_signature_key',
     ]);
 
     $response->assertStatus(403);
@@ -18,7 +18,7 @@ test('test_webhook_successfully_updates_payment_to_paid_on_settlement', function
         'transaction_status' => 'settlement',
         'status_code' => '200',
         'gross_amount' => '150000.00',
-        'signature_key' => 'valid_signature' // Sesuaikan dengan logika app/helpers test Anda
+        'signature_key' => 'valid_signature', // Sesuaikan dengan logika app/helpers test Anda
     ]);
 
     $response->assertOk();
@@ -29,7 +29,7 @@ test('test_snap_token_endpoint_indicates_mock_when_server_key_is_empty', functio
 
     $response = $this->postJson('/api/payment/snap-token', [
         'order_id' => 1,
-        'amount' => 50000
+        'amount' => 50000,
     ]);
 
     $response->assertOk();

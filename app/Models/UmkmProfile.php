@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class UmkmProfile extends Model
 {
@@ -39,5 +40,15 @@ class UmkmProfile extends Model
     public function orderReviews(): HasMany
     {
         return $this->hasMany(OrderReview::class, 'umkm_id');
+    }
+
+    public function reliabilityScores(): HasMany
+    {
+        return $this->hasMany(UmkmReliabilityScore::class, 'umkm_id');
+    }
+
+    public function latestReliabilityScore(): HasOne
+    {
+        return $this->hasOne(UmkmReliabilityScore::class, 'umkm_id')->latest('calculated_at');
     }
 }

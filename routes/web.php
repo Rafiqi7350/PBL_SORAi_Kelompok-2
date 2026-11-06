@@ -16,6 +16,7 @@ use App\Http\Controllers\Supplier\PengirimanController as SupplierPengirimanCont
 use App\Http\Controllers\Supplier\RiwayatTransaksiController;
 use App\Http\Controllers\Supplier\SupplierDashboardController;
 use App\Http\Controllers\Supplier\SupplyPlanningController as SupplierSupplyPlanningController;
+use App\Http\Controllers\Supplier\UmkmReliabilityController;
 use App\Http\Controllers\Umkm\CollaborativeSupplyPlanningController;
 use App\Http\Controllers\Umkm\KatalogController;
 use App\Http\Controllers\Umkm\PemesananController;
@@ -101,6 +102,11 @@ Route::prefix('supplier')->name('supplier.')->middleware(EnsureUserIsSupplier::c
     Route::post('/pengiriman/{order}/kirim-backorder', [SupplierPengirimanController::class, 'kirimBackorder'])->name('pengiriman.kirim-backorder');
 
     Route::get('/riwayat-transaksi', [RiwayatTransaksiController::class, 'index'])->name('riwayat-transaksi.index');
+
+    /* Skor Keandalan Mitra UMKM & Manajemen Fasilitas TOP */
+    Route::get('/umkm/{umkmId}/reliability-score', [UmkmReliabilityController::class, 'show'])->name('umkm.reliability-score');
+    Route::post('/umkm/{umkmId}/recalculate-score', [UmkmReliabilityController::class, 'recalculate'])->name('umkm.recalculate-score');
+    Route::patch('/partnerships/{partnershipId}/credit-terms', [UmkmReliabilityController::class, 'updateCreditTerms'])->name('partnerships.update-credit-terms');
 });
 
 /* Admin Protected Routes (Master Data Komoditas, Kategori, Satuan Baku, User Moderasi) */
