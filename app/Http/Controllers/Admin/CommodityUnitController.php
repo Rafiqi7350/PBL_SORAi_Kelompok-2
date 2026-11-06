@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Commodity;
 use App\Models\CommodityUnit;
 use Illuminate\Http\Request;
 
@@ -61,7 +62,7 @@ class CommodityUnitController extends Controller
     {
         $unit = CommodityUnit::findOrFail($id);
 
-        if (\App\Models\Commodity::where('unit', $unit->name)->orWhere('unit', $unit->symbol)->exists()) {
+        if (Commodity::where('unit', $unit->name)->orWhere('unit', $unit->symbol)->exists()) {
             return redirect('/admin?tab=master')
                 ->with('error', 'Satuan baku "'.$unit->name.'" tidak dapat dihapus karena masih digunakan oleh komoditas master.');
         }
