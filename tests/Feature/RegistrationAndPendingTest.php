@@ -64,7 +64,7 @@ class RegistrationAndPendingTest extends TestCase
             'address' => 'Malang',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-            'role' => 'umkm'
+            'role' => 'umkm',
         ]);
 
         $response->assertRedirect('/register/pending');
@@ -82,7 +82,7 @@ class RegistrationAndPendingTest extends TestCase
         $response = $this->post('/register/supplier', [
             'email' => 'bademail',
             'password' => '123',
-            'password_confirmation' => '456'
+            'password_confirmation' => '456',
         ]);
         $response->assertStatus(302);
     }
@@ -91,7 +91,7 @@ class RegistrationAndPendingTest extends TestCase
     {
         $response = $this->post('/register/supplier', [
             'nib' => 'invalid',
-            'phone' => 'salah'
+            'phone' => 'salah',
         ]);
         $response->assertStatus(302);
     }
@@ -105,7 +105,7 @@ class RegistrationAndPendingTest extends TestCase
             'nib' => '1234567890123',
             'password' => 'password123',
             'password_confirmation' => 'password123',
-            'role' => 'pemasok'
+            'role' => 'pemasok',
         ]);
 
         $response->assertRedirect('/register/pending');

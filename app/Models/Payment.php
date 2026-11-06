@@ -23,6 +23,7 @@ class Payment extends Model
         'payment_status',
         'notes',
         'transaction_time',
+        'due_date',
         'paid_at',
     ];
 
@@ -33,6 +34,7 @@ class Payment extends Model
             'amount' => 'decimal:2',
             'quantity_billed' => 'decimal:2',
             'transaction_time' => 'datetime',
+            'due_date' => 'date',
             'paid_at' => 'datetime',
         ];
     }
