@@ -135,7 +135,7 @@
                     @click="setTab('monitoring')" 
                     :class="activeTab === 'monitoring' ? 'bg-[#ea580c] text-white font-bold shadow-sm' : 'hover:bg-gray-100 text-gray-600 hover:text-black'"
                     class="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full transition flex items-center gap-1.5 cursor-pointer shrink-0">
-                    <span>Contract Monitoring</span>
+                    <span>Monitoring & SLA</span>
                 </button>
             </nav>
 

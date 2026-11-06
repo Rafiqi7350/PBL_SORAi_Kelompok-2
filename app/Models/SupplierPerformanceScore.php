@@ -62,22 +62,22 @@ class SupplierPerformanceScore extends Model
     public function getGradeBadgeColor(): string
     {
         return match ($this->grade) {
-            self::GRADE_A => 'bg-emerald-50 text-emerald-700 border-emerald-200',
-            self::GRADE_B => 'bg-blue-50 text-blue-700 border-blue-200',
-            self::GRADE_C => 'bg-amber-50 text-amber-700 border-amber-200',
-            self::GRADE_D => 'bg-rose-50 text-rose-700 border-rose-200',
-            default => 'bg-gray-100 text-gray-700 border-gray-200',
+            self::GRADE_A => 'bg-emerald-50 text-emerald-800 border-emerald-200/80',
+            self::GRADE_B => 'bg-sky-50 text-sky-800 border-sky-200/80',
+            self::GRADE_C => 'bg-amber-50 text-amber-800 border-amber-200/80',
+            self::GRADE_D => 'bg-rose-50 text-rose-800 border-rose-200/80',
+            default => 'bg-zinc-100 text-zinc-700 border-zinc-200',
         };
     }
 
     public function getGradeLabel(): string
     {
         return match ($this->grade) {
-            self::GRADE_A => 'Top Vendor (Sangat Andal & Tepat Waktu)',
-            self::GRADE_B => 'Reliable Vendor (Standar Baik)',
-            self::GRADE_C => 'Perlu Pemantauan (Sering Terlambat/Backorder)',
-            self::GRADE_D => 'Risiko Logistik Tinggi (Pelanggaran SLA)',
-            default => 'Vendor Baru (Belum Terperingkat)',
+            self::GRADE_A => 'Mitra Utama (Kepatuhan SLA Prima)',
+            self::GRADE_B => 'Mitra Andal (Standar Operasional Baik)',
+            self::GRADE_C => 'Perlu Pemantauan (Toleransi Keterlambatan & Backorder)',
+            self::GRADE_D => 'Peringatan SLA (Risiko Pasokan Logistik Tinggi)',
+            default => 'Pemasok Baru (Masa Observasi 3 Pengiriman Awal)',
         };
     }
 
