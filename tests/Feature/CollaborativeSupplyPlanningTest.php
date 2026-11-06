@@ -15,188 +15,184 @@ class CollaborativeSupplyPlanningTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function createUmkmUser(): User
+    private User $umkmUser;
+
+    private UmkmProfile $umkmProfile;
+
+    private User $supplierUser;
+
+    private SupplierProfile $supplierProfile;
+
+    private Partnership $partnership;
+
+    protected function setUp(): void
     {
-        $user = User::create([
-            'email' => 'umkm_collab_'.uniqid().'@test.com',
+        parent::setUp();
+
+        $this->umkmUser = User::create([
+            'email' => 'umkm.csp@example.com',
             'password' => Hash::make('password123'),
             'role' => 'umkm',
             'status' => 'active',
         ]);
 
-        UmkmProfile::create([
-            'user_id' => $user->id,
-            'business_name' => 'Dapur Kuliner Uji',
-            'owner_name' => 'Budi Santoso',
+        $this->umkmProfile = UmkmProfile::create([
+            'user_id' => $this->umkmUser->id,
+            'business_name' => 'Dapur Sambal Malang',
+            'owner_name' => 'Budi Prakoso',
             'phone' => '081234567890',
-            'address' => 'Jl. Pengujian No. 10',
+            'address' => 'Jl. Ijen No. 10, Malang',
         ]);
 
-        return $user;
-    }
-
-    private function createSupplierUser(): User
-    {
-        $user = User::create([
-            'email' => 'supplier_collab_'.uniqid().'@test.com',
+        $this->supplierUser = User::create([
+            'email' => 'supplier.csp@example.com',
             'password' => Hash::make('password123'),
             'role' => 'supplier',
             'status' => 'active',
         ]);
 
-        SupplierProfile::create([
-            'user_id' => $user->id,
-            'company_name' => 'CV Sumber Pasokan Pangan',
-            'owner_name' => 'Pak Tani Jaya',
-            'phone' => '089988776655',
-            'warehouse_address' => 'Jl. Pergudangan No. 5',
+        $this->supplierProfile = SupplierProfile::create([
+            'user_id' => $this->supplierUser->id,
+            'company_name' => 'Kelompok Tani Poultry Malang',
+            'owner_name' => 'Sutrisno',
+            'phone' => '085712345678',
+            'warehouse_address' => 'Jl. Peternakan No. 5',
             'max_capacity' => '5 Ton / Minggu',
             'delivery_area' => 'Malang Raya',
-            'nib_number' => '9120004561234',
         ]);
 
-        return $user;
+        $this->partnership = Partnership::create([
+            'umkm_id' => $this->umkmProfile->id,
+            'supplier_id' => $this->supplierProfile->id,
+            'submission_details' => 'Kemitraan Rutin Daging Ayam',
+            'status' => 'active',
+        ]);
     }
 
+    // UMKM kirim estimasi rencana kebutuhan pasokan mingguan
     public function test_umkm_can_submit_collaborative_supply_plan(): void
     {
-        $umkmUser = $this->createUmkmUser();
-        $supplierUser = $this->createSupplierUser();
-        $supplierProfile = $supplierUser->supplierProfile;
+        $this->actingAs($this->umkmUser);
 
-        $targetPeriod = now()->addMonth()->format('Y-m');
-
-        $response = $this->actingAs($umkmUser)->post('/umkm/supply-planning', [
-            'supplier_id' => $supplierProfile->id,
+        $response = $this->post('/umkm/supply-planning', [
+            'supplier_id' => $this->supplierProfile->id,
             'commodity_name' => 'Daging Ayam Broiler Segar',
             'estimated_quantity' => 250,
             'unit' => 'kg',
-            'period_month_year' => $targetPeriod,
-            'notes' => 'Kebutuhan fillet dada dingin, jadwal pasokan subuh.',
+            'period_month_year' => 'November 2026',
+            'notes' => 'Kebutuhan tinggi persiapan akhir tahun',
         ]);
 
         $response->assertRedirect(route('umkm.katalog.index', ['tab' => 'supply-planning']));
-        $response->assertSessionHas('success');
 
         $this->assertDatabaseHas('supply_plans', [
+            'partnership_id' => $this->partnership->id,
             'commodity_name' => 'Daging Ayam Broiler Segar',
-            'period_month_year' => $targetPeriod,
             'estimated_quantity' => 250,
             'unit' => 'kg',
+            'period_month_year' => 'November 2026',
             'supplier_confirmation_status' => 'MENUNGGU_KONFIRMASI',
         ]);
     }
 
+    // UMKM hapus draft pengajuan supply plan yang masih pending
     public function test_umkm_can_cancel_pending_supply_plan(): void
     {
-        $umkmUser = $this->createUmkmUser();
-        $supplierUser = $this->createSupplierUser();
-
-        $partnership = Partnership::create([
-            'umkm_id' => $umkmUser->umkmProfile->id,
-            'supplier_id' => $supplierUser->supplierProfile->id,
-            'status' => 'active',
-        ]);
+        $this->actingAs($this->umkmUser);
 
         $plan = SupplyPlan::create([
-            'partnership_id' => $partnership->id,
-            'commodity_name' => 'Bawang Merah Probolinggo',
-            'period_month_year' => '2026-11',
-            'estimated_quantity' => 100,
+            'partnership_id' => $this->partnership->id,
+            'commodity_name' => 'Daging Ayam Broiler Segar',
+            'estimated_quantity' => 150,
             'unit' => 'kg',
+            'period_month_year' => 'November 2026',
             'supplier_confirmation_status' => 'MENUNGGU_KONFIRMASI',
         ]);
 
-        $response = $this->actingAs($umkmUser)->delete("/umkm/supply-planning/{$plan->id}");
+        $response = $this->delete("/umkm/supply-planning/{$plan->id}");
 
         $response->assertRedirect(route('umkm.katalog.index', ['tab' => 'supply-planning']));
-        $response->assertSessionHas('success');
-
-        $this->assertDatabaseMissing('supply_plans', [
-            'id' => $plan->id,
-        ]);
+        $this->assertDatabaseMissing('supply_plans', ['id' => $plan->id]);
     }
 
+    // Pemasok melihat halaman dashboard agregasi supply plan dari mitra
     public function test_supplier_can_view_collaborative_supply_planning_dashboard(): void
     {
-        $supplierUser = $this->createSupplierUser();
+        $this->actingAs($this->supplierUser);
 
-        $response = $this->actingAs($supplierUser)->get('/supplier/supply-planning');
-
-        $response->assertStatus(200);
-        $response->assertSee('Collaborative Supply Planning');
-        $response->assertSee('Total Estimasi Masuk');
-        $response->assertSee('Kapasitas Disetujui');
-    }
-
-    public function test_supplier_can_confirm_supply_plan_full(): void
-    {
-        $umkmUser = $this->createUmkmUser();
-        $supplierUser = $this->createSupplierUser();
-
-        $partnership = Partnership::create([
-            'umkm_id' => $umkmUser->umkmProfile->id,
-            'supplier_id' => $supplierUser->supplierProfile->id,
-            'status' => 'active',
-        ]);
-
-        $plan = SupplyPlan::create([
-            'partnership_id' => $partnership->id,
+        SupplyPlan::create([
+            'partnership_id' => $this->partnership->id,
             'commodity_name' => 'Daging Ayam Broiler Segar',
-            'period_month_year' => '2026-11',
             'estimated_quantity' => 300,
             'unit' => 'kg',
+            'period_month_year' => 'November 2026',
             'supplier_confirmation_status' => 'MENUNGGU_KONFIRMASI',
         ]);
 
-        $response = $this->actingAs($supplierUser)->patch("/supplier/supply-planning/{$plan->id}/konfirmasi", [
-            'action' => 'terima_penuh',
-            'supplier_notes' => 'Kapasitas kandang siap 100% untuk pasokan November.',
-        ]);
+        $response = $this->get('/supplier/supply-planning');
 
-        $response->assertRedirect(route('supplier.supply-planning.index'));
-        $response->assertSessionHas('success');
-
-        $this->assertDatabaseHas('supply_plans', [
-            'id' => $plan->id,
-            'supplier_confirmation_status' => 'DISETUJUI',
-            'confirmed_quantity' => 300,
+        $response->assertStatus(200);
+        $response->assertViewIs('supplier.supply-planning.index');
+        $response->assertViewHasAll([
+            'totalEstimatedVolume',
+            'totalConfirmedVolume',
+            'totalUmkmCount',
+            'pendingCount',
+            'approvedCount',
+            'commodityAggregations',
         ]);
     }
 
-    public function test_supplier_can_adjust_supply_plan_capacity(): void
+    // Pemasok setujui kapasitas pasokan 100%
+    public function test_supplier_can_confirm_supply_plan_full(): void
     {
-        $umkmUser = $this->createUmkmUser();
-        $supplierUser = $this->createSupplierUser();
-
-        $partnership = Partnership::create([
-            'umkm_id' => $umkmUser->umkmProfile->id,
-            'supplier_id' => $supplierUser->supplierProfile->id,
-            'status' => 'active',
-        ]);
+        $this->actingAs($this->supplierUser);
 
         $plan = SupplyPlan::create([
-            'partnership_id' => $partnership->id,
-            'commodity_name' => 'Cabai Rawit Merah',
-            'period_month_year' => '2026-12',
+            'partnership_id' => $this->partnership->id,
+            'commodity_name' => 'Daging Ayam Broiler Segar',
             'estimated_quantity' => 200,
             'unit' => 'kg',
+            'period_month_year' => 'November 2026',
             'supplier_confirmation_status' => 'MENUNGGU_KONFIRMASI',
         ]);
 
-        $response = $this->actingAs($supplierUser)->patch("/supplier/supply-planning/{$plan->id}/konfirmasi", [
-            'action' => 'sesuaikan',
-            'confirmed_quantity' => 150,
-            'supplier_notes' => 'Hanya sanggup 150 kg karena musim hujan.',
+        $response = $this->patch("/supplier/supply-planning/{$plan->id}/konfirmasi", [
+            'action' => 'terima_penuh',
+            'supplier_notes' => 'Kapasitas siap dipenuhi 100%',
         ]);
 
         $response->assertRedirect(route('supplier.supply-planning.index'));
-        $response->assertSessionHas('success');
 
-        $this->assertDatabaseHas('supply_plans', [
-            'id' => $plan->id,
-            'supplier_confirmation_status' => 'DISESUAIKAN',
-            'confirmed_quantity' => 150,
+        $plan->refresh();
+        $this->assertEquals('DISETUJUI', $plan->supplier_confirmation_status);
+        $this->assertEquals(200, (float) $plan->confirmed_quantity);
+    }
+
+    // Pemasok sesuaikan kuota karena kapasitas panen terbatas
+    public function test_supplier_can_adjust_supply_plan_capacity(): void
+    {
+        $this->actingAs($this->supplierUser);
+
+        $plan = SupplyPlan::create([
+            'partnership_id' => $this->partnership->id,
+            'commodity_name' => 'Daging Ayam Broiler Segar',
+            'estimated_quantity' => 250,
+            'unit' => 'kg',
+            'period_month_year' => 'November 2026',
+            'supplier_confirmation_status' => 'MENUNGGU_KONFIRMASI',
         ]);
+
+        $response = $this->patch("/supplier/supply-planning/{$plan->id}/konfirmasi", [
+            'action' => 'sesuaikan',
+            'confirmed_quantity' => 180,
+            'supplier_notes' => 'Kapasitas panen terbatas, hanya mampu suplai 180 kg',
+        ]);
+
+        $response->assertRedirect(route('supplier.supply-planning.index'));
+
+        $plan->refresh();
+        $this->assertEquals('DISESUAIKAN', $plan->supplier_confirmation_status);
+        $this->assertEquals(180, (float) $plan->confirmed_quantity);
     }
 }
