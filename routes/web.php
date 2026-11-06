@@ -20,6 +20,7 @@ use App\Http\Controllers\Supplier\UmkmReliabilityController;
 use App\Http\Controllers\Umkm\CollaborativeSupplyPlanningController;
 use App\Http\Controllers\Umkm\KatalogController;
 use App\Http\Controllers\Umkm\PemesananController;
+use App\Http\Controllers\Umkm\SupplierPerformanceController;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\EnsureUserIsSupplier;
 use App\Http\Middleware\EnsureUserIsUmkm;
@@ -74,6 +75,10 @@ Route::prefix('umkm')->name('umkm.')->middleware(EnsureUserIsUmkm::class)->group
     Route::post('/pemesanan/pembayaran/{payment}/snap-token', [PemesananController::class, 'getSnapToken'])->name('pemesanan.snap-token');
     Route::post('/pemesanan/pembayaran/{payment}/sync-status', [PemesananController::class, 'syncPaymentStatus'])->name('pemesanan.sync-status');
     Route::post('/pemesanan/{orderId}/ulasan', [PemesananController::class, 'storeOrUpdateReview'])->name('pemesanan.ulasan');
+
+    /* Indikator Performa Kerja Sama Pemasok (Supplier Performance Tracker) */
+    Route::get('/suppliers/{supplierId}/performance', [SupplierPerformanceController::class, 'show'])->name('suppliers.performance');
+    Route::post('/suppliers/{supplierId}/recalculate-performance', [SupplierPerformanceController::class, 'recalculate'])->name('suppliers.recalculate-performance');
 });
 
 /* Supplier Routes */

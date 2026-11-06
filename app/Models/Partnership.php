@@ -40,6 +40,16 @@ class Partnership extends Model
         return $this->hasOne(UmkmReliabilityScore::class, 'partnership_id')->latest('calculated_at');
     }
 
+    public function supplierPerformanceScores(): HasMany
+    {
+        return $this->hasMany(SupplierPerformanceScore::class, 'partnership_id');
+    }
+
+    public function latestSupplierPerformanceScore(): HasOne
+    {
+        return $this->hasOne(SupplierPerformanceScore::class, 'partnership_id')->latest('calculated_at');
+    }
+
     public function umkm(): BelongsTo
     {
         return $this->belongsTo(UmkmProfile::class, 'umkm_id');

@@ -438,6 +438,75 @@
                 this.notify('✓ Estimasi Collaborative Supply Plan (' + this.planningForm.volume + ' kg) berhasil dikirimkan ke Pemasok Mitra!');
             },
 
+            selectedSupplierPerformance: null,
+            isLoadingPerformance: false,
+            isRecalculatingPerformance: false,
+
+            openSupplierTrackerModal: function(supplierId, partnershipId) {
+                var self = this;
+                self.isLoadingPerformance = true;
+                self.selectedSupplierPerformance = null;
+                var url = '{{ url("umkm/suppliers") }}/' + supplierId + '/performance';
+                if (partnershipId) {
+                    url += '?partnership_id=' + partnershipId;
+                }
+                fetch(url, {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(function(res) { return res.json(); })
+                .then(function(json) {
+                    self.isLoadingPerformance = false;
+                    if (json.status === 'success') {
+                        self.selectedSupplierPerformance = json.data;
+                    } else {
+                        alert('Gagal memuat evaluasi performa pemasok.');
+                    }
+                })
+                .catch(function(err) {
+                    self.isLoadingPerformance = false;
+                    alert('Terjadi kendala jaringan saat memuat data performa.');
+                });
+            },
+
+            recalculateSupplierTracker: function(supplierId, partnershipId) {
+                var self = this;
+                self.isRecalculatingPerformance = true;
+                var url = '{{ url("umkm/suppliers") }}/' + supplierId + '/recalculate-performance';
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        partnership_id: partnershipId || null
+                    })
+                })
+                .then(function(res) { return res.json(); })
+                .then(function(json) {
+                    self.isRecalculatingPerformance = false;
+                    if (json.status === 'success') {
+                        self.notify('✓ ' + json.message);
+                        self.openSupplierTrackerModal(supplierId, partnershipId);
+                    } else {
+                        alert('Gagal memperbarui skor: ' + (json.message || 'Error'));
+                    }
+                })
+                .catch(function(err) {
+                    self.isRecalculatingPerformance = false;
+                    alert('Terjadi kesalahan saat kalkulasi performa.');
+                });
+            },
+
+            closeSupplierTrackerModal: function() {
+                this.selectedSupplierPerformance = null;
+                this.isLoadingPerformance = false;
+            },
+
             notify: function(msg) {
                 var self = this;
                 this.notificationMsg = msg;
@@ -644,6 +713,36 @@
                                 <p class="text-[11px] text-gray-400 truncate">
                                     📍 {{ $product->supplier->warehouse_address }}
                                 </p>
+
+                                @php
+                                    $perfScore = $product->supplier?->latestPerformanceScore;
+                                @endphp
+                                <div class="pt-1.5 flex items-center justify-between gap-1 text-[11px] border-t border-gray-50">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        @if($perfScore && $perfScore->grade !== \App\Models\SupplierPerformanceScore::GRADE_UNRATED)
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-md font-bold text-[10px] border {{ $perfScore->getGradeBadgeColor() }}">
+                                                Grade {{ $perfScore->grade }}
+                                            </span>
+                                            <span class="font-bold text-amber-600 flex items-center gap-0.5 text-[11px]">
+                                                ★ {{ number_format($perfScore->star_rating, 1) }}
+                                            </span>
+                                            <span class="text-gray-400 text-[10px]">
+                                                ({{ number_format($perfScore->metrics_breakdown['delivery']['otd_rate'] ?? 100, 0) }}% OTD)
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-gray-100 text-gray-600 border border-gray-200">
+                                                Pemasok Baru
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <button 
+                                        type="button" 
+                                        @click.stop="openSupplierTrackerModal('{{ $product->supplier->id }}')" 
+                                        class="text-[11px] font-bold text-orange-600 hover:text-orange-700 hover:underline flex items-center gap-0.5 cursor-pointer shrink-0">
+                                        <span>Rapor SLA</span>
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                    </button>
+                                </div>
                             </div>
 
                             <div class="border-t border-gray-100 pt-3 space-y-2">
@@ -2877,29 +2976,234 @@
     </div>
 
     <!-- ========================================================= -->
-    <!-- TAB 4: CONTRACT PERFORMANCE MONITORING                   -->
+    <!-- TAB 4: SUPPLIER PERFORMANCE TRACKER & CONTRACT MONITORING -->
     <!-- ========================================================= -->
     <div x-show="activeTab === 'monitoring'" class="space-y-6">
 
-        <div class="border-b border-gray-200 pb-3">
-            <span class="text-xs font-bold text-orange-600 uppercase font-mono">METRIK REALISASI KEMITRAAN</span>
-            <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Contract Performance Monitoring</h2>
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-gray-200 pb-4">
+            <div>
+                <span class="text-xs font-bold text-orange-600 uppercase font-mono tracking-wider">INDIKATOR PERFORMA PEMASOK & SLA LOGISTIK</span>
+                <h2 class="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">Evaluasi Kinerja Mitra Pemasok</h2>
+                <p class="text-xs text-gray-500 mt-1">Penilaian objektif berbasis riil On-Time Delivery (OTD), Pemenuhan Kuota Komoditas, dan Kualitas Bahan Baku Dapur.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-orange-50 text-orange-700 border border-orange-200">
+                    <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>SLA Tracking Aktif</span>
+                </span>
+            </div>
         </div>
 
-        <div class="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-4">
-            <span class="text-xs font-semibold text-gray-500 uppercase">Kesesuaian Kontrak Dengan Realisasi Pasokan</span>
-            <div class="grid sm:grid-cols-2 gap-4">
-                <div class="bg-[#f8f9fa] p-6 rounded-2xl border border-gray-100 space-y-1">
-                    <p class="text-xs text-gray-500 font-medium">Tingkat Kesesuaian Volume Pasokan:</p>
-                    <p class="text-4xl font-bold text-emerald-700">98.5%</p>
-                    <p class="text-xs text-gray-400">Realisasi pasok daging & bumbu dapur mendekati 100% dari kontrak.</p>
+        @php
+            $perfItems = $contractedSuppliersPerformance ?? collect();
+            $scoredItems = $perfItems->filter(fn($item) => !empty($item['score']));
+            $avgScore = $scoredItems->isNotEmpty() ? $scoredItems->avg(fn($item) => (float) $item['score']->final_score) : 92.5;
+            $avgOtd = $scoredItems->isNotEmpty() ? $scoredItems->avg(fn($item) => (float) ($item['score']->metrics_breakdown['delivery']['otd_rate'] ?? 98.0)) : 98.5;
+            $avgFulfillment = $scoredItems->isNotEmpty() ? $scoredItems->avg(fn($item) => (float) ($item['score']->metrics_breakdown['fulfillment']['fill_rate'] ?? 99.0)) : 99.2;
+            $avgStar = $scoredItems->isNotEmpty() ? $scoredItems->avg(fn($item) => (float) $item['score']->star_rating) : 4.8;
+        @endphp
+
+        <!-- 4 KARTU RINGKASAN METRIK UTAMA SLA -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-gray-500">Skor Rata-Rata Vendor</span>
+                    <span class="text-base text-amber-500 font-bold">★ {{ number_format($avgStar, 1) }}</span>
                 </div>
-                <div class="bg-[#f8f9fa] p-6 rounded-2xl border border-gray-100 space-y-1">
-                    <p class="text-xs text-gray-500 font-medium">Kesesuaian Jam Pengiriman Subuh:</p>
-                    <p class="text-4xl font-bold text-emerald-700">100% On-Time</p>
-                    <p class="text-xs text-gray-400">Seluruh armada pengiriman tiba di dapur sebelum jam 07.00 WIB.</p>
-                </div>
+                <div class="text-3xl font-extrabold text-gray-900">{{ number_format($avgScore, 1) }}<span class="text-xs text-gray-400 font-normal">/100</span></div>
+                <p class="text-[11px] text-gray-400">Indeks komposit seluruh mitra pasokan.</p>
             </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-gray-500">On-Time Delivery (OTD)</span>
+                    <span class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Bobot 40%</span>
+                </div>
+                <div class="text-3xl font-extrabold text-emerald-600">{{ number_format($avgOtd, 1) }}%</div>
+                <p class="text-[11px] text-gray-400">Tiba tepat waktu sebelum batas jam operasional.</p>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-gray-500">Pemenuhan Kuota (OFR)</span>
+                    <span class="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Bobot 35%</span>
+                </div>
+                <div class="text-3xl font-extrabold text-blue-600">{{ number_format($avgFulfillment, 1) }}%</div>
+                <p class="text-[11px] text-gray-400">Tingkat pengiriman utuh tanpa kekurangan/retur.</p>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-gray-500">Mitra Terkontrak</span>
+                    <span class="text-xs font-bold text-purple-600 bg-purple-50 px-2 py-0.5 rounded-full">Terverifikasi</span>
+                </div>
+                <div class="text-3xl font-extrabold text-gray-900">{{ $perfItems->count() }} <span class="text-xs text-gray-400 font-normal">Pemasok</span></div>
+                <p class="text-[11px] text-gray-400">Total mitra pasokan aktif dalam sistem.</p>
+            </div>
+        </div>
+
+        <!-- DAFTAR EVALUASI PER KEMITRAAN / PEMASOK -->
+        <div class="space-y-4">
+            <div class="flex items-center justify-between">
+                <h3 class="font-bold text-lg text-gray-900 flex items-center gap-2">
+                    <span>Rapor Kinerja Vendor Berjalan</span>
+                    <span class="text-xs font-medium text-gray-500 font-normal">({{ $perfItems->count() }} Pemasok Terdaftar)</span>
+                </h3>
+            </div>
+
+            @if($perfItems->isEmpty())
+                <div class="bg-white rounded-3xl p-10 text-center border border-gray-100 shadow-sm space-y-3">
+                    <div class="w-16 h-16 bg-orange-50 text-orange-600 rounded-full flex items-center justify-center mx-auto text-2xl font-bold">
+                        📊
+                    </div>
+                    <h4 class="font-bold text-base text-gray-900">Belum Ada Kemitraan Aktif</h4>
+                    <p class="text-xs text-gray-500 max-w-md mx-auto">Ajukan kemitraan pasokan komoditas di tab Katalog Bahan Baku untuk mengaktifkan pemantauan realisasi SLA pemasok secara otomatis.</p>
+                    <button type="button" @click="activeTab = 'katalog'" class="inline-flex items-center gap-2 px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-full text-xs font-bold transition shadow-sm cursor-pointer">
+                        <span>Buka Katalog Bahan Baku</span>
+                    </button>
+                </div>
+            @else
+                <div class="grid grid-cols-1 gap-5">
+                    @foreach($perfItems as $item)
+                        @php
+                            $sup = $item['supplier'];
+                            $score = $item['score'];
+                            $p = $item['partnership'];
+                            $metrics = $score?->metrics_breakdown ?? [];
+                            $gradeBadge = $score ? $score->getGradeBadgeColor() : 'bg-gray-100 text-gray-700 border-gray-200';
+                            $gradeLabel = $score ? $score->getGradeLabel() : 'Vendor Baru';
+                            $grade = $score?->grade ?? 'UNRATED';
+                            $otdRate = $metrics['delivery']['otd_rate'] ?? 100.0;
+                            $fillRate = $metrics['fulfillment']['fill_rate'] ?? 100.0;
+                            $avgDelay = $metrics['delivery']['avg_delay_hours'] ?? 0.0;
+                            $backorderRate = $metrics['fulfillment']['backorder_rate'] ?? 0.0;
+                            $defectFree = $metrics['quality']['defect_free_rate'] ?? 100.0;
+                        @endphp
+                        <div class="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition space-y-5">
+                            <!-- Card Header -->
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+                                <div class="flex items-start gap-3.5">
+                                    <div class="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 font-bold flex items-center justify-center text-lg border border-orange-100 shrink-0">
+                                        {{ substr($sup?->company_name ?? 'P', 0, 1) }}
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <h4 class="font-bold text-base text-gray-900">{{ $sup?->company_name ?? 'Pemasok Mitra' }}</h4>
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border {{ $gradeBadge }}">
+                                                Grade {{ $grade }}
+                                            </span>
+                                            <span class="inline-flex items-center text-xs font-bold text-amber-500">
+                                                ★ {{ number_format($score?->star_rating ?? 5.0, 1) }}
+                                            </span>
+                                        </div>
+                                        <p class="text-xs text-gray-500 mt-0.5">
+                                            📍 {{ $sup?->warehouse_address ?? 'Area Lokal' }} • Komoditas: <span class="font-semibold text-gray-800">{{ $item['commodity_name'] }}</span> ({{ number_format($item['volume_per_delivery'], 0) }} {{ $item['unit'] }}/jadwal)
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2 self-end sm:self-center">
+                                    <button 
+                                        type="button" 
+                                        @click="recalculateSupplierTracker('{{ $sup?->id }}', '{{ $p?->id }}')" 
+                                        :disabled="isRecalculatingPerformance"
+                                        class="px-3 py-1.5 rounded-full text-xs font-semibold bg-gray-50 hover:bg-gray-100 text-gray-700 border border-gray-200 transition flex items-center gap-1.5 cursor-pointer">
+                                        <svg class="w-3.5 h-3.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                        <span>Hitung Ulang</span>
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        @click="openSupplierTrackerModal('{{ $sup?->id }}', '{{ $p?->id }}')" 
+                                        class="px-4 py-1.5 rounded-full text-xs font-bold bg-orange-600 hover:bg-orange-700 text-white transition flex items-center gap-1.5 shadow-sm cursor-pointer">
+                                        <span>Rapor Detail SLA</span>
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- 3 Pilar Penilaian Indikator Performa -->
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <!-- Pilar 1: On-Time Delivery -->
+                                <div class="bg-gray-50/70 p-4 rounded-2xl border border-gray-100 space-y-2">
+                                    <div class="flex justify-between items-center text-xs">
+                                        <span class="font-bold text-gray-800">1. Ketepatan Waktu (OTD)</span>
+                                        <span class="font-bold text-emerald-600">{{ number_format($otdRate, 1) }}%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                                        <div class="bg-emerald-500 h-2 rounded-full" style="width: {{ min(100, $otdRate) }}%"></div>
+                                    </div>
+                                    <div class="flex justify-between text-[11px] text-gray-500">
+                                        <span>Rata-rata telat: {{ number_format($avgDelay, 1) }} jam</span>
+                                        <span>Bobot 40%</span>
+                                    </div>
+                                </div>
+
+                                <!-- Pilar 2: Order Fulfillment -->
+                                <div class="bg-gray-50/70 p-4 rounded-2xl border border-gray-100 space-y-2">
+                                    <div class="flex justify-between items-center text-xs">
+                                        <span class="font-bold text-gray-800">2. Pemenuhan Kuota (OFR)</span>
+                                        <span class="font-bold text-blue-600">{{ number_format($fillRate, 1) }}%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                                        <div class="bg-blue-500 h-2 rounded-full" style="width: {{ min(100, $fillRate) }}%"></div>
+                                    </div>
+                                    <div class="flex justify-between text-[11px] text-gray-500">
+                                        <span>Rasio Backorder: {{ number_format($backorderRate, 1) }}%</span>
+                                        <span>Bobot 35%</span>
+                                    </div>
+                                </div>
+
+                                <!-- Pilar 3: Kualitas & Ulasan -->
+                                <div class="bg-gray-50/70 p-4 rounded-2xl border border-gray-100 space-y-2">
+                                    <div class="flex justify-between items-center text-xs">
+                                        <span class="font-bold text-gray-800">3. Kualitas & Ulasan</span>
+                                        <span class="font-bold text-purple-600">{{ number_format($defectFree, 1) }}%</span>
+                                    </div>
+                                    <div class="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                                        <div class="bg-purple-500 h-2 rounded-full" style="width: {{ min(100, $defectFree) }}%"></div>
+                                    </div>
+                                    <div class="flex justify-between text-[11px] text-gray-500">
+                                        <span>Bebas Retur: {{ number_format($defectFree, 1) }}%</span>
+                                        <span>Bobot 25%</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Value Proposition & Strategic Recommendations -->
+                            <div class="bg-orange-50/50 rounded-2xl p-4 border border-orange-100/70 space-y-2.5 text-xs">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-bold text-orange-800 uppercase font-mono text-[10px]">REKOMENDASI OPERASIONAL & INSTRUMEN NEGOSIASI UMKM</span>
+                                </div>
+                                <div class="grid sm:grid-cols-3 gap-3 text-[11px]">
+                                    <div class="bg-white/80 p-3 rounded-xl border border-orange-100 space-y-1">
+                                        <p class="font-bold text-gray-800 flex items-center gap-1">
+                                            <span>🛡️ Buffer Stock Dapur</span>
+                                        </p>
+                                        <p class="text-gray-600 leading-relaxed">
+                                            {{ $score?->recommendations['buffer_stock_advice'] ?? 'Siapkan buffer stock 1-2 hari.' }}
+                                        </p>
+                                    </div>
+                                    <div class="bg-white/80 p-3 rounded-xl border border-orange-100 space-y-1">
+                                        <p class="font-bold text-gray-800 flex items-center gap-1">
+                                            <span>📄 Perpanjangan Kontrak</span>
+                                        </p>
+                                        <p class="text-gray-600 leading-relaxed">
+                                            {{ $score?->recommendations['contract_advice'] ?? 'Pemasok andal untuk kontrak jangka panjang.' }}
+                                        </p>
+                                    </div>
+                                    <div class="bg-white/80 p-3 rounded-xl border border-orange-100 space-y-1">
+                                        <p class="font-bold text-gray-800 flex items-center gap-1">
+                                            <span>⚖️ Klausul Negosiasi SLA</span>
+                                        </p>
+                                        <p class="text-gray-600 leading-relaxed">
+                                            {{ $score?->recommendations['negotiation_tip'] ?? 'Gunakan skor ini untuk mengajukan kompensasi keterlambatan.' }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
         </div>
 
     </div>
@@ -3328,6 +3632,152 @@
             <button type="button" @click="simulateMidtransSuccess()" class="w-full bg-[#ea580c] hover:bg-[#c2410c] text-white py-3 rounded-xl font-semibold text-xs shadow-xs hover:shadow transition cursor-pointer">
                 Simulasi Pembayaran Berhasil (Demo)
             </button>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- MODAL DETAIL EVALUASI PERFORMA PEMASOK (SLA TRACKER)     -->
+    <!-- ========================================================= -->
+    <div x-cloak x-show="selectedSupplierPerformance || isLoadingPerformance" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div @click.away="closeSupplierTrackerModal()" class="bg-white max-w-2xl w-full rounded-3xl p-6 sm:p-8 space-y-6 shadow-2xl relative border border-gray-100 max-h-[92vh] overflow-y-auto">
+            
+            <!-- Loading State -->
+            <template x-if="isLoadingPerformance">
+                <div class="py-16 text-center space-y-3">
+                    <div class="w-10 h-10 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                    <p class="text-xs font-semibold text-gray-500">Memuat analisis performa logistik & SLA pemasok...</p>
+                </div>
+            </template>
+
+            <!-- Loaded Content -->
+            <template x-if="!isLoadingPerformance && selectedSupplierPerformance">
+                <div class="space-y-6">
+                    <!-- Modal Header -->
+                    <div class="flex justify-between items-start border-b border-gray-100 pb-4">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-[10px] font-bold text-orange-600 uppercase font-mono tracking-wider">RAPOR SLA & PERFORMA PEMASOK</span>
+                                <span :class="selectedSupplierPerformance?.grade_badge_color" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold border" x-text="'Grade ' + selectedSupplierPerformance?.grade"></span>
+                            </div>
+                            <h3 class="text-2xl font-bold text-gray-900 tracking-tight" x-text="selectedSupplierPerformance?.company_name"></h3>
+                            <p class="text-xs text-gray-500" x-text="'📍 ' + selectedSupplierPerformance?.warehouse_address + ' • Pemilik: ' + (selectedSupplierPerformance?.owner_name || '-')"></p>
+                        </div>
+                        <button type="button" @click="closeSupplierTrackerModal()" class="text-gray-400 hover:text-gray-700 cursor-pointer p-2 rounded-xl hover:bg-gray-100 transition">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
+
+                    <!-- Composite Score Box -->
+                    <div class="bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl p-5 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+                        <div>
+                            <span class="text-[11px] uppercase tracking-wider font-semibold opacity-90">SKOR KOMPOSIT AKUMULATIF</span>
+                            <div class="flex items-baseline gap-2 mt-0.5">
+                                <span class="text-4xl font-extrabold" x-text="selectedSupplierPerformance?.final_score"></span>
+                                <span class="text-sm opacity-80">/ 100</span>
+                                <span class="text-sm font-bold bg-white/20 px-2.5 py-0.5 rounded-full ml-2" x-text="'★ ' + selectedSupplierPerformance?.star_rating + ' / 5.0'"></span>
+                            </div>
+                            <p class="text-xs opacity-90 mt-1" x-text="selectedSupplierPerformance?.grade_label"></p>
+                        </div>
+                        <div class="text-right sm:border-l sm:border-white/20 sm:pl-5 text-xs space-y-1">
+                            <div class="opacity-80">Total Pengiriman Selesai</div>
+                            <div class="text-xl font-bold" x-text="selectedSupplierPerformance?.metrics_summary?.total_shipments + ' Pesanan'"></div>
+                            <div class="text-[10px] opacity-75" x-text="'Diperbarui: ' + selectedSupplierPerformance?.calculated_at"></div>
+                        </div>
+                    </div>
+
+                    <!-- 3 Pilar Penilaian Metrik Riil -->
+                    <div class="space-y-3">
+                        <h4 class="text-xs font-bold text-gray-800 uppercase font-mono">RINCIAN 3 PILAR EVALUASI OBJEKTIF</h4>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                            <!-- Pilar 1 -->
+                            <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="font-bold text-gray-800">1. On-Time Delivery</span>
+                                    <span class="font-bold text-emerald-600" x-text="selectedSupplierPerformance?.scores?.on_time_delivery + ' pt'"></span>
+                                </div>
+                                <div class="text-[11px] text-gray-600 space-y-1 pt-1 border-t border-gray-200/60">
+                                    <div class="flex justify-between"><span>Ketepatan Waktu:</span><span class="font-bold text-gray-900" x-text="selectedSupplierPerformance?.metrics_summary?.otd_rate + '%'"></span></div>
+                                    <div class="flex justify-between"><span>Rata-rata Terlambat:</span><span class="font-bold text-gray-900" x-text="selectedSupplierPerformance?.metrics_summary?.avg_delay_hours + ' jam'"></span></div>
+                                    <div class="flex justify-between"><span>Keterlambatan Parah:</span><span class="font-bold text-rose-600" x-text="selectedSupplierPerformance?.metrics_summary?.severe_delays_count + 'x'"></span></div>
+                                </div>
+                            </div>
+
+                            <!-- Pilar 2 -->
+                            <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="font-bold text-gray-800">2. Pemenuhan Kuota</span>
+                                    <span class="font-bold text-blue-600" x-text="selectedSupplierPerformance?.scores?.quota_fulfillment + ' pt'"></span>
+                                </div>
+                                <div class="text-[11px] text-gray-600 space-y-1 pt-1 border-t border-gray-200/60">
+                                    <div class="flex justify-between"><span>Fill Rate Batch 1:</span><span class="font-bold text-gray-900" x-text="selectedSupplierPerformance?.metrics_summary?.fill_rate + '%'"></span></div>
+                                    <div class="flex justify-between"><span>Rasio Backorder:</span><span class="font-bold text-gray-900" x-text="selectedSupplierPerformance?.metrics_summary?.backorder_rate + '%'"></span></div>
+                                    <div class="flex justify-between"><span>Pembatalan Stok:</span><span class="font-bold text-rose-600" x-text="selectedSupplierPerformance?.metrics_summary?.cancellation_rate + '%'"></span></div>
+                                </div>
+                            </div>
+
+                            <!-- Pilar 3 -->
+                            <div class="bg-gray-50 p-4 rounded-2xl border border-gray-100 space-y-2">
+                                <div class="flex justify-between items-center">
+                                    <span class="font-bold text-gray-800">3. Kualitas & Ulasan</span>
+                                    <span class="font-bold text-purple-600" x-text="selectedSupplierPerformance?.scores?.quality_rating + ' pt'"></span>
+                                </div>
+                                <div class="text-[11px] text-gray-600 space-y-1 pt-1 border-t border-gray-200/60">
+                                    <div class="flex justify-between"><span>Bebas Retur/Cacat:</span><span class="font-bold text-gray-900" x-text="selectedSupplierPerformance?.metrics_summary?.defect_free_rate + '%'"></span></div>
+                                    <div class="flex justify-between"><span>Rating Bintang:</span><span class="font-bold text-amber-600" x-text="'★ ' + selectedSupplierPerformance?.metrics_summary?.average_rating"></span></div>
+                                    <div class="flex justify-between"><span>Total Ulasan:</span><span class="font-bold text-gray-900" x-text="selectedSupplierPerformance?.metrics_summary?.total_reviews + ' review'"></span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rekomendasi Operasional & Negosiasi -->
+                    <div class="bg-orange-50/60 p-5 rounded-2xl border border-orange-100 space-y-3 text-xs">
+                        <span class="font-bold text-orange-900 uppercase font-mono text-[10px]">PANDUAN OPERASIONAL & KEPUTUSAN KONTRAK UMKM</span>
+                        <div class="space-y-2 text-[11px]">
+                            <div class="flex items-start gap-2 bg-white p-3 rounded-xl border border-orange-100">
+                                <span class="text-base shrink-0">🛡️</span>
+                                <div>
+                                    <span class="font-bold text-gray-900 block">Stok Pengaman (Buffer Stock):</span>
+                                    <span class="text-gray-600" x-text="selectedSupplierPerformance?.recommendations?.buffer_stock_advice"></span>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-2 bg-white p-3 rounded-xl border border-orange-100">
+                                <span class="text-base shrink-0">📄</span>
+                                <div>
+                                    <span class="font-bold text-gray-900 block">Keputusan Pembaruan Kontrak:</span>
+                                    <span class="text-gray-600" x-text="selectedSupplierPerformance?.recommendations?.contract_advice"></span>
+                                </div>
+                            </div>
+                            <div class="flex items-start gap-2 bg-white p-3 rounded-xl border border-orange-100">
+                                <span class="text-base shrink-0">⚖️</span>
+                                <div>
+                                    <span class="font-bold text-gray-900 block">Strategi Negosiasi & Kompensasi SLA:</span>
+                                    <span class="text-gray-600" x-text="selectedSupplierPerformance?.recommendations?.negotiation_tip"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Modal Actions -->
+                    <div class="flex items-center justify-between pt-2">
+                        <button 
+                            type="button" 
+                            @click="recalculateSupplierTracker(selectedSupplierPerformance?.supplier_id)"
+                            :disabled="isRecalculatingPerformance"
+                            class="px-4 py-2 rounded-xl text-xs font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 transition flex items-center gap-1.5 cursor-pointer">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            <span x-text="isRecalculatingPerformance ? 'Menghitung...' : 'Kalkulasi Ulang Realtime'"></span>
+                        </button>
+                        <button 
+                            type="button" 
+                            @click="closeSupplierTrackerModal()" 
+                            class="px-6 py-2 rounded-xl text-xs font-bold bg-orange-600 hover:bg-orange-700 text-white transition shadow-sm cursor-pointer">
+                            Tutup Rapor
+                        </button>
+                    </div>
+                </div>
+            </template>
+
         </div>
     </div>
 
