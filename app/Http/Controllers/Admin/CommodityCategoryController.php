@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Commodity;
 use App\Models\CommodityCategory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -59,7 +60,7 @@ class CommodityCategoryController extends Controller
     {
         $category = CommodityCategory::findOrFail($id);
 
-        if (\App\Models\Commodity::where('category', $category->name)->exists()) {
+        if (Commodity::where('category', $category->name)->exists()) {
             return redirect('/admin?tab=master')
                 ->with('error', 'Kategori "'.$category->name.'" tidak dapat dihapus karena masih digunakan oleh komoditas master.');
         }
