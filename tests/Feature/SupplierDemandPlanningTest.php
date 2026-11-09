@@ -201,4 +201,87 @@ class SupplierDemandPlanningTest extends TestCase
         );
         $this->assertStringStartsWith('PO/SORAI/', $suggestion->fresh()->po_reference_number);
     }
+
+    public function test_supplier_can_ignore_purchase_suggestion(): void
+    {
+        $suggestion = SupplierPurchaseSuggestion::create([
+            'supplier_id' => $this->supplier->id,
+            'commodity_id' => $this->commodity->id,
+            'suggested_order_date' => now()->toDateString(),
+            'target_arrival_date' => now()->addDays(2)->toDateString(),
+            'suggested_quantity' => 80.0,
+            'estimated_cost' => 2000000.0,
+            'urgency_level' => SupplierPurchaseSuggestion::URGENCY_WARNING,
+            'status' => SupplierPurchaseSuggestion::STATUS_PENDING_REVIEW,
+        ]);
+
+        $response = $this->actingAs($this->supplierUser)
+            ->postJson(route('supplier.demand-planning.purchase-suggestion.ignore', ['id' => $suggestion->id]));
+
+        $response->assertOk();
+        $response->assertJson([
+            'status' => 'success',
+            'message' => 'Rekomendasi pengadaan berhasil diabaikan.',
+        ]);
+
+        $this->assertEquals(
+            SupplierPurchaseSuggestion::STATUS_IGNORED,
+            $suggestion->fresh()->status
+        );
+    }
+
+    public function test_supplier_can_update_inventory_stock(): void
+    {
+        $inventory = SupplierInventoryItem::create([
+            'supplier_id' => $this->supplier->id,
+            'commodity_id' => $this->commodity->id,
+            'current_stock' => 50.0,
+            'safety_stock' => 30.0,
+            'reorder_point' => 70.0,
+            'unit' => 'kg',
+        ]);
+
+        $response = $this->actingAs($this->supplierUser)
+            ->patchJson(route('supplier.demand-planning.inventory.update', ['id' => $inventory->id]), [
+                'current_stock' => 120.5,
+            ]);
+
+        $response->assertOk();
+        $response->assertJson([
+            'status' => 'success',
+        ]);
+
+        $this->assertEquals(120.5, (float) $inventory->fresh()->current_stock);
+        $this->assertNotNull($inventory->fresh()->last_restocked_at);
+    }
+
+    public function test_update_inventory_stock_rejects_negative_value(): void
+    {
+        $inventory = SupplierInventoryItem::create([
+            'supplier_id' => $this->supplier->id,
+            'commodity_id' => $this->commodity->id,
+            'current_stock' => 50.0,
+            'safety_stock' => 30.0,
+            'reorder_point' => 70.0,
+            'unit' => 'kg',
+        ]);
+
+        $response = $this->actingAs($this->supplierUser)
+            ->patchJson(route('supplier.demand-planning.inventory.update', ['id' => $inventory->id]), [
+                'current_stock' => -10,
+            ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['current_stock']);
+    }
+
+    public function test_artisan_calculate_supplier_demand_planning_command(): void
+    {
+        $this->artisan('supplier-demand:calculate')
+            ->assertSuccessful();
+
+        $this->assertDatabaseHas('demand_forecast_runs', [
+            'supplier_id' => $this->supplier->id,
+        ]);
+    }
 }
