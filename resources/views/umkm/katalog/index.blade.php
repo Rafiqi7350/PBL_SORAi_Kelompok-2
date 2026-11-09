@@ -441,6 +441,109 @@
             selectedSupplierPerformance: null,
             isLoadingPerformance: false,
             isRecalculatingPerformance: false,
+            recalculatingSupplierId: null,
+            monitoringSearchQuery: '',
+            supplierScores: {
+                @if(isset($contractedSuppliersPerformance))
+                    @foreach($contractedSuppliersPerformance as $item)
+                        @php
+                            $sup = $item['supplier'];
+                            $score = $item['score'];
+                            $m = $score?->metrics_breakdown ?? [];
+                        @endphp
+                        '{{ $sup?->id }}': {
+                            supplier_id: '{{ $sup?->id }}',
+                            company_name: @json($sup?->company_name ?? 'Pemasok Mitra'),
+                            warehouse_address: @json($sup?->warehouse_address ?? 'Area Lokal'),
+                            commodity_name: @json($item['commodity_name'] ?? ''),
+                            final_score: {{ (float) ($score?->final_score ?? 100.0) }},
+                            star_rating: {{ (float) ($score?->star_rating ?? 5.0) }},
+                            grade: '{{ $score?->grade ?? "UNRATED" }}',
+                            grade_label: @json($score ? $score->getGradeLabel() : "Vendor Baru"),
+                            grade_badge_color: '{{ $score ? $score->getGradeBadgeColor() : "bg-gray-100 text-gray-700 border-gray-200" }}',
+                            otd_rate: {{ (float) ($m['delivery']['otd_rate'] ?? 100.0) }},
+                            avg_delay: {{ (float) ($m['delivery']['avg_delay_hours'] ?? 0.0) }},
+                            fill_rate: {{ (float) ($m['fulfillment']['fill_rate'] ?? 100.0) }},
+                            backorder_rate: {{ (float) ($m['fulfillment']['backorder_rate'] ?? 0.0) }},
+                            defect_free: {{ (float) ($m['quality']['defect_free_rate'] ?? 100.0) }},
+                            total_shipments: {{ (int) ($m['total_shipments'] ?? 0) }},
+                            is_recommended_for_renewal: {{ ($score && $score->isRecommendedForRenewal()) ? 'true' : 'false' }},
+                            is_cold_start: {{ empty($m) || (!empty($m['is_cold_start'])) ? 'true' : 'false' }},
+                        },
+                    @endforeach
+                @endif
+            },
+
+            isSupplierMatched: function(supplierId, companyName, address, commodity) {
+                if (!this.monitoringSearchQuery) return true;
+                var q = this.monitoringSearchQuery.toLowerCase().trim();
+                var s = this.supplierScores[supplierId] || {};
+                var name = (s.company_name || companyName || '').toLowerCase();
+                var addr = (s.warehouse_address || address || '').toLowerCase();
+                var comm = (s.commodity_name || commodity || '').toLowerCase();
+                var gr = (s.grade || '').toLowerCase();
+                return name.includes(q) || addr.includes(q) || comm.includes(q) || ('grade ' + gr).includes(q);
+            },
+
+            get filteredSupplierCount() {
+                var self = this;
+                var keys = Object.keys(this.supplierScores);
+                if (!self.monitoringSearchQuery) return keys.length;
+                var q = self.monitoringSearchQuery.toLowerCase().trim();
+                var count = 0;
+                for (var i = 0; i < keys.length; i++) {
+                    var s = self.supplierScores[keys[i]];
+                    if (!s) continue;
+                    var name = (s.company_name || '').toLowerCase();
+                    var addr = (s.warehouse_address || '').toLowerCase();
+                    var comm = (s.commodity_name || '').toLowerCase();
+                    var gr = (s.grade || '').toLowerCase();
+                    if (name.includes(q) || addr.includes(q) || comm.includes(q) || ('grade ' + gr).includes(q)) {
+                        count++;
+                    }
+                }
+                return count;
+            },
+
+            get monitoringAvgScore() {
+                var keys = Object.keys(this.supplierScores);
+                if (!keys.length) return '{{ number_format($avgScore ?? 92.5, 1) }}';
+                var sum = 0;
+                for (var i = 0; i < keys.length; i++) {
+                    sum += Number(this.supplierScores[keys[i]].final_score || 0);
+                }
+                return (sum / keys.length).toFixed(1);
+            },
+
+            get monitoringAvgStar() {
+                var keys = Object.keys(this.supplierScores);
+                if (!keys.length) return '{{ number_format($avgStar ?? 4.8, 1) }}';
+                var sum = 0;
+                for (var i = 0; i < keys.length; i++) {
+                    sum += Number(this.supplierScores[keys[i]].star_rating || 0);
+                }
+                return (sum / keys.length).toFixed(1);
+            },
+
+            get monitoringAvgOtd() {
+                var keys = Object.keys(this.supplierScores);
+                if (!keys.length) return '{{ number_format($avgOtd ?? 98.5, 1) }}';
+                var sum = 0;
+                for (var i = 0; i < keys.length; i++) {
+                    sum += Number(this.supplierScores[keys[i]].otd_rate || 0);
+                }
+                return (sum / keys.length).toFixed(1);
+            },
+
+            get monitoringAvgFill() {
+                var keys = Object.keys(this.supplierScores);
+                if (!keys.length) return '{{ number_format($avgFulfillment ?? 99.2, 1) }}';
+                var sum = 0;
+                for (var i = 0; i < keys.length; i++) {
+                    sum += Number(this.supplierScores[keys[i]].fill_rate || 0);
+                }
+                return (sum / keys.length).toFixed(1);
+            },
 
             openSupplierTrackerModal: function(supplierId, partnershipId) {
                 var self = this;
@@ -471,8 +574,10 @@
                 });
             },
 
-            recalculateSupplierTracker: function(supplierId, partnershipId) {
+            recalculateSupplierTracker: function(supplierId, partnershipId, openModalAfter) {
                 var self = this;
+                if (!supplierId) return;
+                self.recalculatingSupplierId = supplierId;
                 self.isRecalculatingPerformance = true;
                 var url = '{{ url("umkm/suppliers") }}/' + supplierId + '/recalculate-performance';
                 fetch(url, {
@@ -488,15 +593,43 @@
                 })
                 .then(function(res) { return res.json(); })
                 .then(function(json) {
+                    self.recalculatingSupplierId = null;
                     self.isRecalculatingPerformance = false;
-                    if (json.status === 'success') {
-                        self.notify('✓ ' + json.message);
-                        self.openSupplierTrackerModal(supplierId, partnershipId);
+                    if (json.status === 'success' && json.data) {
+                        var d = json.data;
+                        if (self.supplierScores[supplierId]) {
+                            self.supplierScores[supplierId].final_score = d.final_score;
+                            self.supplierScores[supplierId].star_rating = d.star_rating;
+                            self.supplierScores[supplierId].grade = d.grade;
+                            self.supplierScores[supplierId].grade_label = d.grade_label;
+                            self.supplierScores[supplierId].grade_badge_color = d.grade_badge_color;
+                            if (d.metrics_summary) {
+                                self.supplierScores[supplierId].otd_rate = d.metrics_summary.otd_rate;
+                                self.supplierScores[supplierId].avg_delay = d.metrics_summary.avg_delay_hours;
+                                self.supplierScores[supplierId].fill_rate = d.metrics_summary.fill_rate;
+                                self.supplierScores[supplierId].backorder_rate = d.metrics_summary.backorder_rate;
+                                self.supplierScores[supplierId].defect_free = d.metrics_summary.defect_free_rate;
+                                self.supplierScores[supplierId].total_shipments = d.metrics_summary.total_shipments;
+                                self.supplierScores[supplierId].is_cold_start = d.metrics_summary.is_cold_start;
+                            }
+                            self.supplierScores[supplierId].is_recommended_for_renewal = d.is_recommended_for_renewal;
+                        }
+
+                        if (self.selectedSupplierPerformance && self.selectedSupplierPerformance.supplier_id === supplierId) {
+                            self.selectedSupplierPerformance = d;
+                        }
+
+                        self.notify('✓ Skor ' + (d.company_name || 'pemasok') + ' berhasil dikalkulasi ulang secara realtime!');
+
+                        if (openModalAfter) {
+                            self.openSupplierTrackerModal(supplierId, partnershipId);
+                        }
                     } else {
                         alert('Gagal memperbarui skor: ' + (json.message || 'Error'));
                     }
                 })
                 .catch(function(err) {
+                    self.recalculatingSupplierId = null;
                     self.isRecalculatingPerformance = false;
                     alert('Terjadi kesalahan saat kalkulasi performa.');
                 });
@@ -3012,10 +3145,12 @@
                     <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Skor Rata-Rata Vendor</span>
                     <span class="text-amber-500 font-bold text-xs flex items-center gap-1">
                         <svg class="w-3.5 h-3.5 text-amber-500 fill-amber-500" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        {{ number_format($avgStar, 1) }}
+                        <span x-text="monitoringAvgStar">{{ number_format($avgStar, 1) }}</span>
                     </span>
                 </div>
-                <div class="text-3xl font-black font-mono text-[#ea580c] tracking-tight">{{ number_format($avgScore, 1) }}<span class="text-xs font-normal text-gray-400">/100</span></div>
+                <div class="text-3xl font-black font-mono text-[#ea580c] tracking-tight">
+                    <span x-text="monitoringAvgScore">{{ number_format($avgScore, 1) }}</span><span class="text-xs font-normal text-gray-400">/100</span>
+                </div>
                 <p class="text-[11px] text-gray-400">Indeks komposit seluruh mitra pasokan.</p>
             </div>
 
@@ -3024,7 +3159,9 @@
                     <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">On-Time Delivery</span>
                     <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">Bobot 40%</span>
                 </div>
-                <div class="text-3xl font-black font-mono text-emerald-600 tracking-tight">{{ number_format($avgOtd, 1) }}<span class="text-sm font-semibold text-emerald-600/70">%</span></div>
+                <div class="text-3xl font-black font-mono text-emerald-600 tracking-tight">
+                    <span x-text="monitoringAvgOtd">{{ number_format($avgOtd, 1) }}</span><span class="text-sm font-semibold text-emerald-600/70">%</span>
+                </div>
                 <p class="text-[11px] text-gray-400">Tiba sebelum batas jam operasional dapur.</p>
             </div>
 
@@ -3033,7 +3170,9 @@
                     <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Pemenuhan Kuota</span>
                     <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">Bobot 35%</span>
                 </div>
-                <div class="text-3xl font-black font-mono text-blue-600 tracking-tight">{{ number_format($avgFulfillment, 1) }}<span class="text-sm font-semibold text-blue-600/70">%</span></div>
+                <div class="text-3xl font-black font-mono text-blue-600 tracking-tight">
+                    <span x-text="monitoringAvgFill">{{ number_format($avgFulfillment, 1) }}</span><span class="text-sm font-semibold text-blue-600/70">%</span>
+                </div>
                 <p class="text-[11px] text-gray-400">Tingkat pengiriman utuh tanpa kekurangan/retur.</p>
             </div>
 
@@ -3042,18 +3181,44 @@
                     <span class="text-xs font-bold text-gray-500 uppercase tracking-wider">Mitra Terkontrak</span>
                     <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-100 text-purple-800">Aktif</span>
                 </div>
-                <div class="text-3xl font-black font-mono text-purple-700 tracking-tight">{{ $perfItems->count() }} <span class="text-xs font-normal text-gray-400">Pemasok</span></div>
+                <div class="text-3xl font-black font-mono text-purple-700 tracking-tight">
+                    <span>{{ $perfItems->count() }}</span> <span class="text-xs font-normal text-gray-400">Pemasok</span>
+                </div>
                 <p class="text-[11px] text-gray-400">Total mitra pasokan terikat kontrak formal.</p>
             </div>
         </div>
 
         <!-- DAFTAR EVALUASI PER KEMITRAAN / PEMASOK -->
         <div class="space-y-4">
-            <div class="flex items-center justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <h3 class="font-bold text-base text-gray-900 flex items-center gap-2">
                     <span>Daftar Kontrak & Realisasi Layanan Vendor</span>
-                    <span class="text-xs font-bold text-gray-400">({{ $perfItems->count() }} Mitra Aktif)</span>
+                    <span class="text-xs font-bold text-gray-400" x-text="'(' + filteredSupplierCount + ' Mitra Ditampilkan)'">({{ $perfItems->count() }} Mitra Aktif)</span>
                 </h3>
+
+                <!-- SEARCH BAR INPUT -->
+                <div class="relative w-full sm:w-80">
+                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+                        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </span>
+                    <input 
+                        type="text" 
+                        x-model="monitoringSearchQuery" 
+                        placeholder="Cari pemasok, komoditas, atau alamat..." 
+                        class="w-full pl-10 pr-9 py-2 rounded-xl bg-white border border-gray-200 text-xs font-medium text-gray-800 placeholder-gray-400 shadow-2xs focus:outline-none focus:ring-2 focus:ring-[#ea580c] focus:border-[#ea580c] transition"
+                    />
+                    <button 
+                        type="button" 
+                        x-show="monitoringSearchQuery" 
+                        @click="monitoringSearchQuery = ''" 
+                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             @if($perfItems->isEmpty())
@@ -3070,6 +3235,20 @@
                     </button>
                 </div>
             @else
+                <!-- State Jika Tidak Ada Hasil Pencarian -->
+                <div x-show="filteredSupplierCount === 0 && monitoringSearchQuery" class="bg-white rounded-2xl p-8 text-center border border-gray-100 shadow-sm space-y-3">
+                    <div class="w-12 h-12 bg-gray-50 text-gray-400 rounded-full flex items-center justify-center mx-auto border border-gray-200">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                    </div>
+                    <h4 class="font-bold text-sm text-gray-800">Tidak ada pemasok yang cocok</h4>
+                    <p class="text-xs text-gray-500 max-w-sm mx-auto">Tidak ditemukan mitra pemasok dengan kata kunci "<span class="font-semibold text-gray-800" x-text="monitoringSearchQuery"></span>".</p>
+                    <button type="button" @click="monitoringSearchQuery = ''" class="px-4 py-1.5 rounded-full text-xs font-bold text-[#ea580c] bg-orange-50 hover:bg-orange-100 border border-orange-200 transition cursor-pointer">
+                        Reset Pencarian
+                    </button>
+                </div>
+
                 <div class="grid grid-cols-1 gap-5">
                     @foreach($perfItems as $item)
                         @php
@@ -3086,7 +3265,7 @@
                             $backorderRate = $metrics['fulfillment']['backorder_rate'] ?? 0.0;
                             $defectFree = $metrics['quality']['defect_free_rate'] ?? 100.0;
                         @endphp
-                        <div class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition space-y-5">
+                        <div x-show="isSupplierMatched('{{ $sup?->id }}', '{{ addslashes($sup?->company_name ?? '') }}', '{{ addslashes($sup?->warehouse_address ?? '') }}', '{{ addslashes($item['commodity_name'] ?? '') }}')" class="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition space-y-5">
                             <!-- Card Header -->
                             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-gray-100">
                                 <div class="flex items-start gap-3.5">
@@ -3096,10 +3275,13 @@
                                     <div>
                                         <div class="flex items-center gap-2 flex-wrap">
                                             <h4 class="font-bold text-base text-gray-900">{{ $sup?->company_name ?? 'Pemasok Mitra' }}</h4>
-                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border {{ $gradeBadge }}">
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition-colors"
+                                                  :class="supplierScores['{{ $sup?->id }}']?.grade_badge_color || '{{ $gradeBadge }}'"
+                                                  x-text="'Grade ' + (supplierScores['{{ $sup?->id }}']?.grade || '{{ $grade }}')">
                                                 Grade {{ $grade }}
                                             </span>
-                                            <span class="inline-flex items-center text-xs font-bold text-amber-500">
+                                            <span class="inline-flex items-center text-xs font-bold text-amber-500 font-mono"
+                                                  x-text="'★ ' + Number(supplierScores['{{ $sup?->id }}']?.star_rating || {{ $score?->star_rating ?? 5.0 }}).toFixed(1)">
                                                 ★ {{ number_format($score?->star_rating ?? 5.0, 1) }}
                                             </span>
                                         </div>
@@ -3113,11 +3295,13 @@
                                 <div class="flex items-center gap-2 self-end sm:self-center">
                                     <button 
                                         type="button" 
-                                        @click="recalculateSupplierTracker('{{ $sup?->id }}', '{{ $p?->id }}')" 
-                                        :disabled="isRecalculatingPerformance"
-                                        class="px-3.5 py-1.5 rounded-full text-xs font-bold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 transition flex items-center gap-1.5 cursor-pointer">
-                                        <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                                        <span>Hitung Ulang</span>
+                                        @click="recalculateSupplierTracker('{{ $sup?->id }}', '{{ $p?->id }}', false)" 
+                                        :disabled="recalculatingSupplierId === '{{ $sup?->id }}'"
+                                        class="px-3.5 py-1.5 rounded-full text-xs font-bold text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+                                        <svg :class="recalculatingSupplierId === '{{ $sup?->id }}' ? 'animate-spin text-[#ea580c]' : 'text-gray-400'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                        </svg>
+                                        <span x-text="recalculatingSupplierId === '{{ $sup?->id }}' ? 'Menghitung...' : 'Hitung Ulang'">Hitung Ulang</span>
                                     </button>
                                     <button 
                                         type="button" 
@@ -3135,13 +3319,13 @@
                                 <div class="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 space-y-2">
                                     <div class="flex justify-between items-center text-xs">
                                         <span class="font-bold text-gray-800">1. Ketepatan Waktu (OTD)</span>
-                                        <span class="font-mono font-bold text-emerald-700">{{ number_format($otdRate, 1) }}%</span>
+                                        <span class="font-mono font-bold text-emerald-700" x-text="Number(supplierScores['{{ $sup?->id }}']?.otd_rate ?? {{ $otdRate }}).toFixed(1) + '%'">{{ number_format($otdRate, 1) }}%</span>
                                     </div>
                                     <div class="w-full bg-emerald-100 h-2 rounded-full overflow-hidden">
-                                        <div class="bg-emerald-600 h-2 rounded-full" style="width: {{ min(100, $otdRate) }}%"></div>
+                                        <div class="bg-emerald-600 h-2 rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, (supplierScores['{{ $sup?->id }}']?.otd_rate ?? {{ $otdRate }})) + '%'" style="width: {{ min(100, $otdRate) }}%"></div>
                                     </div>
                                     <div class="flex justify-between text-[11px] text-gray-500 font-mono">
-                                        <span>Rerata telat: {{ number_format($avgDelay, 1) }} jam</span>
+                                        <span x-text="'Rerata telat: ' + Number(supplierScores['{{ $sup?->id }}']?.avg_delay ?? {{ $avgDelay }}).toFixed(1) + ' jam'">Rerata telat: {{ number_format($avgDelay, 1) }} jam</span>
                                         <span class="text-emerald-700 font-bold">Bobot 40%</span>
                                     </div>
                                 </div>
@@ -3150,13 +3334,13 @@
                                 <div class="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-2">
                                     <div class="flex justify-between items-center text-xs">
                                         <span class="font-bold text-gray-800">2. Pemenuhan Kuota (OFR)</span>
-                                        <span class="font-mono font-bold text-blue-700">{{ number_format($fillRate, 1) }}%</span>
+                                        <span class="font-mono font-bold text-blue-700" x-text="Number(supplierScores['{{ $sup?->id }}']?.fill_rate ?? {{ $fillRate }}).toFixed(1) + '%'">{{ number_format($fillRate, 1) }}%</span>
                                     </div>
                                     <div class="w-full bg-blue-100 h-2 rounded-full overflow-hidden">
-                                        <div class="bg-blue-600 h-2 rounded-full" style="width: {{ min(100, $fillRate) }}%"></div>
+                                        <div class="bg-blue-600 h-2 rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, (supplierScores['{{ $sup?->id }}']?.fill_rate ?? {{ $fillRate }})) + '%'" style="width: {{ min(100, $fillRate) }}%"></div>
                                     </div>
                                     <div class="flex justify-between text-[11px] text-gray-500 font-mono">
-                                        <span>Rasio Backorder: {{ number_format($backorderRate, 1) }}%</span>
+                                        <span x-text="'Rasio Backorder: ' + Number(supplierScores['{{ $sup?->id }}']?.backorder_rate ?? {{ $backorderRate }}).toFixed(1) + '%'">Rasio Backorder: {{ number_format($backorderRate, 1) }}%</span>
                                         <span class="text-blue-700 font-bold">Bobot 35%</span>
                                     </div>
                                 </div>
@@ -3165,10 +3349,10 @@
                                 <div class="bg-amber-50/50 p-4 rounded-xl border border-amber-100 space-y-2">
                                     <div class="flex justify-between items-center text-xs">
                                         <span class="font-bold text-gray-800">3. Bebas Retur & Cacat</span>
-                                        <span class="font-mono font-bold text-amber-700">{{ number_format($defectFree, 1) }}%</span>
+                                        <span class="font-mono font-bold text-amber-700" x-text="Number(supplierScores['{{ $sup?->id }}']?.defect_free ?? {{ $defectFree }}).toFixed(1) + '%'">{{ number_format($defectFree, 1) }}%</span>
                                     </div>
                                     <div class="w-full bg-amber-100 h-2 rounded-full overflow-hidden">
-                                        <div class="bg-amber-500 h-2 rounded-full" style="width: {{ min(100, $defectFree) }}%"></div>
+                                        <div class="bg-amber-500 h-2 rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, (supplierScores['{{ $sup?->id }}']?.defect_free ?? {{ $defectFree }})) + '%'" style="width: {{ min(100, $defectFree) }}%"></div>
                                     </div>
                                     <div class="flex justify-between text-[11px] text-gray-500 font-mono">
                                         <span>Kesesuaian Spesifikasi</span>
@@ -3177,53 +3361,64 @@
                                 </div>
                             </div>
 
-                            <!-- Status Operasional Kontrak & Parameter Logistik (Tanpa Teks Panduan Generik) -->
+                            <!-- Status Operasional Kontrak & Parameter Logistik -->
                             <div class="bg-gray-50/80 rounded-xl p-3.5 border border-gray-200/70 flex flex-wrap items-center justify-between gap-3 text-xs">
                                 <div class="flex items-center gap-2">
                                     <span class="text-gray-500 font-medium">Status Kepatuhan SLA:</span>
-                                    @if($score && $score->grade === \App\Models\SupplierPerformanceScore::GRADE_A)
-                                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold bg-emerald-100 text-emerald-800 text-[11px]">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                                            <span>SLA Prima (Top Tier)</span>
-                                        </span>
-                                    @elseif($score && $score->grade === \App\Models\SupplierPerformanceScore::GRADE_B)
-                                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold bg-blue-100 text-blue-800 text-[11px]">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                                            <span>SLA Standar Baik</span>
-                                        </span>
-                                    @elseif($score && $score->grade === \App\Models\SupplierPerformanceScore::GRADE_C)
-                                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold bg-amber-100 text-amber-800 text-[11px]">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                            <span>Perhatian: Defisit Keterlambatan</span>
-                                        </span>
-                                    @elseif($score && $score->grade === \App\Models\SupplierPerformanceScore::GRADE_D)
-                                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold bg-rose-100 text-rose-800 text-[11px]">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                                            <span>Peringatan Pelanggaran SLA</span>
-                                        </span>
-                                    @else
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full font-bold bg-gray-200 text-gray-700 text-[11px]">
-                                            Masa Observasi (Vendor Baru)
-                                        </span>
-                                    @endif
+                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold text-[11px] transition-colors"
+                                          :class="{
+                                              'bg-emerald-100 text-emerald-800': supplierScores['{{ $sup?->id }}']?.grade === 'A',
+                                              'bg-blue-100 text-blue-800': supplierScores['{{ $sup?->id }}']?.grade === 'B',
+                                              'bg-amber-100 text-amber-800': supplierScores['{{ $sup?->id }}']?.grade === 'C',
+                                              'bg-rose-100 text-rose-800': supplierScores['{{ $sup?->id }}']?.grade === 'D',
+                                              'bg-gray-200 text-gray-700': !supplierScores['{{ $sup?->id }}'] || supplierScores['{{ $sup?->id }}']?.grade === 'UNRATED'
+                                          }">
+                                        <template x-if="supplierScores['{{ $sup?->id }}']?.grade === 'A'">
+                                            <span class="flex items-center gap-1">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                <span>SLA Prima (Top Tier)</span>
+                                            </span>
+                                        </template>
+                                        <template x-if="supplierScores['{{ $sup?->id }}']?.grade === 'B'">
+                                            <span class="flex items-center gap-1">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                <span>SLA Standar Baik</span>
+                                            </span>
+                                        </template>
+                                        <template x-if="supplierScores['{{ $sup?->id }}']?.grade === 'C'">
+                                            <span class="flex items-center gap-1">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                                <span>Perhatian: Defisit Keterlambatan</span>
+                                            </span>
+                                        </template>
+                                        <template x-if="supplierScores['{{ $sup?->id }}']?.grade === 'D'">
+                                            <span class="flex items-center gap-1">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                                <span>Peringatan Pelanggaran SLA</span>
+                                            </span>
+                                        </template>
+                                        <template x-if="!supplierScores['{{ $sup?->id }}'] || supplierScores['{{ $sup?->id }}']?.grade === 'UNRATED'">
+                                            <span>Masa Observasi (Vendor Baru)</span>
+                                        </template>
+                                    </span>
                                 </div>
 
                                 <div class="flex items-center gap-4 text-gray-600 text-[11px]">
                                     <div>
                                         <span class="text-gray-400">Target Buffer Dapur:</span>
-                                        <span class="font-bold text-gray-800 font-mono ml-1">
+                                        <span class="font-bold text-gray-800 font-mono ml-1" x-text="(supplierScores['{{ $sup?->id }}']?.grade === 'A' || supplierScores['{{ $sup?->id }}']?.grade === 'B') ? '1 Hari' : '2–3 Hari'">
                                             {{ ($score && in_array($score->grade, ['A', 'B'])) ? '1 Hari' : '2–3 Hari' }}
                                         </span>
                                     </div>
                                     <div>
                                         <span class="text-gray-400">Rekomendasi Kuota:</span>
-                                        <span class="font-bold text-gray-800 ml-1">
+                                        <span class="font-bold text-gray-800 ml-1" x-text="supplierScores['{{ $sup?->id }}']?.is_recommended_for_renewal ? 'Prioritas Utama' : 'Evaluasi Cadangan'">
                                             {{ ($score && $score->isRecommendedForRenewal()) ? 'Prioritas Utama' : 'Evaluasi Cadangan' }}
                                         </span>
                                     </div>
                                     <div>
                                         <span class="text-gray-400">Pengiriman Tuntas:</span>
-                                        <span class="font-bold text-gray-800 font-mono ml-1">{{ $metrics['total_shipments'] ?? 0 }} Order</span>
+                                        <span class="font-bold text-gray-800 font-mono ml-1" x-text="(supplierScores['{{ $sup?->id }}']?.total_shipments || 0) + ' Order'">{{ $metrics['total_shipments'] ?? 0 }} Order</span>
                                     </div>
                                 </div>
                             </div>
@@ -3790,11 +3985,11 @@
                     <div class="flex items-center justify-between pt-2">
                         <button 
                             type="button" 
-                            @click="recalculateSupplierTracker(selectedSupplierPerformance?.supplier_id)"
-                            :disabled="isRecalculatingPerformance"
-                            class="px-4 py-2 rounded-xl text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition flex items-center gap-1.5 cursor-pointer">
-                            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                            <span x-text="isRecalculatingPerformance ? 'Menghitung...' : 'Kalkulasi Ulang Realtime'"></span>
+                            @click="recalculateSupplierTracker(selectedSupplierPerformance?.supplier_id, null, false)"
+                            :disabled="recalculatingSupplierId === selectedSupplierPerformance?.supplier_id"
+                            class="px-4 py-2 rounded-xl text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+                            <svg :class="recalculatingSupplierId === selectedSupplierPerformance?.supplier_id ? 'animate-spin text-[#ea580c]' : 'text-gray-400'" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            <span x-text="recalculatingSupplierId === selectedSupplierPerformance?.supplier_id ? 'Menghitung...' : 'Kalkulasi Ulang Realtime'">Kalkulasi Ulang Realtime</span>
                         </button>
                         <button 
                             type="button" 

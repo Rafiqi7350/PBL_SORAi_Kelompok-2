@@ -213,6 +213,21 @@ class SupplierPerformanceTrackerTest extends TestCase
             'status' => 'success',
             'message' => 'Skor performa pemasok berhasil dikalkulasi ulang.',
         ]);
+        $response->assertJsonStructure([
+            'status',
+            'message',
+            'data' => [
+                'supplier_id',
+                'company_name',
+                'final_score',
+                'star_rating',
+                'grade',
+                'grade_badge_color',
+                'scores' => ['on_time_delivery', 'quota_fulfillment', 'quality_rating'],
+                'metrics_summary' => ['otd_rate', 'fill_rate', 'defect_free_rate'],
+                'recommendations',
+            ],
+        ]);
     }
 
     public function test_artisan_command_calculates_all_supplier_scores(): void
