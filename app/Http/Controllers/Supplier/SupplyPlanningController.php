@@ -3,8 +3,13 @@
 namespace App\Http\Controllers\Supplier;
 
 use App\Http\Controllers\Controller;
+use App\Models\Partnership;
+use App\Models\SupplierInventoryItem;
+use App\Models\SupplierPurchaseSuggestion;
 use App\Models\SupplyPlan;
 use App\Models\User;
+use App\Services\Planning\SupplierDemandPlanningService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -12,6 +17,10 @@ use Illuminate\View\View;
 
 class SupplyPlanningController extends Controller
 {
+    public function __construct(
+        protected SupplierDemandPlanningService $planningService
+    ) {}
+
     private function getActiveSupplierProfile()
     {
         if (! Auth::check() || Auth::user()->role !== 'supplier') {
@@ -25,8 +34,7 @@ class SupplyPlanningController extends Controller
     }
 
     /**
-     * Tampilkan dasbor Collaborative Supply Planning untuk pemasok:
-     * Agregasi estimasi kebutuhan bahan baku dari seluruh UMKM sebagai dasar perencanaan pasokan.
+     * Tampilkan dasbor Collaborative Supply Planning & Demand Forecasting untuk pemasok.
      */
     public function index(Request $request): View|RedirectResponse
     {
@@ -37,6 +45,7 @@ class SupplyPlanningController extends Controller
                 ->with('error', 'Silakan daftarkan profil Pemasok terlebih dahulu.');
         }
 
+        // Filter Collaborative Supply Plans
         $statusFilter = $request->input('status');
         $periodFilter = $request->input('period');
 
@@ -74,7 +83,7 @@ class SupplyPlanningController extends Controller
             ? round(($approvedCount / $totalBasePlans->count()) * 100)
             : 0;
 
-        // Agregasi Kebutuhan per Komoditas dan Periode untuk Perencanaan Pasokan Petani / Gudang
+        // Agregasi Kebutuhan per Komoditas dan Periode untuk Perencanaan Pasokan
         $commodityAggregations = $totalBasePlans->groupBy(function ($item) {
             return $item->period_month_year.'___'.$item->commodity_name;
         })->map(function ($group) {
@@ -91,8 +100,55 @@ class SupplyPlanningController extends Controller
             ];
         })->values();
 
-        // Periode unik untuk filter
         $availablePeriods = $totalBasePlans->pluck('period_month_year')->unique()->values();
+
+        // =========================================================================
+        // DATA MODUL PERENCANAAN PERSEDIAAN & DEMAND FORECASTING PEMASOK
+        // =========================================================================
+        $latestForecastRun = $supplier->forecastRuns()->latest('run_at')->first();
+
+        // Inisialisasi otomatis jika belum ada kalkulasi peramalan
+        if (! $latestForecastRun) {
+            $latestForecastRun = $this->planningService->generateForecastAndPlanning($supplier, '7_DAYS');
+        }
+
+        $forecastItems = $latestForecastRun
+            ? $latestForecastRun->items()->with('commodity')->orderBy('forecast_date')->get()
+            : collect();
+
+        // Inventori bahan baku dan status EWS
+        $inventoryItems = $supplier->inventoryItems()->with('commodity')->get();
+
+        // Rekomendasi Pengadaan (Purchase Suggestions)
+        $purchaseSuggestions = $supplier->purchaseSuggestions()
+            ->with(['commodity', 'materialSource'])
+            ->latest()
+            ->get();
+
+        // Multi-tenant Breakdown Kebutuhan per UMKM (Privacy-Preserving)
+        $umkmBreakdowns = Partnership::where('supplier_id', $supplier->id)
+            ->with(['umkm', 'deliverySchedules.supplierProduct.commodity'])
+            ->get()
+            ->map(function ($p) {
+                return [
+                    'id' => $p->id,
+                    'umkm_name' => $p->umkm?->business_name ?? 'UMKM Mitra',
+                    'contract_status' => $p->status,
+                    'schedules_count' => $p->deliverySchedules->count(),
+                    'total_scheduled_volume' => (float) $p->deliverySchedules->sum('volume_per_delivery'),
+                    'commodity_name' => $p->deliverySchedules->first()?->supplierProduct?->commodity?->name ?? 'Bahan Baku',
+                    'unit' => $p->deliverySchedules->first()?->unit ?? 'kg',
+                    'delivery_days' => $p->deliverySchedules->first()?->delivery_days ?? [1, 3, 5],
+                ];
+            });
+
+        // Simulasi What-If default
+        $whatIfSimulationDefault = $this->planningService->simulateWhatIfScenario($supplier, 20.0, 2);
+
+        // Ringkasan Total Kebutuhan Proyeksi
+        $totalProjectedDemand7Days = $forecastItems->sum('baseline_demand');
+        $criticalInventoryCount = $inventoryItems->filter(fn ($i) => $i->ews_status === 'CRITICAL')->count();
+        $warningInventoryCount = $inventoryItems->filter(fn ($i) => $i->ews_status === 'WARNING')->count();
 
         return view('supplier.supply-planning.index', compact(
             'supplier',
@@ -106,8 +162,163 @@ class SupplyPlanningController extends Controller
             'commodityAggregations',
             'availablePeriods',
             'statusFilter',
-            'periodFilter'
+            'periodFilter',
+            // Data Demand Planning
+            'latestForecastRun',
+            'forecastItems',
+            'inventoryItems',
+            'purchaseSuggestions',
+            'umkmBreakdowns',
+            'whatIfSimulationDefault',
+            'totalProjectedDemand7Days',
+            'criticalInventoryCount',
+            'warningInventoryCount'
         ));
+    }
+
+    /**
+     * Hitung ulang proyeksi demand dan stok pengaman via endpoint realtime.
+     */
+    public function recalculateForecast(Request $request): JsonResponse
+    {
+        $supplier = $this->getActiveSupplierProfile();
+
+        if (! $supplier) {
+            return response()->json(['status' => 'error', 'message' => 'Profil pemasok tidak ditemukan.'], 403);
+        }
+
+        $horizon = (string) $request->input('horizon', '7_DAYS');
+        $run = $this->planningService->generateForecastAndPlanning($supplier, $horizon);
+
+        $items = $run->items()->with('commodity')->orderBy('forecast_date')->get();
+        $inventory = $supplier->inventoryItems()->with('commodity')->get()->map(function ($inv) {
+            return [
+                'id' => $inv->id,
+                'commodity_name' => $inv->commodity?->name ?? 'Komoditas',
+                'current_stock' => (float) $inv->current_stock,
+                'safety_stock' => (float) $inv->safety_stock,
+                'reorder_point' => (float) $inv->reorder_point,
+                'unit' => $inv->unit,
+                'ews_status' => $inv->ews_status,
+                'ews_label' => $inv->ews_label,
+                'ews_badge_color' => $inv->ews_badge_color,
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Proyeksi demand dan ambang batas inventori berhasil dikalkulasi ulang.',
+            'data' => [
+                'run_id' => $run->id,
+                'horizon' => $run->forecast_horizon,
+                'total_projected_volume' => (float) $items->sum('baseline_demand'),
+                'items' => $items,
+                'inventory' => $inventory,
+            ],
+        ]);
+    }
+
+    /**
+     * Jalankan simulasi skenario "What-If" untuk pemasok.
+     */
+    public function simulateWhatIf(Request $request): JsonResponse
+    {
+        $supplier = $this->getActiveSupplierProfile();
+
+        if (! $supplier) {
+            return response()->json(['status' => 'error', 'message' => 'Profil pemasok tidak ditemukan.'], 403);
+        }
+
+        $demandShockPct = (float) $request->input('demand_shock_pct', 20.0);
+        $leadTimeDelayDays = (int) $request->input('lead_time_delay_days', 2);
+        $scenarioName = (string) $request->input('scenario_name', 'Simulasi Skenario Interaktif');
+
+        $result = $this->planningService->simulateWhatIfScenario(
+            $supplier,
+            $demandShockPct,
+            $leadTimeDelayDays,
+            $scenarioName
+        );
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $result,
+        ]);
+    }
+
+    /**
+     * Setujui rekomendasi pengadaan dan ubah menjadi PO resmi.
+     */
+    public function approvePurchaseSuggestion(string $id): JsonResponse|RedirectResponse
+    {
+        $supplier = $this->getActiveSupplierProfile();
+
+        $suggestion = SupplierPurchaseSuggestion::where('supplier_id', $supplier->id)->findOrFail($id);
+
+        $poNumber = 'PO/SORAI/'.date('Y/m').'/'.strtoupper(substr($suggestion->id, 0, 8));
+
+        $suggestion->update([
+            'status' => SupplierPurchaseSuggestion::STATUS_ORDERED,
+            'po_reference_number' => $poNumber,
+        ]);
+
+        if (request()->wantsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => "Purchase Order resmi {$poNumber} berhasil diterbitkan.",
+                'data' => $suggestion,
+            ]);
+        }
+
+        return redirect()->back()->with('success', "✓ Purchase Order resmi {$poNumber} berhasil diterbitkan.");
+    }
+
+    /**
+     * Abaikan rekomendasi pengadaan.
+     */
+    public function ignorePurchaseSuggestion(string $id): JsonResponse|RedirectResponse
+    {
+        $supplier = $this->getActiveSupplierProfile();
+
+        $suggestion = SupplierPurchaseSuggestion::where('supplier_id', $supplier->id)->findOrFail($id);
+        $suggestion->update(['status' => SupplierPurchaseSuggestion::STATUS_IGNORED]);
+
+        if (request()->wantsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Rekomendasi pengadaan berhasil diabaikan.',
+            ]);
+        }
+
+        return redirect()->back()->with('info', 'Rekomendasi pengadaan berhasil diabaikan.');
+    }
+
+    /**
+     * Perbarui stok fisik bahan baku pemasok di gudang.
+     */
+    public function updateInventoryItem(Request $request, string $id): JsonResponse|RedirectResponse
+    {
+        $supplier = $this->getActiveSupplierProfile();
+
+        $validated = $request->validate([
+            'current_stock' => 'required|numeric|min:0|max:1000000',
+        ]);
+
+        $item = SupplierInventoryItem::where('supplier_id', $supplier->id)->findOrFail($id);
+        $item->update([
+            'current_stock' => $validated['current_stock'],
+            'last_restocked_at' => now(),
+        ]);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Stok gudang berhasil diperbarui.',
+                'data' => $item,
+            ]);
+        }
+
+        return redirect()->back()->with('success', '✓ Stok gudang berhasil diperbarui.');
     }
 
     /**

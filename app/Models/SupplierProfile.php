@@ -72,4 +72,29 @@ class SupplierProfile extends Model
     {
         return $this->hasOne(SupplierPerformanceScore::class, 'supplier_id')->latest('calculated_at');
     }
+
+    public function inventoryItems(): HasMany
+    {
+        return $this->hasMany(SupplierInventoryItem::class, 'supplier_id');
+    }
+
+    public function materialSources(): HasMany
+    {
+        return $this->hasMany(SupplierMaterialSource::class, 'supplier_id');
+    }
+
+    public function forecastRuns(): HasMany
+    {
+        return $this->hasMany(DemandForecastRun::class, 'supplier_id');
+    }
+
+    public function purchaseSuggestions(): HasMany
+    {
+        return $this->hasMany(SupplierPurchaseSuggestion::class, 'supplier_id');
+    }
+
+    public function whatIfSimulations(): HasMany
+    {
+        return $this->hasMany(WhatIfSimulation::class, 'supplier_id');
+    }
 }
