@@ -1,181 +1,204 @@
 @extends('layouts.supplier')
 
 @section('content')
-<div class="space-y-8" x-data="{
-    activeTab: (new URLSearchParams(window.location.search).get('tab') || 'forecast'),
-    forecastHorizon: '{{ $latestForecastRun?->forecast_horizon ?? '7_DAYS' }}',
-    isRecalculating: false,
-    notificationMsg: '',
-    searchCommodityQuery: '',
+<script>
+function supplierDemandPlanningPage() {
+    return {
+        activeTab: (new URLSearchParams(window.location.search).get('tab') || 'forecast'),
+        forecastHorizon: '{{ $latestForecastRun?->forecast_horizon ?? '7_DAYS' }}',
+        isRecalculating: false,
+        notificationMsg: '',
+        searchCommodityQuery: '',
 
-    // Modal Collaborative Response
-    openModal: false,
-    selectedPlan: null,
-    actionType: 'terima_penuh',
-    confirmedQty: 0,
-    supplierNotes: '',
+        // Data arrays passed safely in JS literal
+        inventoryItemsData: @json($inventoryItems),
+        allPlansData: @json($allPlans->items()),
 
-    // Modal Edit Stok Fisik
-    openInventoryModal: false,
-    editingInventory: null,
-    editingStockQty: 0,
-    isUpdatingStock: false,
+        // Modal Collaborative Response
+        openModal: false,
+        selectedPlan: null,
+        actionType: 'terima_penuh',
+        confirmedQty: 0,
+        supplierNotes: '',
 
-    // What-If Simulation State
-    simDemandShock: 20,
-    simLeadTimeDelay: 2,
-    simScenarioName: 'Simulasi Lonjakan Hari Raya & Libur Panjang',
-    isSimulating: false,
-    simulationResult: @json($whatIfSimulationDefault),
+        // Modal Edit Stok Fisik
+        openInventoryModal: false,
+        editingInventory: null,
+        editingStockQty: 0,
+        isUpdatingStock: false,
 
-    openResponseModal(plan, action) {
-        this.selectedPlan = plan;
-        this.actionType = action;
-        this.confirmedQty = plan.confirmed_quantity || plan.estimated_quantity;
-        if (action === 'terima_penuh') {
-            this.supplierNotes = 'Kapasitas siap dipenuhi 100% sesuai estimasi kebutuhan dapur.';
-        } else if (action === 'sesuaikan') {
-            this.supplierNotes = 'Kapasitas pasokan disesuaikan dengan kuota panen/gudang yang tersedia.';
-        } else {
-            this.supplierNotes = 'Mohon maaf, kapasitas pasokan kami pada periode ini belum mencukupi.';
-        }
-        this.openModal = true;
-    },
+        // What-If Simulation State
+        simDemandShock: 20,
+        simLeadTimeDelay: 2,
+        simScenarioName: 'Simulasi Lonjakan Hari Raya & Libur Panjang',
+        isSimulating: false,
+        simulationResult: @json($whatIfSimulationDefault),
 
-    openStockModal(inv) {
-        this.editingInventory = inv;
-        this.editingStockQty = inv.current_stock;
-        this.openInventoryModal = true;
-    },
+        setTab(tab) {
+            this.activeTab = tab;
+            try {
+                const url = new URL(window.location);
+                url.searchParams.set('tab', tab);
+                window.history.replaceState({}, '', url);
+            } catch(e) {}
+        },
 
-    recalculateForecast(horizon) {
-        var self = this;
-        self.isRecalculating = true;
-        self.forecastHorizon = horizon;
-        fetch('{{ route("supplier.demand-planning.recalculate") }}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-            },
-            body: JSON.stringify({ horizon: horizon })
-        })
-        .then(function(res) { return res.json(); })
-        .then(function(json) {
-            self.isRecalculating = false;
-            if (json.status === 'success') {
-                self.notify('✓ ' + json.message);
-                setTimeout(function() { window.location.reload(); }, 600);
+        openResponseModal(planId, action) {
+            var plan = this.allPlansData.find(function(p) { return p.id === planId; });
+            if (!plan) return;
+            this.selectedPlan = plan;
+            this.actionType = action;
+            this.confirmedQty = plan.confirmed_quantity || plan.estimated_quantity;
+            if (action === 'terima_penuh') {
+                this.supplierNotes = 'Kapasitas siap dipenuhi 100% sesuai estimasi kebutuhan dapur.';
+            } else if (action === 'sesuaikan') {
+                this.supplierNotes = 'Kapasitas pasokan disesuaikan dengan kuota panen/gudang yang tersedia.';
             } else {
-                alert(json.message || 'Gagal menghitung proyeksi.');
+                this.supplierNotes = 'Mohon maaf, kapasitas pasokan kami pada periode ini belum mencukupi.';
             }
-        })
-        .catch(function(err) {
-            self.isRecalculating = false;
-            alert('Terjadi kesalahan jaringan.');
-        });
-    },
+            this.openModal = true;
+        },
 
-    runWhatIfSimulation() {
-        var self = this;
-        self.isSimulating = true;
-        fetch('{{ route("supplier.demand-planning.what-if") }}', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-            },
-            body: JSON.stringify({
-                demand_shock_pct: self.simDemandShock,
-                lead_time_delay_days: self.simLeadTimeDelay,
-                scenario_name: self.simScenarioName
+        openStockModal(invId) {
+            var inv = this.inventoryItemsData.find(function(i) { return i.id === invId; });
+            if (!inv) return;
+            this.editingInventory = inv;
+            this.editingStockQty = inv.current_stock;
+            this.openInventoryModal = true;
+        },
+
+        recalculateForecast(horizon) {
+            var self = this;
+            self.isRecalculating = true;
+            self.forecastHorizon = horizon;
+            fetch('{{ route("supplier.demand-planning.recalculate") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ horizon: horizon })
             })
-        })
-        .then(function(res) { return res.json(); })
-        .then(function(json) {
-            self.isSimulating = false;
-            if (json.status === 'success') {
-                self.simulationResult = json.data;
-                self.notify('✓ Simulasi skenario berhasil dijalankan.');
-            }
-        })
-        .catch(function() {
-            self.isSimulating = false;
-            alert('Gagal menjalankan simulasi.');
-        });
-    },
+            .then(function(res) { return res.json(); })
+            .then(function(json) {
+                self.isRecalculating = false;
+                if (json.status === 'success') {
+                    self.notify('✓ ' + json.message);
+                    setTimeout(function() { window.location.reload(); }, 600);
+                } else {
+                    alert(json.message || 'Gagal menghitung proyeksi.');
+                }
+            })
+            .catch(function(err) {
+                self.isRecalculating = false;
+                alert('Terjadi kesalahan jaringan.');
+            });
+        },
 
-    approvePurchaseOrder(id) {
-        var self = this;
-        if (!confirm('Terbitkan Purchase Order resmi ke pihak produsen/petani hulu?')) return;
-        fetch('{{ url("supplier/demand-planning/purchase-suggestion") }}/' + id + '/approve', {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-            }
-        })
-        .then(function(res) { return res.json(); })
-        .then(function(json) {
-            if (json.status === 'success') {
-                self.notify('✓ ' + json.message);
-                setTimeout(function() { window.location.reload(); }, 600);
-            }
-        });
-    },
+        runWhatIfSimulation() {
+            var self = this;
+            self.isSimulating = true;
+            fetch('{{ route("supplier.demand-planning.what-if") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({
+                    demand_shock_pct: self.simDemandShock,
+                    lead_time_delay_days: self.simLeadTimeDelay,
+                    scenario_name: self.simScenarioName
+                })
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(json) {
+                self.isSimulating = false;
+                if (json.status === 'success') {
+                    self.simulationResult = json.data;
+                    self.notify('✓ Simulasi skenario berhasil dijalankan.');
+                }
+            })
+            .catch(function() {
+                self.isSimulating = false;
+                alert('Gagal menjalankan simulasi.');
+            });
+        },
 
-    ignorePurchaseOrder(id) {
-        var self = this;
-        fetch('{{ url("supplier/demand-planning/purchase-suggestion") }}/' + id + '/ignore', {
-            method: 'POST',
-            headers: {
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-            }
-        })
-        .then(function(res) { return res.json(); })
-        .then(function(json) {
-            if (json.status === 'success') {
-                self.notify(json.message);
-                setTimeout(function() { window.location.reload(); }, 500);
-            }
-        });
-    },
+        approvePurchaseOrder(id) {
+            var self = this;
+            if (!confirm('Terbitkan Purchase Order resmi ke pihak produsen/petani hulu?')) return;
+            fetch('{{ url("supplier/demand-planning/purchase-suggestion") }}/' + id + '/approve', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                }
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(json) {
+                if (json.status === 'success') {
+                    self.notify('✓ ' + json.message);
+                    setTimeout(function() { window.location.reload(); }, 600);
+                }
+            });
+        },
 
-    submitUpdateStock() {
-        var self = this;
-        if (!self.editingInventory) return;
-        self.isUpdatingStock = true;
-        fetch('{{ url("supplier/demand-planning/inventory") }}/' + self.editingInventory.id, {
-            method: 'PATCH',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': '{{ csrf_token() }}'
-            },
-            body: JSON.stringify({ current_stock: self.editingStockQty })
-        })
-        .then(function(res) { return res.json(); })
-        .then(function(json) {
-            self.isUpdatingStock = false;
-            self.openInventoryModal = false;
-            if (json.status === 'success') {
-                self.notify('✓ ' + json.message);
-                setTimeout(function() { window.location.reload(); }, 500);
-            }
-        });
-    },
+        ignorePurchaseOrder(id) {
+            var self = this;
+            fetch('{{ url("supplier/demand-planning/purchase-suggestion") }}/' + id + '/ignore', {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                }
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(json) {
+                if (json.status === 'success') {
+                    self.notify(json.message);
+                    setTimeout(function() { window.location.reload(); }, 500);
+                }
+            });
+        },
 
-    notify(msg) {
-        var self = this;
-        self.notificationMsg = msg;
-        setTimeout(function() {
-            if (self.notificationMsg === msg) self.notificationMsg = '';
-        }, 3500);
-    }
-}">
+        submitUpdateStock() {
+            var self = this;
+            if (!self.editingInventory) return;
+            self.isUpdatingStock = true;
+            fetch('{{ url("supplier/demand-planning/inventory") }}/' + self.editingInventory.id, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ current_stock: self.editingStockQty })
+            })
+            .then(function(res) { return res.json(); })
+            .then(function(json) {
+                self.isUpdatingStock = false;
+                self.openInventoryModal = false;
+                if (json.status === 'success') {
+                    self.notify('✓ ' + json.message);
+                    setTimeout(function() { window.location.reload(); }, 500);
+                }
+            });
+        },
+
+        notify(msg) {
+            var self = this;
+            self.notificationMsg = msg;
+            setTimeout(function() {
+                if (self.notificationMsg === msg) self.notificationMsg = '';
+            }, 3500);
+        }
+    };
+}
+</script>
+
+<div class="space-y-8" x-data="supplierDemandPlanningPage()">
 
     {{-- Toast Notification Floating --}}
     <div x-cloak x-show="notificationMsg" x-transition
@@ -288,14 +311,14 @@
 
     {{-- TAB NAVIGATION (5 Modul Utama) --}}
     <div class="flex items-center gap-2 overflow-x-auto pb-2 border-b border-gray-200">
-        <button type="button" @click="activeTab = 'forecast'"
+        <button type="button" @click="setTab('forecast')"
                 :class="activeTab === 'forecast' ? 'bg-[#ea580c] text-white shadow-sm' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'"
                 class="px-5 py-2.5 rounded-full text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg>
             <span>Proyeksi Permintaan 7–90 Hari</span>
         </button>
 
-        <button type="button" @click="activeTab = 'inventory'"
+        <button type="button" @click="setTab('inventory')"
                 :class="activeTab === 'inventory' ? 'bg-[#ea580c] text-white shadow-sm' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'"
                 class="px-5 py-2.5 rounded-full text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
@@ -305,7 +328,7 @@
             @endif
         </button>
 
-        <button type="button" @click="activeTab = 'purchase-orders'"
+        <button type="button" @click="setTab('purchase-orders')"
                 :class="activeTab === 'purchase-orders' ? 'bg-[#ea580c] text-white shadow-sm' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'"
                 class="px-5 py-2.5 rounded-full text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
@@ -315,14 +338,14 @@
             @endif
         </button>
 
-        <button type="button" @click="activeTab = 'what-if'"
+        <button type="button" @click="setTab('what-if')"
                 :class="activeTab === 'what-if' ? 'bg-[#ea580c] text-white shadow-sm' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'"
                 class="px-5 py-2.5 rounded-full text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
             <span>Simulator Skenario What-If</span>
         </button>
 
-        <button type="button" @click="activeTab = 'collaborative'"
+        <button type="button" @click="setTab('collaborative')"
                 :class="activeTab === 'collaborative' ? 'bg-[#ea580c] text-white shadow-sm' : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'"
                 class="px-5 py-2.5 rounded-full text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
@@ -498,7 +521,7 @@
                             </span>
                             <h4 class="font-extrabold text-base text-gray-900 mt-2">{{ $inv->commodity?->name ?? 'Komoditas' }}</h4>
                         </div>
-                        <button type="button" @click="openStockModal(@json($inv))" class="text-xs font-bold text-[#ea580c] hover:underline cursor-pointer">
+                        <button type="button" @click="openStockModal('{{ $inv->id }}')" class="text-xs font-bold text-[#ea580c] hover:underline cursor-pointer">
                             Update Stok
                         </button>
                     </div>
@@ -896,7 +919,7 @@
                                     <td class="p-4 text-right">
                                         <div class="flex items-center justify-end gap-1.5">
                                             <button type="button"
-                                                    @click="openResponseModal({{ json_encode($plan) }}, 'terima_penuh')"
+                                                    @click="openResponseModal('{{ $plan->id }}', 'terima_penuh')"
                                                     class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white font-bold text-[11px] transition shadow-xs cursor-pointer"
                                                     title="Terima 100% Sesuai Kebutuhan">
                                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" /></svg>
@@ -904,7 +927,7 @@
                                             </button>
 
                                             <button type="button"
-                                                    @click="openResponseModal({{ json_encode($plan) }}, 'sesuaikan')"
+                                                    @click="openResponseModal('{{ $plan->id }}', 'sesuaikan')"
                                                     class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white font-bold text-[11px] transition shadow-xs cursor-pointer"
                                                     title="Sesuaikan Kapasitas Pasok">
                                                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
@@ -912,7 +935,7 @@
                                             </button>
 
                                             <button type="button"
-                                                    @click="openResponseModal({{ json_encode($plan) }}, 'tolak')"
+                                                    @click="openResponseModal('{{ $plan->id }}', 'tolak')"
                                                     class="p-1.5 rounded-xl bg-gray-100 text-gray-500 hover:bg-rose-50 hover:text-rose-600 font-bold text-[11px] transition cursor-pointer"
                                                     title="Tolak / Kapasitas Belum Ada">
                                                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
