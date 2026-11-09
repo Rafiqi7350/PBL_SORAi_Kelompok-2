@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class SupplierProfile extends Model
 {
@@ -60,5 +61,15 @@ class SupplierProfile extends Model
     public function orderReviews(): HasMany
     {
         return $this->hasMany(OrderReview::class, 'supplier_id');
+    }
+
+    public function performanceScores(): HasMany
+    {
+        return $this->hasMany(SupplierPerformanceScore::class, 'supplier_id');
+    }
+
+    public function latestPerformanceScore(): HasOne
+    {
+        return $this->hasOne(SupplierPerformanceScore::class, 'supplier_id')->latest('calculated_at');
     }
 }

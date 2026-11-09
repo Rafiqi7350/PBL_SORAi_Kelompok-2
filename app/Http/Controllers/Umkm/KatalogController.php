@@ -29,7 +29,7 @@ class KatalogController extends Controller
         $isHalal = $request->boolean('is_halal');
         $sort = $request->input('sort', 'terbaru');
 
-        $query = SupplierProduct::with(['supplier.user', 'commodity']);
+        $query = SupplierProduct::with(['supplier.user', 'supplier.latestPerformanceScore', 'commodity']);
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -97,7 +97,8 @@ class KatalogController extends Controller
         }
 
         $allPartnerships = $umkm ? Partnership::with([
-            'supplier',
+            'supplier.latestPerformanceScore',
+            'latestSupplierPerformanceScore',
             'deliverySchedules.supplierProduct.commodity',
         ])
             ->where('umkm_id', $umkm->id)
@@ -409,6 +410,22 @@ class KatalogController extends Controller
             ];
         }
 
+        // Ambil data performa mitra pemasok untuk Tab Monitoring & Evaluasi Kemitraan
+        $contractedSuppliersPerformance = $allPartnerships->map(function ($p) {
+            $sup = $p->supplier;
+            $score = $p->latestSupplierPerformanceScore ?? $sup?->latestPerformanceScore;
+
+            return [
+                'partnership' => $p,
+                'supplier' => $sup,
+                'score' => $score,
+                'commodity_name' => $p->deliverySchedules->first()?->supplierProduct?->commodity?->name ?? 'Komoditas Pasokan',
+                'volume_per_delivery' => $p->deliverySchedules->sum('volume_per_delivery'),
+                'unit' => $p->deliverySchedules->first()?->unit ?? 'kg',
+                'status' => $p->status,
+            ];
+        });
+
         return view('umkm.katalog.index', compact(
             'products',
             'categories',
@@ -438,6 +455,7 @@ class KatalogController extends Controller
             'totalContractsCount',
             'activeContractCommodities',
             'reviewOrders',
+            'contractedSuppliersPerformance',
         ));
     }
 
