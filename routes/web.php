@@ -102,6 +102,13 @@ Route::prefix('supplier')->name('supplier.')->middleware(EnsureUserIsSupplier::c
     Route::get('/supply-planning', [SupplierSupplyPlanningController::class, 'index'])->name('supply-planning.index');
     Route::patch('/supply-planning/{id}/konfirmasi', [SupplierSupplyPlanningController::class, 'konfirmasi'])->name('supply-planning.konfirmasi');
 
+    /* Modul Perencanaan Persediaan & Prediksi Permintaan Pemasok */
+    Route::post('/demand-planning/recalculate', [SupplierSupplyPlanningController::class, 'recalculateForecast'])->name('demand-planning.recalculate');
+    Route::post('/demand-planning/what-if', [SupplierSupplyPlanningController::class, 'simulateWhatIf'])->name('demand-planning.what-if');
+    Route::post('/demand-planning/purchase-suggestion/{id}/approve', [SupplierSupplyPlanningController::class, 'approvePurchaseSuggestion'])->name('demand-planning.purchase-suggestion.approve');
+    Route::post('/demand-planning/purchase-suggestion/{id}/ignore', [SupplierSupplyPlanningController::class, 'ignorePurchaseSuggestion'])->name('demand-planning.purchase-suggestion.ignore');
+    Route::patch('/demand-planning/inventory/{id}', [SupplierSupplyPlanningController::class, 'updateInventoryItem'])->name('demand-planning.inventory.update');
+
     Route::get('/pengiriman', [SupplierPengirimanController::class, 'index'])->name('pengiriman.index');
     Route::post('/pengiriman/{order}/kirim', [SupplierPengirimanController::class, 'prosesKirim'])->name('pengiriman.kirim');
     Route::post('/pengiriman/{order}/kirim-batch1', [SupplierPengirimanController::class, 'kirimBatch1'])->name('pengiriman.kirim-batch1');
