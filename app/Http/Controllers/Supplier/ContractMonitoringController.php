@@ -21,9 +21,6 @@ class ContractMonitoringController extends Controller
         protected UmkmReliabilityScoreService $reliabilityService
     ) {}
 
-    /**
-     * Tampilkan halaman Contract Monitoring untuk pemasok aktif.
-     */
     public function index(Request $request): View|RedirectResponse
     {
         $supplier = Auth::user()?->supplierProfile;
