@@ -10,6 +10,7 @@ use App\Http\Controllers\Auth\PendingRegistrationController;
 use App\Http\Controllers\Auth\SupplierRegisterController;
 use App\Http\Controllers\Auth\UmkmRegisterController;
 use App\Http\Controllers\MidtransWebhookController;
+use App\Http\Controllers\Supplier\ContractMonitoringController;
 use App\Http\Controllers\Supplier\KatalogSupplierController;
 use App\Http\Controllers\Supplier\PengajuanMasukController;
 use App\Http\Controllers\Supplier\PengirimanController as SupplierPengirimanController;
@@ -107,6 +108,12 @@ Route::prefix('supplier')->name('supplier.')->middleware(EnsureUserIsSupplier::c
     Route::post('/pengiriman/{order}/kirim-backorder', [SupplierPengirimanController::class, 'kirimBackorder'])->name('pengiriman.kirim-backorder');
 
     Route::get('/riwayat-transaksi', [RiwayatTransaksiController::class, 'index'])->name('riwayat-transaksi.index');
+
+    Route::get('/contract-monitoring', [ContractMonitoringController::class, 'index'])->name('contract-monitoring.index');
+    Route::post('/contract-monitoring/{partnership}/evaluations', [ContractMonitoringController::class, 'storeEvaluation'])->name('contract-monitoring.evaluations.store');
+    Route::patch('/contract-monitoring/{partnership}/extend', [ContractMonitoringController::class, 'extendContract'])->name('contract-monitoring.extend');
+    Route::patch('/contract-monitoring/{partnership}/toggle-auto-order', [ContractMonitoringController::class, 'toggleAutoOrder'])->name('contract-monitoring.toggle-auto-order');
+    Route::patch('/contract-monitoring/{partnership}/status', [ContractMonitoringController::class, 'updateStatus'])->name('contract-monitoring.status.update');
 
     /* Skor Keandalan Mitra UMKM & Manajemen Fasilitas TOP */
     Route::get('/umkm/{umkmId}/reliability-score', [UmkmReliabilityController::class, 'show'])->name('umkm.reliability-score');
