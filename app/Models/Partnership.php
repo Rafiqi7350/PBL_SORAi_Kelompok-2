@@ -13,6 +13,12 @@ class Partnership extends Model
 {
     use HasFactory, HasUuids;
 
+    public const STATUS_ACTIVE = 'active';
+
+    public const STATUS_PAUSED = 'paused';
+
+    public const STATUS_TERMINATED = 'terminated';
+
     protected $fillable = [
         'umkm_id',
         'supplier_id',
@@ -78,5 +84,35 @@ class Partnership extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class, 'partnership_id');
+    }
+
+    public function evaluations(): HasMany
+    {
+        return $this->hasMany(PartnershipEvaluation::class, 'partnership_id')->latest('created_at');
+    }
+
+    public function latestEvaluation(): HasOne
+    {
+        return $this->hasOne(PartnershipEvaluation::class, 'partnership_id')->latest('created_at');
+    }
+
+    public function getContractCodeAttribute(): string
+    {
+        return 'CTR-'.strtoupper(substr((string) $this->id, 0, 8));
+    }
+
+    public function isActiveStatus(): bool
+    {
+        return in_array(strtolower((string) $this->status), ['active', 'approved', 'accepted', 'disetujui'], true);
+    }
+
+    public function isPausedStatus(): bool
+    {
+        return in_array(strtolower((string) $this->status), ['paused', 'suspended', 'ditangguhkan'], true);
+    }
+
+    public function isTerminatedStatus(): bool
+    {
+        return in_array(strtolower((string) $this->status), ['terminated', 'ended', 'completed', 'berakhir', 'dihentikan'], true);
     }
 }

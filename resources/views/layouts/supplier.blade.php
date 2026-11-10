@@ -73,7 +73,8 @@
                     Perencanaan Stok &amp; Demand
                 </a>
 
-                <a href="#" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:text-white hover:bg-gray-800 transition">
+                <a href="{{ route('supplier.contract-monitoring.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold transition
+                    {{ request()->routeIs('supplier.contract-monitoring.*') ? 'bg-[#ea580c] text-white shadow-md' : 'text-gray-400 hover:text-white hover:bg-gray-800' }}">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     Contract Monitoring
                 </a>
