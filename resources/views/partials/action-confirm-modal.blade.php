@@ -11,96 +11,101 @@
          x-transition:leave="transition ease-in duration-150"
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
-         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-midnight-ink/80 backdrop-blur-sm">
+         @click.self="cancel()"
+         role="dialog"
+         aria-modal="true"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/55 backdrop-blur-sm">
 
-        <!-- Card Dialog Box (Neo-Brutalist Aesthetic) -->
-        <div @click.away="cancel()"
-             x-show="isOpen"
+        <!-- Card Dialog Box -->
+        <div x-show="isOpen"
              x-transition:enter="transition ease-out duration-200"
-             x-transition:enter-start="opacity-0 scale-95 -translate-y-2"
+             x-transition:enter-start="opacity-0 scale-95 translate-y-2"
              x-transition:enter-end="opacity-100 scale-100 translate-y-0"
              x-transition:leave="transition ease-in duration-150"
              x-transition:leave-start="opacity-100 scale-100 translate-y-0"
-             x-transition:leave-end="opacity-0 scale-95 -translate-y-2"
-             class="bg-plaster-white rounded-card p-6 sm:p-7 max-w-md w-full border-4 border-midnight-ink shadow-[8px_8px_0px_0px_rgba(30,34,45,1)] relative text-center space-y-4">
+             x-transition:leave-end="opacity-0 scale-95 translate-y-2"
+             class="bg-white rounded-3xl px-6 py-7 sm:px-7 sm:py-8 max-w-[380px] w-full shadow-2xl border border-slate-100 relative text-center">
 
-            <!-- Tombol Tutup (X) -->
+            <!-- Tombol Tutup -->
             <button type="button"
                     @click="cancel()"
-                    class="absolute top-4 right-4 text-midnight-ink/50 hover:text-midnight-ink font-bold text-2xl leading-none cursor-pointer"
-                    title="Tutup">
-                &times;
+                    class="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer"
+                    aria-label="Tutup">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
             </button>
 
             <!-- Ikon Badge Sesuai Tindakan -->
-            <div class="w-16 h-16 rounded-2xl border-3 border-midnight-ink flex items-center justify-center mx-auto shadow-sm"
+            <div class="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
                  :class="{
-                     'bg-rose-100 text-rose-600': modalType === 'delete' || modalType === 'logout',
-                     'bg-amber-100 text-amber-700': modalType === 'edit' || modalType === 'warning',
-                     'bg-voltage-lime text-midnight-ink': modalType === 'create',
-                     'bg-emerald-100 text-emerald-700': modalType === 'verify'
+                     'bg-rose-50 text-rose-600': modalType === 'delete' || modalType === 'logout',
+                     'bg-amber-50 text-amber-600': modalType === 'edit' || modalType === 'warning',
+                     'bg-orange-50 text-[#ea580c]': modalType === 'create',
+                     'bg-emerald-50 text-emerald-600': modalType === 'verify'
                  }">
                 <!-- Icon Delete -->
                 <template x-if="modalType === 'delete'">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                 </template>
                 <!-- Icon Logout -->
                 <template x-if="modalType === 'logout'">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                     </svg>
                 </template>
-                <!-- Icon Edit -->
-                <template x-if="modalType === 'edit'">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2">
+                <!-- Icon Edit / Warning -->
+                <template x-if="modalType === 'edit' || modalType === 'warning'">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                     </svg>
                 </template>
                 <!-- Icon Create / Tambah -->
                 <template x-if="modalType === 'create'">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
                     </svg>
                 </template>
                 <!-- Icon Verify -->
                 <template x-if="modalType === 'verify'">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2">
+                    <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                     </svg>
                 </template>
             </div>
 
             <!-- Header Badge & Informasi Konfirmasi -->
-            <div class="space-y-1">
-                <span class="font-mono text-[10px] font-extrabold uppercase px-3 py-1 rounded-pill border-2 border-midnight-ink inline-block"
+            <div class="space-y-1.5">
+                <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full inline-block"
                       :class="{
-                          'bg-rose-200 text-rose-950': modalType === 'delete' || modalType === 'logout',
-                          'bg-amber-200 text-amber-950': modalType === 'edit' || modalType === 'warning',
-                          'bg-voltage-lime text-midnight-ink': modalType === 'create',
-                          'bg-emerald-200 text-emerald-950': modalType === 'verify'
+                          'bg-rose-50 text-rose-700': modalType === 'delete' || modalType === 'logout',
+                          'bg-amber-50 text-amber-700': modalType === 'edit' || modalType === 'warning',
+                          'bg-orange-50 text-[#c2410c]': modalType === 'create',
+                          'bg-emerald-50 text-emerald-700': modalType === 'verify'
                       }"
                       x-text="badgeText">
                 </span>
-                <h3 class="font-display font-extrabold text-xl sm:text-2xl text-midnight-ink uppercase pt-1" x-text="title"></h3>
-                <p class="text-xs sm:text-sm font-semibold text-midnight-ink/75 leading-relaxed pt-1" x-text="message"></p>
+                <h3 class="font-bold text-lg text-slate-900 tracking-tight leading-snug pt-0.5" x-text="title"></h3>
+                <p class="text-xs sm:text-[13px] text-slate-500 leading-relaxed max-w-[290px] mx-auto" x-text="message"></p>
             </div>
 
-            <!-- Tombol Aksi (Batal & Lanjutkan) -->
-            <div class="flex flex-col sm:flex-row items-center gap-3 pt-3">
+            <!-- Tombol Aksi -->
+            <div class="mt-6 grid grid-cols-2 gap-3">
                 <button type="button"
                         @click="cancel()"
-                        class="w-full sm:w-1/2 py-3 px-4 rounded-pill border-2 border-midnight-ink bg-gray-100 hover:bg-gray-200 text-midnight-ink font-bold text-xs sm:text-sm transition cursor-pointer">
+                        class="w-full py-2.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm transition cursor-pointer">
                     Batal
                 </button>
                 <button type="button"
                         @click="confirm()"
-                        class="w-full sm:w-1/2 py-3 px-4 rounded-pill border-2 border-midnight-ink font-extrabold text-xs sm:text-sm shadow-md hover:shadow-lg transition cursor-pointer"
+                        class="w-full py-2.5 px-4 rounded-xl font-semibold text-xs sm:text-sm shadow-xs transition cursor-pointer"
                         :class="{
                             'bg-rose-600 hover:bg-rose-700 text-white': modalType === 'delete' || modalType === 'logout',
-                            'bg-sun-orange hover:bg-amber-600 text-midnight-ink': modalType === 'edit' || modalType === 'create',
-                            'bg-emerald-500 hover:bg-emerald-600 text-white': modalType === 'verify'
+                            'bg-amber-600 hover:bg-amber-700 text-white': modalType === 'warning',
+                            'bg-[#ea580c] hover:bg-[#c2410c] text-white': modalType === 'edit' || modalType === 'create',
+                            'bg-emerald-600 hover:bg-emerald-700 text-white': modalType === 'verify'
                         }"
                         x-text="confirmText">
                 </button>
@@ -194,16 +199,22 @@
             // 1. Aksi Keluar (Logout)
             if (action.includes('logout') || form.dataset.confirmType === 'logout') {
                 e.preventDefault();
-                window.dispatchEvent(new CustomEvent('open-confirm-modal', {
-                    detail: {
-                        type: 'logout',
-                        badge: 'KONFIRMASI KELUAR',
-                        title: 'Apakah Anda Yakin Ingin Keluar?',
-                        message: 'Sesi akun Anda saat ini akan diakhiri. Anda perlu memasukkan email & kata sandi kembali untuk masuk ke sistem.',
-                        confirmText: 'Ya, Keluar Akun',
-                        form: form
-                    }
-                }));
+                if (document.getElementById('logout-modal-root')) {
+                    window.dispatchEvent(new CustomEvent('open-logout-modal', {
+                        detail: { form: form }
+                    }));
+                } else {
+                    window.dispatchEvent(new CustomEvent('open-confirm-modal', {
+                        detail: {
+                            type: 'logout',
+                            badge: 'KONFIRMASI KELUAR',
+                            title: 'Keluar dari akun?',
+                            message: 'Sesi aktif Anda akan berakhir dan Anda perlu masuk kembali untuk mengakses akun ini.',
+                            confirmText: 'Keluar',
+                            form: form
+                        }
+                    }));
+                }
                 return;
             }
 
