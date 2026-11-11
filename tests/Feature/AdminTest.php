@@ -13,7 +13,7 @@ class AdminTest extends TestCase
     public function test_unauthenticated_user_cannot_access_admin_dashboard(): void
     {
         $response = $this->get('/admin');
-        $response->assertRedirect('/admin/login');
+        $response->assertRedirect('/login');
     }
 
     public function test_non_admin_user_cannot_access_admin_dashboard(): void

@@ -15,7 +15,7 @@ class EnsureUserIsAdmin
     public function handle(Request $request, Closure $next): Response
     {
         if (! Auth::check()) {
-            return redirect()->route('admin.login')
+            return redirect()->route('login')
                 ->with('warning', 'Silakan masuk dengan akun Administrator untuk mengakses panel ini.');
         }
 

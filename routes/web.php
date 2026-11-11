@@ -4,17 +4,18 @@ use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\CommodityCategoryController;
 use App\Http\Controllers\Admin\CommodityController;
 use App\Http\Controllers\Admin\CommodityUnitController;
-use App\Http\Controllers\Auth\AdminLoginController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\PendingRegistrationController;
 use App\Http\Controllers\Auth\SupplierRegisterController;
 use App\Http\Controllers\Auth\UmkmRegisterController;
 use App\Http\Controllers\MidtransWebhookController;
+use App\Http\Controllers\ProfilePhotoController;
 use App\Http\Controllers\Supplier\ContractMonitoringController;
 use App\Http\Controllers\Supplier\KatalogSupplierController;
 use App\Http\Controllers\Supplier\PengajuanMasukController;
 use App\Http\Controllers\Supplier\PengirimanController as SupplierPengirimanController;
 use App\Http\Controllers\Supplier\RiwayatTransaksiController;
+use App\Http\Controllers\Supplier\SupplierAccountController;
 use App\Http\Controllers\Supplier\SupplierDashboardController;
 use App\Http\Controllers\Supplier\SupplyPlanningController as SupplierSupplyPlanningController;
 use App\Http\Controllers\Supplier\UmkmReliabilityController;
@@ -22,6 +23,7 @@ use App\Http\Controllers\Umkm\CollaborativeSupplyPlanningController;
 use App\Http\Controllers\Umkm\KatalogController;
 use App\Http\Controllers\Umkm\PemesananController;
 use App\Http\Controllers\Umkm\SupplierPerformanceController;
+use App\Http\Controllers\Umkm\UmkmAccountController;
 use App\Http\Middleware\EnsureUserIsAdmin;
 use App\Http\Middleware\EnsureUserIsSupplier;
 use App\Http\Middleware\EnsureUserIsUmkm;
@@ -50,11 +52,9 @@ Route::post('/register/umkm', [UmkmRegisterController::class, 'store'])->name('r
 Route::get('/register/pending', [PendingRegistrationController::class, 'index'])->name('register.pending');
 Route::get('/api/check-status', [PendingRegistrationController::class, 'checkStatus'])->name('api.check-status');
 
-/* Admin Guest Auth Routes */
+/* Admin Logout Route */
 Route::prefix('admin')->name('admin.')->group(function () {
-    Route::get('/login', [AdminLoginController::class, 'create'])->name('login');
-    Route::post('/login', [AdminLoginController::class, 'store'])->name('login.store');
-    Route::match(['get', 'post'], '/logout', [AdminLoginController::class, 'destroy'])->name('logout');
+    Route::match(['get', 'post'], '/logout', [LoginController::class, 'destroy'])->name('logout');
 });
 
 /* UMKM Routes */
@@ -80,7 +80,17 @@ Route::prefix('umkm')->name('umkm.')->middleware(EnsureUserIsUmkm::class)->group
     /* Indikator Performa Kerja Sama Pemasok (Supplier Performance Tracker) */
     Route::get('/suppliers/{supplierId}/performance', [SupplierPerformanceController::class, 'show'])->name('suppliers.performance');
     Route::post('/suppliers/{supplierId}/recalculate-performance', [SupplierPerformanceController::class, 'recalculate'])->name('suppliers.recalculate-performance');
+
+    /* Kelola Akun & Profil UMKM */
+    Route::get('/akun', [UmkmAccountController::class, 'edit'])->name('account.edit');
+    Route::put('/akun', [UmkmAccountController::class, 'updateProfile'])->name('account.update');
+    Route::put('/akun/password', [UmkmAccountController::class, 'updatePassword'])->name('account.password.update');
+    Route::put('/akun/foto', [UmkmAccountController::class, 'updatePhoto'])->name('account.photo.update');
+    Route::delete('/akun/foto', [UmkmAccountController::class, 'destroyPhoto'])->name('account.photo.destroy');
 });
+
+/* Authenticated Account Media Route */
+Route::get('/akun/foto/{user}', [ProfilePhotoController::class, 'show'])->middleware('auth')->name('account.photo.show');
 
 /* Supplier Routes */
 Route::prefix('supplier')->name('supplier.')->middleware(EnsureUserIsSupplier::class)->group(function () {
@@ -126,6 +136,13 @@ Route::prefix('supplier')->name('supplier.')->middleware(EnsureUserIsSupplier::c
     Route::get('/umkm/{umkmId}/reliability-score', [UmkmReliabilityController::class, 'show'])->name('umkm.reliability-score');
     Route::post('/umkm/{umkmId}/recalculate-score', [UmkmReliabilityController::class, 'recalculate'])->name('umkm.recalculate-score');
     Route::patch('/partnerships/{partnershipId}/credit-terms', [UmkmReliabilityController::class, 'updateCreditTerms'])->name('partnerships.update-credit-terms');
+
+    /* Kelola Akun & Profil Pemasok */
+    Route::get('/akun', [SupplierAccountController::class, 'edit'])->name('account.edit');
+    Route::put('/akun', [SupplierAccountController::class, 'updateProfile'])->name('account.update');
+    Route::put('/akun/password', [SupplierAccountController::class, 'updatePassword'])->name('account.password.update');
+    Route::put('/akun/foto', [SupplierAccountController::class, 'updatePhoto'])->name('account.photo.update');
+    Route::delete('/akun/foto', [SupplierAccountController::class, 'destroyPhoto'])->name('account.photo.destroy');
 });
 
 /* Admin Protected Routes (Master Data Komoditas, Kategori, Satuan Baku, User Moderasi) */

@@ -293,13 +293,15 @@ class AuthRegistrationTest extends TestCase
         ]);
     }
 
-    // Tampilkan halaman login
+    // Tampilkan halaman login tanpa opsi login administrator
     public function test_login_screen_can_be_rendered(): void
     {
         $response = $this->get('/login');
 
         $response->assertStatus(200);
         $response->assertViewIs('Auth.login');
+        $response->assertDontSee('Masuk sebagai Administrator Panel');
+        $response->assertDontSee('/admin/login');
     }
 
     // Login UMKM berhasil redirect ke katalog
@@ -481,16 +483,17 @@ class AuthRegistrationTest extends TestCase
         $this->assertNotNull($user->remember_token);
     }
 
-    // Tampilkan form login panel admin
-    public function test_admin_login_screen_can_be_rendered(): void
+    // Halaman login admin terpisah sudah dihapus
+    public function test_admin_login_route_is_removed_and_returns_not_found(): void
     {
-        $response = $this->get('/admin/login');
-
-        $response->assertStatus(200);
-        $response->assertViewIs('admin.auth.login');
+        $this->get('/admin/login')->assertNotFound();
+        $this->post('/admin/login', [
+            'email' => 'admin@sorai.id',
+            'password' => 'admin12345',
+        ])->assertNotFound();
     }
 
-    // Login admin berhasil redirect ke dashboard admin
+    // Login admin melalui halaman /login berhasil redirect ke dashboard admin
     public function test_admin_user_can_login_and_is_redirected_to_admin_dashboard(): void
     {
         $admin = User::create([
@@ -500,7 +503,7 @@ class AuthRegistrationTest extends TestCase
             'status' => 'active',
         ]);
 
-        $response = $this->post('/admin/login', [
+        $response = $this->post('/login', [
             'email' => 'admin@sorai.id',
             'password' => 'admin12345',
         ]);
@@ -509,52 +512,22 @@ class AuthRegistrationTest extends TestCase
         $this->assertAuthenticatedAs($admin);
     }
 
-    // User non-admin tidak boleh login lewat portal admin
-    public function test_non_admin_user_cannot_login_via_admin_login(): void
+    // Login admin ditolak jika status akun tidak aktif
+    public function test_inactive_admin_user_cannot_login(): void
     {
         User::create([
-            'email' => 'bukanadmin@example.com',
-            'password' => Hash::make('password123'),
-            'role' => 'umkm',
-            'status' => 'active',
-        ]);
-
-        $response = $this->post('/admin/login', [
-            'email' => 'bukanadmin@example.com',
-            'password' => 'password123',
-        ]);
-
-        $response->assertSessionHasErrors(['email']);
-        $this->assertGuest();
-    }
-
-    // Login admin ditolak jika password salah
-    public function test_admin_user_cannot_login_with_invalid_password(): void
-    {
-        User::create([
-            'email' => 'admin2@sorai.id',
-            'password' => Hash::make('passwordBenar'),
+            'email' => 'suspendedadmin@sorai.id',
+            'password' => Hash::make('admin12345'),
             'role' => 'admin',
-            'status' => 'active',
+            'status' => 'suspended',
         ]);
 
-        $response = $this->post('/admin/login', [
-            'email' => 'admin2@sorai.id',
-            'password' => 'passwordSalah',
-        ]);
-
-        $response->assertSessionHasErrors(['email']);
-        $this->assertGuest();
-    }
-
-    // Login admin ditolak jika email belum ada
-    public function test_admin_user_cannot_login_with_unregistered_email(): void
-    {
-        $response = $this->post('/admin/login', [
-            'email' => 'acak@sorai.id',
+        $response = $this->post('/login', [
+            'email' => 'suspendedadmin@sorai.id',
             'password' => 'admin12345',
         ]);
 
+        $response->assertRedirect(route('login'));
         $response->assertSessionHasErrors(['email']);
         $this->assertGuest();
     }
@@ -574,16 +547,16 @@ class AuthRegistrationTest extends TestCase
 
         $response = $this->post('/admin/logout');
 
-        $response->assertRedirect('/admin/login');
+        $response->assertRedirect('/');
         $this->assertGuest();
     }
 
-    // Guest dilarang masuk ke dashboard admin
-    public function test_unauthenticated_user_cannot_access_admin_dashboard_and_is_redirected_to_admin_login(): void
+    // Guest dilarang masuk ke dashboard admin dan diarahkan ke /login
+    public function test_unauthenticated_user_cannot_access_admin_dashboard_and_is_redirected_to_login(): void
     {
         $response = $this->get('/admin');
 
-        $response->assertRedirect(route('admin.login'));
+        $response->assertRedirect(route('login'));
     }
 
     // User UMKM dialihkan saat mencoba buka dashboard admin
@@ -603,8 +576,8 @@ class AuthRegistrationTest extends TestCase
         $response->assertRedirect(route('umkm.katalog.index'));
     }
 
-    // Admin yang sudah login diarahkan ke dashboard jika buka login lagi
-    public function test_authenticated_admin_visiting_login_page_is_redirected_to_dashboard(): void
+    // Admin yang sudah login melihat pintasan Panel Admin saat membuka /login
+    public function test_authenticated_admin_visiting_login_page_sees_admin_panel_shortcut(): void
     {
         $admin = User::create([
             'email' => 'adminloginpage@sorai.id',
@@ -615,8 +588,9 @@ class AuthRegistrationTest extends TestCase
 
         $this->actingAs($admin);
 
-        $response = $this->get('/admin/login');
+        $response = $this->get('/login');
 
-        $response->assertRedirect(route('admin.dashboard'));
+        $response->assertSee('Mode Admin');
+        $response->assertSee(route('admin.dashboard'), false);
     }
 }

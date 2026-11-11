@@ -21,9 +21,55 @@ class AdminDashboardController extends Controller
     {
         $currentTab = $request->query('tab', 'dashboard');
 
-        // 1. Users list with profiles (paginated for performance)
-        $dbUsers = User::with(['umkmProfile', 'supplierProfile'])
-            ->whereIn('role', ['umkm', 'supplier'])
+        $userSearch = trim((string) $request->query('user_search', ''));
+        $rawRoleFilter = strtoupper(trim((string) $request->query('user_role', 'ALL')));
+        $userFilterRole = match ($rawRoleFilter) {
+            'UMKM' => 'UMKM',
+            'PEMASOK', 'SUPPLIER' => 'PEMASOK',
+            default => 'ALL',
+        };
+        $rawStatusFilter = strtoupper(trim((string) $request->query('user_status', 'ALL')));
+        $userFilterStatus = match ($rawStatusFilter) {
+            'AKTIF', 'ACTIVE' => 'AKTIF',
+            'PENDING_VERIFIKASI', 'PENDING' => 'PENDING_VERIFIKASI',
+            'NONAKTIF', 'INACTIVE', 'SUSPENDED' => 'NONAKTIF',
+            default => 'ALL',
+        };
+
+        // 1. Users list with profiles (filtered & paginated for performance)
+        $usersQuery = User::with(['umkmProfile', 'supplierProfile'])
+            ->whereIn('role', ['umkm', 'supplier']);
+
+        if ($userFilterRole === 'UMKM') {
+            $usersQuery->where('role', 'umkm');
+        } elseif ($userFilterRole === 'PEMASOK') {
+            $usersQuery->where('role', 'supplier');
+        }
+
+        if ($userFilterStatus === 'AKTIF') {
+            $usersQuery->whereRaw("LOWER(COALESCE(status, '')) IN ('active', 'aktif')");
+        } elseif ($userFilterStatus === 'PENDING_VERIFIKASI') {
+            $usersQuery->whereRaw("LOWER(COALESCE(status, '')) IN ('pending', 'pending_verifikasi')");
+        } elseif ($userFilterStatus === 'NONAKTIF') {
+            $usersQuery->whereRaw("LOWER(COALESCE(status, '')) NOT IN ('active', 'aktif', 'pending', 'pending_verifikasi')");
+        }
+
+        if ($userSearch !== '') {
+            $searchTerm = '%'.mb_strtolower($userSearch).'%';
+            $usersQuery->where(function ($q) use ($searchTerm) {
+                $q->whereRaw('LOWER(email) LIKE ?', [$searchTerm])
+                    ->orWhereHas('umkmProfile', function ($pq) use ($searchTerm) {
+                        $pq->whereRaw('LOWER(business_name) LIKE ?', [$searchTerm])
+                            ->orWhereRaw('LOWER(owner_name) LIKE ?', [$searchTerm]);
+                    })
+                    ->orWhereHas('supplierProfile', function ($pq) use ($searchTerm) {
+                        $pq->whereRaw('LOWER(company_name) LIKE ?', [$searchTerm])
+                            ->orWhereRaw('LOWER(owner_name) LIKE ?', [$searchTerm]);
+                    });
+            });
+        }
+
+        $dbUsers = $usersQuery
             ->latest('created_at')
             ->paginate(10, ['*'], 'users_page')
             ->withQueryString();
@@ -32,6 +78,10 @@ class AdminDashboardController extends Controller
             $name = $u->role === 'supplier'
                 ? ($u->supplierProfile?->company_name ?? $u->supplierProfile?->owner_name ?? explode('@', $u->email)[0])
                 : ($u->umkmProfile?->business_name ?? $u->umkmProfile?->owner_name ?? explode('@', $u->email)[0]);
+
+            $ownerName = $u->role === 'supplier'
+                ? ($u->supplierProfile?->owner_name ?? '')
+                : ($u->umkmProfile?->owner_name ?? '');
 
             $phone = $u->role === 'supplier'
                 ? ($u->supplierProfile?->phone ?? '081987654321')
@@ -47,6 +97,7 @@ class AdminDashboardController extends Controller
                 'raw_id' => $u->id,
                 'id' => 'USR-'.sprintf('%03d', $u->id),
                 'name' => $name,
+                'search_text' => mb_strtolower(trim($name.' '.$ownerName.' '.$u->email)),
                 'type' => $u->role === 'supplier' ? 'PEMASOK' : 'UMKM',
                 'email' => $u->email,
                 'phone' => $phone,
@@ -280,6 +331,9 @@ class AdminDashboardController extends Controller
 
         return view('admin.dashboard', compact(
             'currentTab',
+            'userSearch',
+            'userFilterRole',
+            'userFilterStatus',
             'users',
             'totalUmkm',
             'activeUmkm',
