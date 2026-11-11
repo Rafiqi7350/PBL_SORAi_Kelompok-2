@@ -60,8 +60,9 @@
           sidebarHidden: (() => { try { return window.localStorage.getItem('sorai_admin_sidebar_hidden') === 'true'; } catch (e) { return false; } })(),
           adminTab: '{{ request()->query('tab', ($errors->any() ? 'master' : $currentTab)) }}',
           chartFilter: 'minggu',
-          userSearch: '',
-          userFilterRole: 'ALL',
+          userSearch: @js($userSearch),
+          userFilterRole: @js($userFilterRole),
+          userFilterStatus: @js($userFilterStatus),
           isCategoryModalOpen: {{ $errors->any() && old('symbol') === null ? 'true' : 'false' }},
           isUnitModalOpen: {{ $errors->any() && old('symbol') !== null ? 'true' : 'false' }},
           notification: '{{ session('success') ?? session('warning') ?? '' }}',
@@ -862,33 +863,72 @@
                     @endif
                 </div>
 
-                {{-- Search & Role Filter --}}
-                <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div class="relative flex-1">
-                        <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                        </span>
-                        <input
-                            type="text"
-                            x-model="userSearch"
-                            placeholder="Cari berdasarkan nama usaha, akun, atau email..."
-                            class="w-full pl-10 pr-4 py-2.5 text-xs font-medium bg-slate-50 rounded-xl border border-slate-200/90 focus:bg-white focus:outline-none focus:border-[#ea580c] focus:ring-2 focus:ring-orange-500/20 text-slate-900 transition"
-                        />
+                {{-- Search, Role & Account Status Filter --}}
+                <form method="GET"
+                      action="{{ route('admin.dashboard') }}"
+                      class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col xl:flex-row xl:items-center justify-between gap-3">
+                    <input type="hidden" name="tab" value="users">
+
+                    <div class="flex items-center gap-2 flex-1 min-w-0">
+                        <div class="relative flex-1 min-w-0">
+                            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                            </span>
+                            <input
+                                type="text"
+                                name="user_search"
+                                x-model="userSearch"
+                                value="{{ $userSearch }}"
+                                placeholder="Cari berdasarkan nama usaha, akun, atau email..."
+                                class="w-full pl-10 pr-4 py-2.5 text-xs font-medium bg-slate-50 rounded-xl border border-slate-200/90 focus:bg-white focus:outline-none focus:border-[#ea580c] focus:ring-2 focus:ring-orange-500/20 text-slate-900 transition"
+                            />
+                        </div>
+                        <button type="submit"
+                                class="px-3.5 py-2.5 rounded-xl bg-[#161922] hover:bg-slate-800 text-white text-xs font-semibold transition shrink-0 cursor-pointer">
+                            Cari
+                        </button>
                     </div>
 
-                    <div class="flex items-center gap-2.5 text-xs shrink-0">
-                        <span class="font-semibold text-slate-500">Tipe Akun:</span>
-                        <select
-                            x-model="userFilterRole"
-                            class="px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 font-semibold text-slate-700 focus:bg-white focus:outline-none focus:border-[#ea580c] focus:ring-2 focus:ring-orange-500/20 transition cursor-pointer">
-                            <option value="ALL">Semua Akun</option>
-                            <option value="UMKM">UMKM Kuliner</option>
-                            <option value="PEMASOK">Pemasok Bahan Baku</option>
-                        </select>
+                    <div class="flex flex-wrap items-center gap-2.5 text-xs shrink-0">
+                        <div class="flex items-center gap-2">
+                            <label for="user-filter-role" class="font-semibold text-slate-500 whitespace-nowrap">Tipe Akun:</label>
+                            <select
+                                id="user-filter-role"
+                                name="user_role"
+                                x-model="userFilterRole"
+                                @change="$nextTick(() => $el.form.submit())"
+                                class="px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 font-semibold text-slate-700 focus:bg-white focus:outline-none focus:border-[#ea580c] focus:ring-2 focus:ring-orange-500/20 transition cursor-pointer">
+                                <option value="ALL" @selected($userFilterRole === 'ALL')>Semua Akun</option>
+                                <option value="UMKM" @selected($userFilterRole === 'UMKM')>UMKM Kuliner</option>
+                                <option value="PEMASOK" @selected($userFilterRole === 'PEMASOK')>Pemasok Bahan Baku</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <label for="user-filter-status" class="font-semibold text-slate-500 whitespace-nowrap">Status Akun:</label>
+                            <select
+                                id="user-filter-status"
+                                name="user_status"
+                                x-model="userFilterStatus"
+                                @change="$nextTick(() => $el.form.submit())"
+                                class="px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 font-semibold text-slate-700 focus:bg-white focus:outline-none focus:border-[#ea580c] focus:ring-2 focus:ring-orange-500/20 transition cursor-pointer">
+                                <option value="ALL" @selected($userFilterStatus === 'ALL')>Semua Status</option>
+                                <option value="AKTIF" @selected($userFilterStatus === 'AKTIF')>Aktif</option>
+                                <option value="PENDING_VERIFIKASI" @selected($userFilterStatus === 'PENDING_VERIFIKASI')>Pending Verifikasi</option>
+                                <option value="NONAKTIF" @selected($userFilterStatus === 'NONAKTIF')>Nonaktif</option>
+                            </select>
+                        </div>
+
+                        @if($userSearch !== '' || $userFilterRole !== 'ALL' || $userFilterStatus !== 'ALL')
+                            <a href="{{ route('admin.dashboard', ['tab' => 'users']) }}"
+                               class="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 font-semibold transition">
+                                Reset
+                            </a>
+                        @endif
                     </div>
-                </div>
+                </form>
 
                 {{-- Table Moderasi Akun --}}
                 <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
@@ -907,7 +947,7 @@
                             <tbody class="divide-y divide-slate-100">
                                 @forelse($users as $u)
                                     <tr
-                                        x-show="(!userSearch || ('{{ strtolower($u['name']) }}'.includes(userSearch.toLowerCase()) || '{{ strtolower($u['email']) }}'.includes(userSearch.toLowerCase()))) && (userFilterRole === 'ALL' || userFilterRole === '{{ $u['type'] }}')"
+                                        x-show="(!userSearch || {{ \Illuminate\Support\Js::from($u['search_text']) }}.includes(userSearch.toLowerCase().trim())) && (userFilterRole === 'ALL' || userFilterRole === '{{ $u['type'] }}') && (userFilterStatus === 'ALL' || userFilterStatus === '{{ $u['status'] }}')"
                                         class="hover:bg-slate-50/70 transition-colors">
                                         <td class="py-4 px-5 font-semibold text-slate-600 tabular-nums">{{ $u['id'] }}</td>
                                         <td class="py-4 px-5 font-semibold text-[13px] text-slate-900">{{ $u['name'] }}</td>
@@ -965,7 +1005,13 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="px-6 py-12 text-center text-slate-400">Belum ada data pengguna mitra.</td>
+                                        <td colspan="6" class="px-6 py-12 text-center text-slate-400">
+                                            @if($userSearch !== '' || $userFilterRole !== 'ALL' || $userFilterStatus !== 'ALL')
+                                                Tidak ada akun pengguna yang sesuai dengan filter yang dipilih.
+                                            @else
+                                                Belum ada data pengguna mitra.
+                                            @endif
+                                        </td>
                                     </tr>
                                 @endforelse
                             </tbody>

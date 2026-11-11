@@ -41,10 +41,17 @@
 <body class="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between antialiased selection:bg-orange-100 selection:text-orange-900"
       x-data="{
           mobileNavOpen: false,
-          activeTab: (new URLSearchParams(window.location.search).get('tab') || 'katalog'),
+          profileMenuOpen: false,
+          mobileProfileMenuOpen: false,
+          activeTab: @if(request()->routeIs('umkm.katalog.index')) (new URLSearchParams(window.location.search).get('tab') || 'katalog') @else '' @endif,
           setTab(t) {
+              @if(!request()->routeIs('umkm.katalog.index'))
+                  window.location.href = '{{ route('umkm.katalog.index') }}?tab=' + encodeURIComponent(t);
+                  return;
+              @endif
               this.activeTab = t;
               this.mobileNavOpen = false;
+              this.mobileProfileMenuOpen = false;
               const url = new URL(window.location);
               url.searchParams.set('tab', t);
               window.history.replaceState({}, '', url);
@@ -82,44 +89,93 @@
                 </a>
 
                 {{-- Right Account & Utility Controls --}}
-                <div class="flex items-center gap-3 shrink-0">
+                <div class="flex items-center gap-2.5 sm:gap-3 shrink-0">
                     <span class="hidden lg:inline-flex items-center text-xs font-medium text-slate-400 tabular-nums">
                         {{ now()->locale('id')->translatedFormat('l, d M Y') }}
                     </span>
 
                     <span class="hidden lg:block h-4 w-px bg-slate-200"></span>
 
-                    {{-- UMKM Business Identity --}}
-                    <div class="hidden md:flex items-center gap-2.5 min-w-0">
-                        <div class="relative shrink-0">
-                            <span class="w-8 h-8 rounded-lg bg-[#161922] text-white text-xs font-bold flex items-center justify-center tracking-tight">
-                                {{ $umkmInitial }}
-                            </span>
-                            <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" title="Mitra UMKM Aktif"></span>
-                        </div>
-                        <div class="min-w-0 leading-tight">
-                            <p class="text-xs font-semibold text-slate-800 max-w-[160px] lg:max-w-[210px] truncate">{{ $umkmBusinessName }}</p>
-                            <p class="text-[11px] font-medium text-slate-400 max-w-[160px] lg:max-w-[210px] truncate">{{ $authUser?->email ?? 'Mitra Dapur UMKM' }}</p>
+                    {{-- UMKM Profile Dropdown --}}
+                    <div class="relative"
+                         @click.outside="profileMenuOpen = false"
+                         @keydown.escape.window="profileMenuOpen = false">
+                        <button type="button"
+                                @click="profileMenuOpen = !profileMenuOpen; mobileNavOpen = false"
+                                :aria-expanded="profileMenuOpen.toString()"
+                                aria-haspopup="menu"
+                                aria-label="Menu Akun {{ $umkmBusinessName }}"
+                                data-umkm-profile-trigger
+                                class="flex items-center gap-2 sm:gap-2.5 min-w-0 rounded-xl px-1.5 sm:px-2 py-1 border transition-colors cursor-pointer group"
+                                :class="profileMenuOpen ? 'bg-slate-100/90 border-slate-200/90' : 'border-transparent hover:bg-slate-100/75 hover:border-slate-200/70'">
+                            <div class="relative shrink-0">
+                                @if($authUser?->profile_photo_url)
+                                    <img src="{{ $authUser->profile_photo_url }}"
+                                         alt="Foto Profil {{ $umkmBusinessName }}"
+                                         class="w-8 h-8 rounded-lg object-cover border border-slate-200/80 bg-slate-100">
+                                @else
+                                    <span class="w-8 h-8 rounded-lg bg-[#161922] text-white text-xs font-bold flex items-center justify-center tracking-tight group-hover:bg-[#ea580c] transition-colors">
+                                        {{ $umkmInitial }}
+                                    </span>
+                                @endif
+                                <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+                            </div>
+                            <div class="hidden md:block min-w-0 text-left leading-tight">
+                                <p class="text-xs font-semibold text-slate-800 group-hover:text-[#ea580c] max-w-[160px] lg:max-w-[200px] truncate transition-colors">{{ $umkmBusinessName }}</p>
+                                <p class="text-[11px] font-medium text-slate-400 max-w-[160px] lg:max-w-[200px] truncate">{{ $authUser?->email ?? 'Mitra Dapur UMKM' }}</p>
+                            </div>
+                            <svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-transform duration-150 shrink-0"
+                                 :class="profileMenuOpen ? 'rotate-180 text-slate-600' : ''"
+                                 fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                            </svg>
+                        </button>
+
+                        {{-- Dropdown Menu --}}
+                        <div x-cloak
+                             x-show="profileMenuOpen"
+                             x-transition:enter="transition ease-out duration-150"
+                             x-transition:enter-start="opacity-0 scale-95 -translate-y-1"
+                             x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                             x-transition:leave="transition ease-in duration-100"
+                             x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+                             x-transition:leave-end="opacity-0 scale-95 -translate-y-1"
+                             role="menu"
+                             aria-label="Menu Profil Pengguna"
+                             data-umkm-profile-menu
+                             class="absolute right-0 mt-2 w-60 origin-top-right rounded-2xl bg-white border border-slate-200/90 shadow-lg shadow-slate-900/10 p-1.5 z-40">
+                            <div class="md:hidden px-3 py-2 mb-1 border-b border-slate-100">
+                                <p class="text-xs font-semibold text-slate-900 truncate">{{ $umkmBusinessName }}</p>
+                                <p class="text-[11px] font-medium text-slate-400 truncate mt-0.5">{{ $authUser?->email ?? 'Mitra Dapur UMKM' }}</p>
+                            </div>
+
+                            <a href="{{ route('umkm.account.edit') }}"
+                               @click="profileMenuOpen = false"
+                               role="menuitem"
+                               class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold transition-colors {{ request()->routeIs('umkm.account.*') ? 'bg-orange-50/90 text-[#c2410c]' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900' }}">
+                                <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('umkm.account.*') ? 'text-[#ea580c]' : 'text-slate-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                                </svg>
+                                <span>Kelola Akun</span>
+                            </a>
+
+                            <div class="my-1 border-t border-slate-100"></div>
+
+                            <button type="button"
+                                    @click="profileMenuOpen = false; $dispatch('open-logout-modal')"
+                                    role="menuitem"
+                                    class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-600 hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer text-left">
+                                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                                </svg>
+                                <span>Keluar</span>
+                            </button>
                         </div>
                     </div>
 
-                    <span class="hidden md:block h-5 w-px bg-slate-200/90"></span>
-
-                    {{-- Logout Button --}}
-                    <a href="{{ route('logout') }}"
-                       @click.prevent="$dispatch('open-logout-modal')"
-                       onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('open-logout-modal'));"
-                       class="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-rose-50/90 text-slate-600 hover:text-rose-600 border border-slate-200/90 hover:border-rose-200 text-xs font-semibold transition-colors cursor-pointer shrink-0"
-                       title="Keluar dari Akun">
-                        <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-                        </svg>
-                        <span>Keluar</span>
-                    </a>
-
                     {{-- Mobile Menu Toggle --}}
                     <button type="button"
-                            @click="mobileNavOpen = !mobileNavOpen"
+                            @click="mobileNavOpen = !mobileNavOpen; profileMenuOpen = false; if (!mobileNavOpen) mobileProfileMenuOpen = false"
                             class="md:hidden inline-flex items-center justify-center p-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 transition cursor-pointer"
                             aria-label="Toggle Menu Navigasi">
                         <svg x-show="!mobileNavOpen" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -233,16 +289,55 @@
              x-transition:leave-end="opacity-0 -translate-y-2"
              class="md:hidden border-t border-slate-200 bg-white px-4 py-4 space-y-3 shadow-lg">
 
-            <div class="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-200/80">
-                <div class="relative shrink-0">
-                    <span class="w-9 h-9 rounded-lg bg-[#161922] text-white text-xs font-bold flex items-center justify-center">
-                        {{ $umkmInitial }}
-                    </span>
-                    <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-slate-50"></span>
-                </div>
-                <div class="min-w-0 flex-1 leading-tight">
-                    <p class="text-xs font-bold text-slate-900 truncate">{{ $umkmBusinessName }}</p>
-                    <p class="text-[11px] font-medium text-slate-500 truncate mt-0.5">{{ $authUser?->email ?? 'Mitra UMKM Aktif' }}</p>
+            <div class="rounded-xl bg-slate-50 border border-slate-200/80 overflow-hidden">
+                <button type="button"
+                        @click="mobileProfileMenuOpen = !mobileProfileMenuOpen"
+                        :aria-expanded="mobileProfileMenuOpen.toString()"
+                        class="w-full flex items-center gap-3 p-3 text-left hover:bg-slate-100/70 transition-colors cursor-pointer">
+                    <div class="relative shrink-0">
+                        @if($authUser?->profile_photo_url)
+                            <img src="{{ $authUser->profile_photo_url }}"
+                                 alt="Foto Profil {{ $umkmBusinessName }}"
+                                 class="w-9 h-9 rounded-lg object-cover border border-slate-200/80 bg-slate-100">
+                        @else
+                            <span class="w-9 h-9 rounded-lg bg-[#161922] text-white text-xs font-bold flex items-center justify-center">
+                                {{ $umkmInitial }}
+                            </span>
+                        @endif
+                        <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-slate-50"></span>
+                    </div>
+                    <div class="min-w-0 flex-1 leading-tight">
+                        <p class="text-xs font-bold text-slate-900 truncate">{{ $umkmBusinessName }}</p>
+                        <p class="text-[11px] font-medium text-slate-500 truncate mt-0.5">{{ $authUser?->email ?? 'Mitra Dapur UMKM' }}</p>
+                    </div>
+                    <svg class="w-4 h-4 text-slate-400 transition-transform duration-150 shrink-0"
+                         :class="mobileProfileMenuOpen ? 'rotate-180 text-slate-600' : ''"
+                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                    </svg>
+                </button>
+
+                <div x-cloak
+                     x-show="mobileProfileMenuOpen"
+                     x-transition
+                     class="border-t border-slate-200/80 bg-white p-1.5 space-y-1">
+                    <a href="{{ route('umkm.account.edit') }}"
+                       @click="mobileNavOpen = false; mobileProfileMenuOpen = false"
+                       class="w-full py-2 px-3 rounded-lg text-xs font-semibold flex items-center gap-2.5 transition-colors {{ request()->routeIs('umkm.account.*') ? 'bg-orange-50 text-[#c2410c]' : 'text-slate-700 hover:bg-slate-50' }}">
+                        <svg class="w-4 h-4 shrink-0 {{ request()->routeIs('umkm.account.*') ? 'text-[#ea580c]' : 'text-slate-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                        </svg>
+                        <span>Kelola Akun</span>
+                    </a>
+
+                    <button type="button"
+                            @click="mobileNavOpen = false; mobileProfileMenuOpen = false; $dispatch('open-logout-modal')"
+                            class="w-full py-2 px-3 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors cursor-pointer text-left">
+                        <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                        </svg>
+                        <span>Keluar</span>
+                    </button>
                 </div>
             </div>
 
@@ -297,18 +392,6 @@
                     <span>Monitoring &amp; SLA</span>
                 </button>
             </nav>
-
-            <div class="pt-2 border-t border-slate-100">
-                <a href="{{ route('logout') }}"
-                   @click.prevent="mobileNavOpen = false; $dispatch('open-logout-modal')"
-                   onclick="event.preventDefault(); window.dispatchEvent(new CustomEvent('open-logout-modal'));"
-                   class="w-full py-2.5 px-3.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-                    </svg>
-                    <span>Keluar dari Akun</span>
-                </a>
-            </div>
         </div>
     </header>
 

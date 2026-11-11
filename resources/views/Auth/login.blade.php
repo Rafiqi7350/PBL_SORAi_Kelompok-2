@@ -67,6 +67,10 @@
                             <a href="{{ route('umkm.katalog.index') }}" class="flex-1 bg-[#ea580c] text-white text-center py-1.5 rounded-full font-bold text-[11px]">
                                 Ke Dashboard UMKM →
                             </a>
+                        @elseif($activeUser->role === 'admin')
+                            <a href="{{ route('admin.dashboard') }}" class="flex-1 bg-slate-900 text-white text-center py-1.5 rounded-full font-bold text-[11px]">
+                                Ke Panel Admin →
+                            </a>
                         @endif
                         <a href="{{ route('logout') }}"
                            @click.prevent="$dispatch('open-logout-modal')"
@@ -83,6 +87,13 @@
                 <div class="mb-4 p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-semibold flex items-center gap-2">
                     <span>✓</span>
                     <span>{{ session('success') }}</span>
+                </div>
+            @endif
+
+            @if (session('warning'))
+                <div class="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2">
+                    <span>!</span>
+                    <span>{{ session('warning') }}</span>
                 </div>
             @endif
 
@@ -168,18 +179,13 @@
                 </button>
 
                 <!-- Footer Tautan Pendaftaran -->
-                <div class="pt-4 border-t border-gray-100 text-center space-y-2">
+                <div class="pt-4 border-t border-gray-100 text-center">
                     <p class="text-[11px] text-gray-500 font-medium">
                         Belum memiliki akun?
                         <a href="{{ route('register.umkm') }}" class="font-bold text-gray-900 hover:underline ml-1">Daftar UMKM</a>
                         atau
                         <a href="{{ route('register.supplier') }}" class="font-bold text-gray-900 hover:underline">Daftar Pemasok</a>
                     </p>
-                    <div>
-                        <a href="{{ route('admin.login') }}" class="text-[10px] font-mono text-gray-400 hover:text-gray-700 transition">
-                            🛡️ Masuk sebagai Administrator Panel
-                        </a>
-                    </div>
                 </div>
 
             </form>
