@@ -88,7 +88,7 @@ class PemesananController extends Controller
             ]);
         });
 
-        return redirect()->route('umkm.katalog.index', ['tab' => 'pemesanan', 'subtab' => 'confirm'])
+        return redirect()->route('umkm.katalog.index', ['tab' => 'pemesanan', 'subtab' => 'auto-order'])
             ->with('success', '✓ Pesanan otomatis berhasil diterbitkan ke Pemasok! Pesanan telah masuk ke daftar pengiriman mitra pemasok.');
     }
 

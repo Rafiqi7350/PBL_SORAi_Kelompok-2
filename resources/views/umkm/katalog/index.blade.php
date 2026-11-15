@@ -147,14 +147,7 @@
                 var self = this;
                 if (this.isAnyModalOpen()) {
                     this.hasPendingSync = true;
-                    if (typeof this.notify === 'function') {
-                        this.notify('Pembaruan data masuk terdeteksi. Sistem akan menyinkronkan data secara otomatis saat Anda selesai.');
-                    }
                     return;
-                }
-
-                if (typeof this.notify === 'function') {
-                    this.notify('Data baru terdeteksi! Memperbarui tampilan...');
                 }
 
                 setTimeout(function() {
@@ -392,23 +385,241 @@
                 this.orders.unshift(newOrd);
                 this.previewAutoOrder = null;
                 this.notify('✓ Pesanan berhasil diterbitkan untuk hari ini! Jadwal penerbitan selanjutnya: ' + nextText);
-                this.orderSubTab = 'confirm';
+                this.orderSubTab = 'auto-order';
             },
 
             confirmGoodsReceived: function(orderId) {
-                // Buka modal konfirmasi dengan upload foto (terhubung ke DB)
+                this.openConfirmModal(orderId);
+            },
+
+            openConfirmModal: function(orderId) {
+                this.stopCamera();
+                this.resetConfirmPhoto();
                 this.confirmingOrderId = orderId;
-                this.confirmPhotoPreview = null;
                 this.confirmNotes = '';
+            },
+
+            closeConfirmModal: function() {
+                this.stopCamera();
+                this.confirmingOrderId = null;
+                this.resetConfirmPhoto();
+            },
+
+            openConfirmBackorderModal: function(orderId) {
+                this.stopCamera();
+                this.resetConfirmBackorderPhoto();
+                this.confirmingBackorderId = orderId;
+                this.confirmBackorderNotes = '';
+            },
+
+            closeConfirmBackorderModal: function() {
+                this.stopCamera();
+                this.confirmingBackorderId = null;
+                this.resetConfirmBackorderPhoto();
             },
 
             confirmingOrderId: null,
             confirmPhotoPreview: null,
+            confirmPhotoSource: null,
             confirmNotes: '',
 
             confirmingBackorderId: null,
             confirmBackorderPhotoPreview: null,
+            confirmBackorderPhotoSource: null,
             confirmBackorderNotes: '',
+
+            cameraActive: false,
+            cameraTarget: null,
+            cameraStream: null,
+            cameraError: null,
+            isTakingPhoto: false,
+
+            startCamera: async function(target) {
+                var self = this;
+                self.cameraTarget = target;
+                self.cameraError = null;
+                self.isTakingPhoto = false;
+
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    if (target === 'batch1' && self.$refs.cameraInput) {
+                        self.$refs.cameraInput.click();
+                    } else if (target === 'batch2' && self.$refs.cameraBackorderInput) {
+                        self.$refs.cameraBackorderInput.click();
+                    } else {
+                        alert('Perangkat Anda tidak mendukung akses kamera langsung pada browser ini.');
+                    }
+                    return;
+                }
+
+                self.stopCamera();
+
+                try {
+                    var constraints = {
+                        video: {
+                            facingMode: { ideal: 'environment' },
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        },
+                        audio: false
+                    };
+
+                    var stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    self.cameraStream = stream;
+                    self.cameraActive = true;
+                    self.cameraTarget = target;
+
+                    self.$nextTick(function() {
+                        var videoId = target === 'batch1' ? 'cameraVideoBatch1' : 'cameraVideoBatch2';
+                        var videoEl = document.getElementById(videoId);
+                        if (videoEl) {
+                            videoEl.srcObject = stream;
+                            videoEl.play().catch(function(e) {
+                                console.warn('Video play catch:', e);
+                            });
+                        }
+                    });
+                } catch (err) {
+                    console.warn('Akses kamera tidak diizinkan atau gagal:', err);
+                    self.cameraActive = false;
+                    self.cameraStream = null;
+                    self.cameraTarget = null;
+                    
+                    if (target === 'batch1' && self.$refs.cameraInput) {
+                        self.$refs.cameraInput.click();
+                    } else if (target === 'batch2' && self.$refs.cameraBackorderInput) {
+                        self.$refs.cameraBackorderInput.click();
+                    } else {
+                        alert('Tidak dapat mengakses kamera. Pastikan izin kamera telah diizinkan di browser Anda.');
+                    }
+                }
+            },
+
+            captureCameraPhoto: function(target) {
+                var self = this;
+                var videoId = target === 'batch1' ? 'cameraVideoBatch1' : 'cameraVideoBatch2';
+                var videoEl = document.getElementById(videoId);
+
+                if (!videoEl || !videoEl.videoWidth || !videoEl.videoHeight) {
+                    alert('Kamera sedang memuat, silakan tunggu sebentar lalu tekan jepret lagi.');
+                    return;
+                }
+
+                self.isTakingPhoto = true;
+
+                try {
+                    var canvas = document.createElement('canvas');
+                    canvas.width = videoEl.videoWidth;
+                    canvas.height = videoEl.videoHeight;
+                    var ctx = canvas.getContext('2d');
+                    ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+
+                    canvas.toBlob(function(blob) {
+                        if (!blob) {
+                            alert('Gagal mengambil gambar dari kamera.');
+                            self.isTakingPhoto = false;
+                            return;
+                        }
+
+                        var fileName = 'bukti_kamera_' + Date.now() + '.jpg';
+                        var file = new File([blob], fileName, { type: 'image/jpeg' });
+
+                        if (target === 'batch1') {
+                            self.confirmPhotoPreview = URL.createObjectURL(blob);
+                            self.confirmPhotoSource = 'camera';
+                            if (window.DataTransfer && self.$refs.photoInput) {
+                                try {
+                                    var dt = new DataTransfer();
+                                    dt.items.add(file);
+                                    self.$refs.photoInput.files = dt.files;
+                                } catch (e) {
+                                    console.warn('DataTransfer error:', e);
+                                }
+                            }
+                        } else {
+                            self.confirmBackorderPhotoPreview = URL.createObjectURL(blob);
+                            self.confirmBackorderPhotoSource = 'camera';
+                            if (window.DataTransfer && self.$refs.photoBackorderInput) {
+                                try {
+                                    var dt = new DataTransfer();
+                                    dt.items.add(file);
+                                    self.$refs.photoBackorderInput.files = dt.files;
+                                } catch (e) {
+                                    console.warn('DataTransfer error:', e);
+                                }
+                            }
+                        }
+
+                        self.stopCamera();
+                        self.isTakingPhoto = false;
+                    }, 'image/jpeg', 0.88);
+                } catch (e) {
+                    console.error('Capture error:', e);
+                    self.isTakingPhoto = false;
+                    alert('Gagal memproses gambar kamera.');
+                }
+            },
+
+            stopCamera: function() {
+                if (this.cameraStream) {
+                    this.cameraStream.getTracks().forEach(function(track) {
+                        try {
+                            track.stop();
+                        } catch (e) {}
+                    });
+                    this.cameraStream = null;
+                }
+                this.cameraActive = false;
+                this.cameraTarget = null;
+                this.isTakingPhoto = false;
+            },
+
+            onPhotoPicked: function(event, source) {
+                var file = event.target.files[0];
+                if (file) {
+                    this.confirmPhotoPreview = URL.createObjectURL(file);
+                    this.confirmPhotoSource = source;
+                    if (window.DataTransfer && this.$refs.photoInput) {
+                        try {
+                            var dt = new DataTransfer();
+                            dt.items.add(file);
+                            this.$refs.photoInput.files = dt.files;
+                        } catch (e) {}
+                    }
+                }
+            },
+
+            resetConfirmPhoto: function() {
+                this.stopCamera();
+                this.confirmPhotoPreview = null;
+                this.confirmPhotoSource = null;
+                if (this.$refs.photoInput) this.$refs.photoInput.value = '';
+                if (this.$refs.cameraInput) this.$refs.cameraInput.value = '';
+                if (this.$refs.galleryInput) this.$refs.galleryInput.value = '';
+            },
+
+            onBackorderPhotoPicked: function(event, source) {
+                var file = event.target.files[0];
+                if (file) {
+                    this.confirmBackorderPhotoPreview = URL.createObjectURL(file);
+                    this.confirmBackorderPhotoSource = source;
+                    if (window.DataTransfer && this.$refs.photoBackorderInput) {
+                        try {
+                            var dt = new DataTransfer();
+                            dt.items.add(file);
+                            this.$refs.photoBackorderInput.files = dt.files;
+                        } catch (e) {}
+                    }
+                }
+            },
+
+            resetConfirmBackorderPhoto: function() {
+                this.stopCamera();
+                this.confirmBackorderPhotoPreview = null;
+                this.confirmBackorderPhotoSource = null;
+                if (this.$refs.photoBackorderInput) this.$refs.photoBackorderInput.value = '';
+                if (this.$refs.cameraBackorderInput) this.$refs.cameraBackorderInput.value = '';
+                if (this.$refs.galleryBackorderInput) this.$refs.galleryBackorderInput.value = '';
+            },
 
             onConfirmPhotoChange: function(event) {
                 var file = event.target.files[0];
@@ -2262,7 +2473,7 @@
                                         @elseif(! $isBatch1Confirmed)
                                             <button
                                                 type="button"
-                                                @click="confirmingOrderId = '{{ $dbOrder->id }}'; confirmPhotoPreview = null; confirmNotes = '';"
+                                                @click="openConfirmModal('{{ $dbOrder->id }}')"
                                                 class="bg-[#ea580c] hover:bg-[#c2410c] text-white px-3.5 py-2 rounded-xl font-semibold text-[11px] shadow-xs transition cursor-pointer whitespace-nowrap inline-flex items-center gap-1.5">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                                 @if($batch1 && $batch1->backorder_action === 'create_backorder')
@@ -2274,7 +2485,7 @@
                                         @elseif($batch1 && $batch1->backorder_action === 'create_backorder' && $isBatch2Shipped && ! $isBatch2Confirmed)
                                             <button
                                                 type="button"
-                                                @click="confirmingBackorderId = '{{ $dbOrder->id }}'; confirmBackorderPhotoPreview = null; confirmBackorderNotes = '';"
+                                                @click="openConfirmBackorderModal('{{ $dbOrder->id }}')"
                                                 class="bg-amber-500 hover:bg-amber-600 text-white px-3.5 py-2 rounded-xl font-semibold text-[11px] shadow-xs transition cursor-pointer whitespace-nowrap animate-pulse inline-flex items-center gap-1.5">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                                 <span>Konfirmasi Sisa Backorder (Kloter 2)</span>
@@ -2320,14 +2531,14 @@
 
         <!-- MODAL KONFIRMASI PENERIMAAN BATCH 1 + UPLOAD FOTO (TERHUBUNG DATABASE) -->
         <div x-cloak x-show="confirmingOrderId" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div @click.away="confirmingOrderId = null" class="bg-white max-w-lg w-full rounded-2xl p-6 space-y-5 shadow-xl border border-slate-200/80">
+            <div @click.away="closeConfirmModal()" class="bg-white max-w-lg w-full rounded-2xl p-6 space-y-5 shadow-xl border border-slate-200/80">
                 <div class="flex justify-between items-start border-b border-slate-100 pb-4">
                     <div>
                         <span class="text-[11px] font-bold text-[#ea580c] uppercase tracking-wider">Konfirmasi Penerimaan Fisik Batch 1</span>
                         <h3 class="text-lg font-bold text-slate-900 mt-1">Upload Bukti Penerimaan Dapur</h3>
                         <p class="text-xs text-slate-500 mt-0.5">Foto barang kloter pertama yang sudah tiba di dapur Anda sebagai bukti konfirmasi resmi.</p>
                     </div>
-                    <button type="button" @click="confirmingOrderId = null" class="text-slate-400 hover:text-slate-700 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                    <button type="button" @click="closeConfirmModal()" class="text-slate-400 hover:text-slate-700 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
 
                 <template x-if="confirmingOrderId">
@@ -2336,32 +2547,125 @@
 
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-2">Foto Bukti Penerimaan Barang Batch 1 <span class="text-rose-500">*</span></label>
-                            <div class="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center cursor-pointer hover:border-[#ea580c] bg-slate-50/50 transition"
-                                 @click="$refs.photoInput.click()">
-                                <template x-if="!confirmPhotoPreview">
-                                    <div class="space-y-2 py-3">
-                                        <div class="w-11 h-11 mx-auto rounded-xl bg-orange-50 border border-orange-200/70 flex items-center justify-center text-[#ea580c]">
-                                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            </svg>
+                            
+                            <div class="space-y-3">
+                                <!-- State 1: Pilihan Foto Kamera atau Galeri (sebelum ada foto) -->
+                                <template x-if="!confirmPhotoPreview && (!cameraActive || cameraTarget !== 'batch1')">
+                                    <div class="space-y-2.5">
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <!-- Tombol 1: Buka Kamera Langsung (Webcam / HP) -->
+                                            <button 
+                                                type="button" 
+                                                @click="startCamera('batch1')"
+                                                class="p-4 rounded-xl border border-slate-200/90 hover:border-[#ea580c] bg-slate-50/60 hover:bg-orange-50/40 text-center transition flex flex-col items-center justify-center gap-2 group cursor-pointer shadow-2xs">
+                                                <div class="w-11 h-11 rounded-xl bg-orange-100 text-[#ea580c] group-hover:scale-110 flex items-center justify-center transition">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    </svg>
+                                                </div>
+                                                <span class="text-xs font-bold text-slate-800 group-hover:text-[#ea580c] transition block">Foto Kamera</span>
+                                                <span class="text-[10px] text-slate-400 block -mt-1">Nyalakan kamera &amp; jepret langsung</span>
+                                            </button>
+
+                                            <!-- Tombol 2: Pilih dari Galeri File -->
+                                            <button 
+                                                type="button" 
+                                                @click="confirmPhotoSource = 'gallery'; $refs.galleryInput.click()"
+                                                class="p-4 rounded-xl border border-slate-200/90 hover:border-[#ea580c] bg-slate-50/60 hover:bg-orange-50/40 text-center transition flex flex-col items-center justify-center gap-2 group cursor-pointer shadow-2xs">
+                                                <div class="w-11 h-11 rounded-xl bg-sky-100 text-sky-700 group-hover:scale-110 flex items-center justify-center transition">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                    </svg>
+                                                </div>
+                                                <span class="text-xs font-bold text-slate-800 group-hover:text-[#ea580c] transition block">Pilih Galeri</span>
+                                                <span class="text-[10px] text-slate-400 block -mt-1">Dari galeri foto perangkat</span>
+                                            </button>
                                         </div>
-                                        <p class="text-xs text-slate-700 font-semibold">Klik untuk pilih foto atau seret ke sini</p>
-                                        <p class="text-[11px] text-slate-400">JPG, PNG, WEBP — Maks. 5MB</p>
+                                        <p class="text-[11px] text-slate-400 text-center">Format: JPG, PNG, WEBP &bull; Maks. 5MB</p>
                                     </div>
                                 </template>
+
+                                <!-- State 2: Viewfinder Kamera Langsung Aktif -->
+                                <template x-if="cameraActive && cameraTarget === 'batch1'">
+                                    <div class="space-y-3 bg-slate-900 rounded-2xl p-3 border border-slate-800 text-white shadow-inner">
+                                        <div class="relative rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center border border-white/10">
+                                            <video id="cameraVideoBatch1" autoplay playsinline muted class="w-full h-full object-cover"></video>
+                                            <div class="absolute inset-4 border-2 border-dashed border-white/40 rounded-lg pointer-events-none flex items-center justify-center">
+                                                <span class="text-[11px] font-medium text-white/90 bg-black/60 px-2.5 py-1 rounded-md backdrop-blur-xs">Arahkan kamera ke barang penerimaan</span>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between gap-2 px-1">
+                                            <button 
+                                                type="button" 
+                                                @click="stopCamera()" 
+                                                class="text-xs font-semibold text-slate-300 hover:text-white bg-white/10 hover:bg-white/20 px-3.5 py-2 rounded-xl transition cursor-pointer">
+                                                ✕ Batal Kamera
+                                            </button>
+                                            <button 
+                                                type="button" 
+                                                @click="captureCameraPhoto('batch1')" 
+                                                :disabled="isTakingPhoto"
+                                                class="text-xs font-bold text-white bg-[#ea580c] hover:bg-[#c2410c] px-4 py-2 rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50">
+                                                <svg class="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                                <span x-text="isTakingPhoto ? 'Mengambil...' : '📸 Jepret Foto'"></span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <!-- State 3: Foto Sudah Tersedia (Preview) -->
                                 <template x-if="confirmPhotoPreview">
-                                    <img :src="confirmPhotoPreview" class="max-h-48 mx-auto rounded-xl object-contain" alt="Preview">
+                                    <div class="space-y-3">
+                                        <div class="relative rounded-2xl overflow-hidden border border-slate-200/90 bg-slate-900/5 p-2 text-center">
+                                            <img :src="confirmPhotoPreview" class="max-h-52 mx-auto rounded-xl object-contain shadow-xs" alt="Bukti Penerimaan">
+                                            <span class="absolute top-4 left-4 text-[10px] font-bold px-2.5 py-1 rounded-lg text-white shadow-xs backdrop-blur-md"
+                                                  :class="confirmPhotoSource === 'camera' ? 'bg-[#ea580c]/90' : 'bg-sky-600/90'"
+                                                  x-text="confirmPhotoSource === 'camera' ? '📸 Dari Kamera' : '🖼️ Dari Galeri'">
+                                            </span>
+                                        </div>
+                                        <div class="flex items-center justify-center gap-2">
+                                            <button type="button" @click="startCamera('batch1')" class="text-[11px] font-semibold text-slate-600 hover:text-[#ea580c] bg-slate-100 hover:bg-orange-50 px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1 cursor-pointer">
+                                                <span>📸 Foto Ulang Kamera</span>
+                                            </button>
+                                            <button type="button" @click="confirmPhotoSource = 'gallery'; $refs.galleryInput.click()" class="text-[11px] font-semibold text-slate-600 hover:text-sky-600 bg-slate-100 hover:bg-sky-50 px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1 cursor-pointer">
+                                                <span>🖼️ Ganti Galeri</span>
+                                            </button>
+                                            <button type="button" @click="resetConfirmPhoto()" class="text-[11px] font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1 cursor-pointer">
+                                                <span>✕ Hapus</span>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </template>
                             </div>
+
+                            <!-- Input Kamera Fallback (capture="environment") -->
                             <input
                                 type="file"
-                                name="proof_photo"
-                                required
+                                :name="confirmPhotoSource === 'camera_file' ? 'proof_photo' : ''"
+                                accept="image/*"
+                                capture="environment"
+                                x-ref="cameraInput"
+                                class="hidden"
+                                @change="onPhotoPicked($event, 'camera_file')">
+
+                            <!-- Input Galeri Foto (tanpa capture) -->
+                            <input
+                                type="file"
+                                :name="confirmPhotoSource === 'gallery' ? 'proof_photo' : ''"
+                                accept="image/*"
+                                x-ref="galleryInput"
+                                class="hidden"
+                                @change="onPhotoPicked($event, 'gallery')">
+
+                            <!-- Input Form Utama (Menerima file dari capture live camera atau fallback) -->
+                            <input
+                                type="file"
+                                :name="confirmPhotoSource === 'camera' || !confirmPhotoSource ? 'proof_photo' : ''"
                                 accept="image/*"
                                 x-ref="photoInput"
                                 class="hidden"
-                                @change="onConfirmPhotoChange($event)">
+                                :required="!confirmPhotoPreview">
                         </div>
 
                         <div>
@@ -2376,7 +2680,7 @@
                         </div>
 
                         <div class="flex gap-3 pt-2">
-                            <button type="button" @click="confirmingOrderId = null"
+                            <button type="button" @click="closeConfirmModal()"
                                 class="w-1/2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer">
                                 Batal
                             </button>
@@ -2742,14 +3046,14 @@
 
         <!-- MODAL KONFIRMASI TERIMA SISA BACKORDER (BATCH 2) -->
         <div x-cloak x-show="confirmingBackorderId" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-            <div @click.away="confirmingBackorderId = null" class="bg-white max-w-lg w-full rounded-2xl p-6 space-y-5 shadow-xl border border-slate-200/80">
+            <div @click.away="closeConfirmBackorderModal()" class="bg-white max-w-lg w-full rounded-2xl p-6 space-y-5 shadow-xl border border-slate-200/80">
                 <div class="flex justify-between items-start border-b border-slate-100 pb-4">
                     <div>
                         <span class="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Konfirmasi Sisa Backorder (Batch 2)</span>
                         <h3 class="text-lg font-bold text-slate-900 mt-1">Upload Bukti Penerimaan Batch 2</h3>
                         <p class="text-xs text-slate-500 mt-0.5">Pastikan sisa barang pasokan telah Anda terima dengan baik di dapur.</p>
                     </div>
-                    <button type="button" @click="confirmingBackorderId = null" class="text-slate-400 hover:text-slate-700 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
+                    <button type="button" @click="closeConfirmBackorderModal()" class="text-slate-400 hover:text-slate-700 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg></button>
                 </div>
 
                 <template x-if="confirmingBackorderId">
@@ -2758,32 +3062,125 @@
 
                         <div>
                             <label class="block text-xs font-semibold text-slate-700 mb-2">Foto Bukti Penerimaan Sisa Backorder <span class="text-rose-500">*</span></label>
-                            <div class="border-2 border-dashed border-slate-200 rounded-xl p-4 text-center cursor-pointer hover:border-amber-500 bg-slate-50/50 transition"
-                                 @click="$refs.photoBackorderInput.click()">
-                                <template x-if="!confirmBackorderPhotoPreview">
-                                    <div class="space-y-2 py-3">
-                                        <div class="w-11 h-11 mx-auto rounded-xl bg-amber-50 border border-amber-200/70 flex items-center justify-center text-amber-600">
-                                            <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                                            </svg>
+                            
+                            <div class="space-y-3">
+                                <!-- State 1: Pilihan Foto Kamera atau Galeri (sebelum ada foto) -->
+                                <template x-if="!confirmBackorderPhotoPreview && (!cameraActive || cameraTarget !== 'batch2')">
+                                    <div class="space-y-2.5">
+                                        <div class="grid grid-cols-2 gap-3">
+                                            <!-- Tombol 1: Buka Kamera Langsung (Webcam / HP) -->
+                                            <button 
+                                                type="button" 
+                                                @click="startCamera('batch2')"
+                                                class="p-4 rounded-xl border border-slate-200/90 hover:border-amber-500 bg-slate-50/60 hover:bg-amber-50/40 text-center transition flex flex-col items-center justify-center gap-2 group cursor-pointer shadow-2xs">
+                                                <div class="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 group-hover:scale-110 flex items-center justify-center transition">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    </svg>
+                                                </div>
+                                                <span class="text-xs font-bold text-slate-800 group-hover:text-amber-700 transition block">Foto Kamera</span>
+                                                <span class="text-[10px] text-slate-400 block -mt-1">Nyalakan kamera &amp; jepret langsung</span>
+                                            </button>
+
+                                            <!-- Tombol 2: Pilih dari Galeri File -->
+                                            <button 
+                                                type="button" 
+                                                @click="confirmBackorderPhotoSource = 'gallery'; $refs.galleryBackorderInput.click()"
+                                                class="p-4 rounded-xl border border-slate-200/90 hover:border-amber-500 bg-slate-50/60 hover:bg-amber-50/40 text-center transition flex flex-col items-center justify-center gap-2 group cursor-pointer shadow-2xs">
+                                                <div class="w-11 h-11 rounded-xl bg-sky-100 text-sky-700 group-hover:scale-110 flex items-center justify-center transition">
+                                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                    </svg>
+                                                </div>
+                                                <span class="text-xs font-bold text-slate-800 group-hover:text-amber-700 transition block">Pilih Galeri</span>
+                                                <span class="text-[10px] text-slate-400 block -mt-1">Dari galeri foto perangkat</span>
+                                            </button>
                                         </div>
-                                        <p class="text-xs text-slate-700 font-semibold">Pilih foto penerimaan Batch 2</p>
-                                        <p class="text-[11px] text-slate-400">JPG, PNG, WEBP — Maks. 5MB</p>
+                                        <p class="text-[11px] text-slate-400 text-center">Format: JPG, PNG, WEBP &bull; Maks. 5MB</p>
                                     </div>
                                 </template>
+
+                                <!-- State 2: Viewfinder Kamera Langsung Aktif -->
+                                <template x-if="cameraActive && cameraTarget === 'batch2'">
+                                    <div class="space-y-3 bg-slate-900 rounded-2xl p-3 border border-slate-800 text-white shadow-inner">
+                                        <div class="relative rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center border border-white/10">
+                                            <video id="cameraVideoBatch2" autoplay playsinline muted class="w-full h-full object-cover"></video>
+                                            <div class="absolute inset-4 border-2 border-dashed border-white/40 rounded-lg pointer-events-none flex items-center justify-center">
+                                                <span class="text-[11px] font-medium text-white/90 bg-black/60 px-2.5 py-1 rounded-md backdrop-blur-xs">Arahkan kamera ke barang Batch 2</span>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center justify-between gap-2 px-1">
+                                            <button 
+                                                type="button" 
+                                                @click="stopCamera()" 
+                                                class="text-xs font-semibold text-slate-300 hover:text-white bg-white/10 hover:bg-white/20 px-3.5 py-2 rounded-xl transition cursor-pointer">
+                                                ✕ Batal Kamera
+                                            </button>
+                                            <button 
+                                                type="button" 
+                                                @click="captureCameraPhoto('batch2')" 
+                                                :disabled="isTakingPhoto"
+                                                class="text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50">
+                                                <svg class="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                                <span x-text="isTakingPhoto ? 'Mengambil...' : '📸 Jepret Foto'"></span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </template>
+
+                                <!-- State 3: Foto Sudah Tersedia (Preview) -->
                                 <template x-if="confirmBackorderPhotoPreview">
-                                    <img :src="confirmBackorderPhotoPreview" class="max-h-48 mx-auto rounded-xl object-contain" alt="Preview">
+                                    <div class="space-y-3">
+                                        <div class="relative rounded-2xl overflow-hidden border border-slate-200/90 bg-slate-900/5 p-2 text-center">
+                                            <img :src="confirmBackorderPhotoPreview" class="max-h-52 mx-auto rounded-xl object-contain shadow-xs" alt="Bukti Penerimaan Batch 2">
+                                            <span class="absolute top-4 left-4 text-[10px] font-bold px-2.5 py-1 rounded-lg text-white shadow-xs backdrop-blur-md"
+                                                  :class="confirmBackorderPhotoSource === 'camera' ? 'bg-amber-600/90' : 'bg-sky-600/90'"
+                                                  x-text="confirmBackorderPhotoSource === 'camera' ? '📸 Dari Kamera' : '🖼️ Dari Galeri'">
+                                            </span>
+                                        </div>
+                                        <div class="flex items-center justify-center gap-2">
+                                            <button type="button" @click="startCamera('batch2')" class="text-[11px] font-semibold text-slate-600 hover:text-amber-700 bg-slate-100 hover:bg-amber-50 px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1 cursor-pointer">
+                                                <span>📸 Foto Ulang Kamera</span>
+                                            </button>
+                                            <button type="button" @click="confirmBackorderPhotoSource = 'gallery'; $refs.galleryBackorderInput.click()" class="text-[11px] font-semibold text-slate-600 hover:text-sky-600 bg-slate-100 hover:bg-sky-50 px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1 cursor-pointer">
+                                                <span>🖼️ Ganti Galeri</span>
+                                            </button>
+                                            <button type="button" @click="resetConfirmBackorderPhoto()" class="text-[11px] font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1 cursor-pointer">
+                                                <span>✕ Hapus</span>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </template>
                             </div>
+
+                            <!-- Input Kamera Fallback (capture="environment") -->
                             <input
                                 type="file"
-                                name="proof_photo"
-                                required
+                                :name="confirmBackorderPhotoSource === 'camera_file' ? 'proof_photo' : ''"
+                                accept="image/*"
+                                capture="environment"
+                                x-ref="cameraBackorderInput"
+                                class="hidden"
+                                @change="onBackorderPhotoPicked($event, 'camera_file')">
+
+                            <!-- Input Galeri Foto (tanpa capture) -->
+                            <input
+                                type="file"
+                                :name="confirmBackorderPhotoSource === 'gallery' ? 'proof_photo' : ''"
+                                accept="image/*"
+                                x-ref="galleryBackorderInput"
+                                class="hidden"
+                                @change="onBackorderPhotoPicked($event, 'gallery')">
+
+                            <!-- Input Form Utama (Menerima file dari capture live camera atau fallback) -->
+                            <input
+                                type="file"
+                                :name="confirmBackorderPhotoSource === 'camera' || !confirmBackorderPhotoSource ? 'proof_photo' : ''"
                                 accept="image/*"
                                 x-ref="photoBackorderInput"
                                 class="hidden"
-                                @change="onConfirmBackorderPhotoChange($event)">
+                                :required="!confirmBackorderPhotoPreview">
                         </div>
 
                         <div>
@@ -2798,7 +3195,7 @@
                         </div>
 
                         <div class="flex gap-3 pt-2">
-                            <button type="button" @click="confirmingBackorderId = null"
+                            <button type="button" @click="closeConfirmBackorderModal()"
                                 class="w-1/2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer">
                                 Batal
                             </button>

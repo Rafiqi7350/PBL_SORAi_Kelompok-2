@@ -1522,15 +1522,13 @@
                 handleNewDataDetected: function() {
                     if (this.isAnyModalOrInputActive()) {
                         this.hasPendingSync = true;
-                        this.notify('Pembaruan data sistem terdeteksi. Data akan diperbarui saat Anda selesai.');
                         return;
                     }
 
-                    this.notify('Data baru terdeteksi! Memperbarui tampilan...');
                     var self = this;
                     setTimeout(function() {
                         self.performSafeReload();
-                    }, 800);
+                    }, 500);
                 },
 
                 performSafeReload: function() {
