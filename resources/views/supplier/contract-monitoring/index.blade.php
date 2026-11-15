@@ -8,14 +8,11 @@
     {{-- Header Section --}}
     <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-5">
         <div class="space-y-1">
-            <span class="text-[11px] font-bold uppercase text-[#ea580c] tracking-[0.14em] block">
-                MONITORING KONTRAK &amp; KEPATUHAN SLA B2B
-            </span>
-            <h1 class="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight uppercase">
-                Contract Monitoring Pemasok
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                Pemantauan Kontrak Pemasok
             </h1>
-            <p class="text-xs sm:text-[13px] text-slate-500 max-w-2xl leading-relaxed">
-                Pantau masa berlaku kontrak kemitraan, realisasi volume pasokan, eksposur kredit tempo (TOP), tagihan jatuh tempo, serta evaluasi berkala mitra UMKM.
+            <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                Pantau masa berlaku kontrak, realisasi volume pasokan, dan tempo pembayaran mitra UMKM.
             </p>
         </div>
 
@@ -62,15 +59,6 @@
                 <h3 class="text-2xl font-bold text-slate-900 tracking-tight tabular-nums">
                     {{ $kpis['active_contracts_count'] }} <span class="text-xs font-semibold text-slate-500">Kontrak</span>
                 </h3>
-                <p class="text-[11px] font-semibold {{ ($kpis['expiring_soon_count'] + $kpis['expired_count']) > 0 ? 'text-amber-700' : 'text-emerald-700' }} tabular-nums">
-                    @if($kpis['expired_count'] > 0)
-                        {{ $kpis['expired_count'] }} lewat masa berlaku &middot; {{ $kpis['expiring_soon_count'] }} akan berakhir
-                    @elseif($kpis['expiring_soon_count'] > 0)
-                        {{ $kpis['expiring_soon_count'] }} kontrak berakhir &le; 30 hari
-                    @else
-                        Seluruh kontrak dalam masa aktif
-                    @endif
-                </p>
             </div>
         </div>
 
@@ -89,9 +77,6 @@
                     {{ number_format($kpis['total_delivered_volume'], 0, ',', '.') }}
                     <span class="text-xs font-semibold text-slate-500">/ {{ number_format($kpis['total_target_volume'], 0, ',', '.') }}</span>
                 </h3>
-                <p class="text-[11px] font-semibold text-emerald-700 tabular-nums">
-                    {{ number_format($kpis['average_volume_fulfillment'], 1) }}% Pemenuhan Kuota Kontrak
-                </p>
             </div>
         </div>
 
@@ -109,13 +94,6 @@
                 <h3 class="text-xl sm:text-2xl font-bold {{ $kpis['overdue_invoices_count'] > 0 ? 'text-rose-600' : 'text-slate-900' }} tracking-tight tabular-nums">
                     Rp {{ number_format($kpis['total_unpaid_amount'], 0, ',', '.') }}
                 </h3>
-                <p class="text-[11px] font-semibold {{ $kpis['overdue_invoices_count'] > 0 ? 'text-rose-600' : 'text-slate-500' }} tabular-nums">
-                    @if($kpis['overdue_invoices_count'] > 0)
-                        {{ $kpis['overdue_invoices_count'] }} invoice overdue (Rp {{ number_format($kpis['overdue_total_amount'], 0, ',', '.') }})
-                    @else
-                        Tidak ada tagihan jatuh tempo
-                    @endif
-                </p>
             </div>
         </div>
 
@@ -133,9 +111,6 @@
                 <h3 class="text-2xl font-bold text-sky-700 tracking-tight tabular-nums">
                     {{ number_format($kpis['average_otd_rate'], 1) }}%
                 </h3>
-                <p class="text-[11px] font-semibold text-slate-500 tabular-nums">
-                    Rerata Skor Mitra: {{ $kpis['average_reliability_score'] > 0 ? number_format($kpis['average_reliability_score'], 0).'/100' : 'Observasi' }}
-                </p>
             </div>
         </div>
     </div>
@@ -542,7 +517,7 @@
                             </div>
                             <div class="sm:col-span-2 pt-2.5 border-t border-slate-200/70">
                                 <span class="text-[10px] font-bold uppercase text-slate-500 tracking-wider block">Detail Kesepakatan &amp; Instruksi Khusus</span>
-                                <p class="text-slate-700 mt-1 leading-relaxed" x-text="selectedContract.submission_details + ' — ' + selectedContract.special_instructions"></p>
+                                <p class="text-slate-700 mt-1 leading-relaxed" x-text="selectedContract.submission_details ? (selectedContract.submission_details === selectedContract.special_instructions ? selectedContract.submission_details : (selectedContract.submission_details + (selectedContract.special_instructions ? ' — ' + selectedContract.special_instructions : ''))) : (selectedContract.special_instructions || 'Pasokan standar terikat kontrak resmi.')"></p>
                             </div>
                         </div>
 

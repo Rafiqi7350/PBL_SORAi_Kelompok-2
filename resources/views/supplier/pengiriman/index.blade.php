@@ -8,14 +8,11 @@
     {{-- Header Page --}}
     <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-5">
         <div class="space-y-1">
-            <span class="text-[11px] font-bold uppercase text-[#ea580c] tracking-[0.14em] block">
-                MONITORING LOGISTIK &amp; PROYEK
-            </span>
-            <h1 class="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight uppercase">
-                Verifikasi Proyek &amp; Pengiriman
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                Verifikasi &amp; Pengiriman
             </h1>
-            <p class="text-xs sm:text-[13px] text-slate-500 max-w-2xl leading-relaxed">
-                Pantau progres pesanan aktif, verifikasi kesiapan stok gudang, pengiriman subuh, serta alur backorder dengan mitra UMKM.
+            <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                Pantau pesanan aktif, verifikasi kesiapan stok gudang, dan kelola armada pengiriman.
             </p>
         </div>
 

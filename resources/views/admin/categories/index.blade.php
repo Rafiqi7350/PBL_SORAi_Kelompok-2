@@ -6,9 +6,8 @@
     {{-- Page Header --}}
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div class="space-y-1">
-            <p class="text-[11px] font-bold uppercase tracking-widest text-[#ea580c]">Standarisasi Master Data</p>
-            <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Master Kategori Komoditas</h1>
-            <p class="text-xs sm:text-sm text-slate-500 max-w-2xl">Kelola daftar kategori bahan baku acuan (Unggas &amp; Daging, Bumbu Dapur, Sayuran Segar, Telur, dan Sembako).</p>
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Master Kategori Komoditas</h1>
+            <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Kelola pengelompokan kategori bahan baku acuan untuk standarisasi pangan.</p>
         </div>
         <div class="shrink-0">
             <button type="button"

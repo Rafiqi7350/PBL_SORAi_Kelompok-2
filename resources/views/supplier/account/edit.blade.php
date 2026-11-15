@@ -6,23 +6,20 @@
 <div class="space-y-6 pb-10">
 
     {{-- Header --}}
-    <div class="border-b border-slate-200/80 pb-5">
+    <div class="border-b border-slate-200/80 pb-4">
         <div class="space-y-1">
             <a href="{{ route('supplier.dashboard') }}"
                class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-[#ea580c] transition mb-1 group">
                 <svg class="w-4 h-4 transition-transform group-hover:-translate-x-0.5 text-[#ea580c]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
                 </svg>
-                <span>Kembali ke Dashboard Pemasok</span>
+                <span>Kembali ke Dasbor Pemasok</span>
             </a>
-            <span class="text-[11px] font-bold uppercase tracking-[0.14em] text-[#ea580c] block">
-                Pengaturan Akun &amp; Profil Pemasok
-            </span>
-            <h1 class="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight">
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
                 Kelola Akun Pemasok
             </h1>
-            <p class="text-xs sm:text-[13px] text-slate-500 max-w-2xl leading-relaxed">
-                Kelola identitas kelompok tani atau distributor, kapasitas pasok, area pengiriman armada, serta keamanan kata sandi akun Anda.
+            <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                Kelola identitas usaha pasokan, kapasitas armada, dan keamanan kata sandi Anda.
             </p>
         </div>
     </div>
@@ -261,7 +258,6 @@
                         </div>
                         <div class="min-w-0">
                             <h2 class="text-sm font-bold text-slate-900">Keamanan &amp; Kata Sandi</h2>
-                            <p class="text-[11px] text-slate-500 mt-0.5">Ubah kata sandi secara berkala untuk menjaga keamanan akun pemasok.</p>
                         </div>
                     </div>
 
@@ -293,21 +289,18 @@
 
                 {{-- Read-only Password State --}}
                 <div x-show="!isEditingPassword" class="space-y-3 text-xs">
-                    <div class="flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl bg-slate-50/80 border border-slate-200/70">
+                    <div class="flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl bg-slate-50/80 dark:bg-slate-900/60 border border-slate-200/70 dark:border-white/10">
                         <div class="min-w-0">
-                            <span class="block text-[11px] font-semibold text-slate-500">Kata Sandi Akun</span>
-                            <span class="block text-sm font-bold tracking-[0.2em] text-slate-700 mt-0.5 select-none">••••••••••••</span>
+                            <span class="block text-[11px] font-semibold text-slate-500 dark:text-slate-400">Kata Sandi Akun</span>
+                            <span class="block text-sm font-bold tracking-[0.2em] text-slate-700 dark:text-slate-200 mt-0.5 select-none">••••••••••••</span>
                         </div>
-                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200/80 text-[10px] font-semibold text-slate-500 shrink-0">
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-white/10 text-[10px] font-semibold text-slate-500 dark:text-slate-400 shrink-0">
                             <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                             </svg>
                             <span>Terkunci</span>
                         </span>
                     </div>
-                    <p class="text-[11px] text-slate-400 leading-relaxed">
-                        Klik tombol <span class="font-semibold text-slate-600">Edit</span> dengan ikon pensil di kanan atas kartu ini untuk mengganti kata sandi akun Anda.
-                    </p>
                 </div>
 
                 {{-- Editable Password Form --}}
@@ -454,7 +447,6 @@
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-5 mb-6">
                     <div>
                         <h2 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight">Informasi Akun &amp; Operasional Pemasok</h2>
-                        <p class="text-xs text-slate-500 mt-0.5">Informasi ini ditampilkan kepada mitra UMKM pada katalog komoditas, pengajuan kontrak, dan jadwal distribusi.</p>
                     </div>
 
                     <button type="button"
@@ -495,15 +487,15 @@
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <span class="block font-semibold text-slate-500 mb-1.5">Email Pemasok Resmi</span>
-                                <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 border border-slate-200/70 text-xs sm:text-[13px] font-medium text-slate-800">
+                                <span class="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Email Pemasok Resmi</span>
+                                <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200/70 dark:border-white/10 text-xs sm:text-[13px] font-medium text-slate-800 dark:text-slate-200">
                                     {{ $user->email }}
                                 </div>
                             </div>
 
                             <div>
-                                <span class="block font-semibold text-slate-500 mb-1.5">Nama Kelompok Tani / Distributor</span>
-                                <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 border border-slate-200/70 text-xs sm:text-[13px] font-medium {{ filled($profile?->company_name) ? 'text-slate-800' : 'text-slate-400 italic' }}">
+                                <span class="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Nama Kelompok Tani / Distributor</span>
+                                <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200/70 dark:border-white/10 text-xs sm:text-[13px] font-medium {{ filled($profile?->company_name) ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500 italic' }}">
                                     {{ filled($profile?->company_name) ? $profile->company_name : 'Belum diisi' }}
                                 </div>
                             </div>
@@ -511,37 +503,37 @@
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <span class="block font-semibold text-slate-500 mb-1.5">Nama Pemilik / Penanggung Jawab (PIC)</span>
-                                <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 border border-slate-200/70 text-xs sm:text-[13px] font-medium {{ filled($profile?->owner_name) ? 'text-slate-800' : 'text-slate-400 italic' }}">
+                                <span class="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Nama Pemilik / Penanggung Jawab (PIC)</span>
+                                <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200/70 dark:border-white/10 text-xs sm:text-[13px] font-medium {{ filled($profile?->owner_name) ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500 italic' }}">
                                     {{ filled($profile?->owner_name) ? $profile->owner_name : 'Belum diisi' }}
                                 </div>
                             </div>
 
                             <div>
-                                <span class="block font-semibold text-slate-500 mb-1.5">Nomor WhatsApp Operasional</span>
-                                <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 border border-slate-200/70 text-xs sm:text-[13px] font-medium tabular-nums {{ filled($profile?->phone) ? 'text-slate-800' : 'text-slate-400 italic' }}">
+                                <span class="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Nomor WhatsApp Operasional</span>
+                                <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200/70 dark:border-white/10 text-xs sm:text-[13px] font-medium tabular-nums {{ filled($profile?->phone) ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500 italic' }}">
                                     {{ filled($profile?->phone) ? $profile->phone : 'Belum diisi' }}
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="space-y-4 pt-5 border-t border-slate-100">
+                    <div class="space-y-4 pt-5 border-t border-slate-100 dark:border-white/10">
                         <h3 class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">
                             2. Kapasitas Pasok &amp; Legalitas Usaha
                         </h3>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <span class="block font-semibold text-slate-500 mb-1.5">Kategori Komoditas Utama</span>
-                                <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 border border-slate-200/70 text-xs sm:text-[13px] font-medium {{ filled($profile?->commodity?->name) ? 'text-slate-800' : 'text-slate-400 italic' }}">
+                                <span class="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Kategori Komoditas Utama</span>
+                                <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200/70 dark:border-white/10 text-xs sm:text-[13px] font-medium {{ filled($profile?->commodity?->name) ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500 italic' }}">
                                     {{ $profile?->commodity?->name ?: 'Belum dipilih' }}
                                 </div>
                             </div>
 
                             <div>
-                                <span class="block font-semibold text-slate-500 mb-1.5">Kapasitas Pasok Maksimal</span>
-                                <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 border border-slate-200/70 text-xs sm:text-[13px] font-medium {{ filled($profile?->max_capacity) ? 'text-slate-800' : 'text-slate-400 italic' }}">
+                                <span class="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Kapasitas Pasok Maksimal</span>
+                                <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200/70 dark:border-white/10 text-xs sm:text-[13px] font-medium {{ filled($profile?->max_capacity) ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500 italic' }}">
                                     {{ filled($profile?->max_capacity) ? $profile->max_capacity : 'Belum diisi' }}
                                 </div>
                             </div>
@@ -549,29 +541,29 @@
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <span class="block font-semibold text-slate-500 mb-1.5">Jangkauan Area Pengiriman Armada</span>
-                                <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 border border-slate-200/70 text-xs sm:text-[13px] font-medium {{ filled($profile?->delivery_area) ? 'text-slate-800' : 'text-slate-400 italic' }}">
+                                <span class="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Jangkauan Area Pengiriman Armada</span>
+                                <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200/70 dark:border-white/10 text-xs sm:text-[13px] font-medium {{ filled($profile?->delivery_area) ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500 italic' }}">
                                     {{ filled($profile?->delivery_area) ? $profile->delivery_area : 'Belum diisi' }}
                                 </div>
                             </div>
 
                             <div>
-                                <span class="block font-semibold text-slate-500 mb-1.5">Nomor NIB / Legalitas Usaha</span>
-                                <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 border border-slate-200/70 text-xs sm:text-[13px] font-medium tabular-nums {{ filled($profile?->nib_number) ? 'text-slate-800' : 'text-slate-400 italic' }}">
+                                <span class="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Nomor NIB / Legalitas Usaha</span>
+                                <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200/70 dark:border-white/10 text-xs sm:text-[13px] font-medium tabular-nums {{ filled($profile?->nib_number) ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500 italic' }}">
                                     {{ filled($profile?->nib_number) ? $profile->nib_number : 'Belum diisi' }}
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="space-y-4 pt-5 border-t border-slate-100">
+                    <div class="space-y-4 pt-5 border-t border-slate-100 dark:border-white/10">
                         <h3 class="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">
                             3. Lokasi Sentra / Gudang Pengiriman
                         </h3>
 
                         <div>
-                            <span class="block font-semibold text-slate-500 mb-1.5">Alamat Gudang / Lokasi Sentra Pengiriman</span>
-                            <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 border border-slate-200/70 text-xs sm:text-[13px] font-medium whitespace-pre-line min-h-[76px] {{ filled($profile?->warehouse_address) ? 'text-slate-800' : 'text-slate-400 italic' }}">
+                            <span class="block font-semibold text-slate-500 dark:text-slate-400 mb-1.5">Alamat Gudang / Lokasi Sentra Pengiriman</span>
+                            <div class="px-3.5 py-2.5 rounded-xl bg-slate-50/70 dark:bg-slate-900/60 border border-slate-200/70 dark:border-white/10 text-xs sm:text-[13px] font-medium whitespace-pre-line min-h-[76px] {{ filled($profile?->warehouse_address) ? 'text-slate-800 dark:text-slate-200' : 'text-slate-400 dark:text-slate-500 italic' }}">
                                 {{ filled($profile?->warehouse_address) ? $profile->warehouse_address : 'Belum diisi' }}
                             </div>
                         </div>
