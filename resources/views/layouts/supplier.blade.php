@@ -496,15 +496,13 @@
                 handleNewDataDetected: function() {
                     if (this.isAnyModalOrInputActive()) {
                         this.hasPendingSync = true;
-                        this.notify('Pembaruan data masuk terdeteksi. Sistem akan menyinkronkan data secara otomatis saat Anda selesai.');
                         return;
                     }
 
-                    this.notify('Data baru terdeteksi! Memperbarui tampilan...');
                     var self = this;
                     setTimeout(function() {
                         self.performSafeReload();
-                    }, 800);
+                    }, 500);
                 },
 
                 performSafeReload: function() {

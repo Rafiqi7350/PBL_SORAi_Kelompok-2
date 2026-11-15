@@ -31,19 +31,20 @@ class KatalogController extends Controller
         $isHalal = $request->boolean('is_halal');
         $sort = $request->input('sort', 'terbaru');
 
+        $likeOp = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
         $query = SupplierProduct::with(['supplier.user', 'supplier.latestPerformanceScore', 'commodity']);
 
         if ($search) {
-            $query->where(function ($q) use ($search) {
-                $q->whereHas('commodity', function ($cq) use ($search) {
-                    $cq->where('name', 'ilike', '%'.$search.'%')
-                        ->orWhere('category', 'ilike', '%'.$search.'%');
-                })->orWhereHas('supplier', function ($sq) use ($search) {
-                    $sq->where('company_name', 'ilike', '%'.$search.'%')
-                        ->orWhere('warehouse_address', 'ilike', '%'.$search.'%')
-                        ->orWhere('delivery_area', 'ilike', '%'.$search.'%');
-                })->orWhere('description', 'ilike', '%'.$search.'%')
-                    ->orWhere('quality_grade', 'ilike', '%'.$search.'%');
+            $query->where(function ($q) use ($search, $likeOp) {
+                $q->whereHas('commodity', function ($cq) use ($search, $likeOp) {
+                    $cq->where('name', $likeOp, '%'.$search.'%')
+                        ->orWhere('category', $likeOp, '%'.$search.'%');
+                })->orWhereHas('supplier', function ($sq) use ($search, $likeOp) {
+                    $sq->where('company_name', $likeOp, '%'.$search.'%')
+                        ->orWhere('warehouse_address', $likeOp, '%'.$search.'%')
+                        ->orWhere('delivery_area', $likeOp, '%'.$search.'%');
+                })->orWhere('description', $likeOp, '%'.$search.'%')
+                    ->orWhere('quality_grade', $likeOp, '%'.$search.'%');
             });
         }
 
@@ -448,11 +449,11 @@ class KatalogController extends Controller
                 $oq->whereIn('partnership_id', $partnershipIds)
                     ->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
             })
-            ->whereHas('supplierProduct.commodity', function ($cq) {
-                $cq->where('name', 'ilike', '%ayam%')
-                    ->orWhere('name', 'ilike', '%bumbu%')
-                    ->orWhere('category', 'ilike', '%daging%')
-                    ->orWhere('category', 'ilike', '%bumbu%');
+            ->whereHas('supplierProduct.commodity', function ($cq) use ($likeOp) {
+                $cq->where('name', $likeOp, '%ayam%')
+                    ->orWhere('name', $likeOp, '%bumbu%')
+                    ->orWhere('category', $likeOp, '%daging%')
+                    ->orWhere('category', $likeOp, '%bumbu%');
             })
             ->sum('quantity_delivered')
             : 0.0;
@@ -481,12 +482,16 @@ class KatalogController extends Controller
             '2026-11' => 'NOV',
         ];
 
+        $monthFormatSql = DB::connection()->getDriverName() === 'sqlite'
+            ? "strftime('%Y-%m', created_at)"
+            : "TO_CHAR(created_at, 'YYYY-MM')";
+
         $monthlyRealization = ($umkm && $partnershipIds->isNotEmpty())
             ? OrderItem::whereHas('order', function ($oq) use ($partnershipIds) {
                 $oq->whereIn('partnership_id', $partnershipIds);
             })
-            ->selectRaw("TO_CHAR(created_at, 'YYYY-MM') as month_key, SUM(quantity_delivered) as delivered_vol")
-            ->groupBy(DB::raw("TO_CHAR(created_at, 'YYYY-MM')"))
+            ->selectRaw("{$monthFormatSql} as month_key, SUM(quantity_delivered) as delivered_vol")
+            ->groupBy(DB::raw($monthFormatSql))
             ->pluck('delivered_vol', 'month_key')
             ->toArray()
             : [];
@@ -495,8 +500,8 @@ class KatalogController extends Controller
             ? OrderItem::whereHas('order', function ($oq) use ($partnershipIds) {
                 $oq->whereIn('partnership_id', $partnershipIds);
             })
-            ->selectRaw("TO_CHAR(created_at, 'YYYY-MM') as month_key, SUM(subtotal) as cost_total")
-            ->groupBy(DB::raw("TO_CHAR(created_at, 'YYYY-MM')"))
+            ->selectRaw("{$monthFormatSql} as month_key, SUM(subtotal) as cost_total")
+            ->groupBy(DB::raw($monthFormatSql))
             ->pluck('cost_total', 'month_key')
             ->toArray()
             : [];
@@ -730,8 +735,8 @@ class KatalogController extends Controller
         $deliveredKg = ($umkm && $partnershipIds->isNotEmpty())
             ? (float) OrderItem::whereHas('order', function ($oq) use ($partnershipIds, $startOfMonth, $endOfMonth) {
                 $oq->whereIn('partnership_id', $partnershipIds)->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
-            })->whereHas('supplierProduct.commodity', function ($cq) {
-                $cq->where('name', 'ilike', '%ayam%')->orWhere('name', 'ilike', '%bumbu%')->orWhere('category', 'ilike', '%daging%')->orWhere('category', 'ilike', '%bumbu%');
+            })->whereHas('supplierProduct.commodity', function ($cq) use ($likeOp) {
+                $cq->where('name', $likeOp, '%ayam%')->orWhere('name', $likeOp, '%bumbu%')->orWhere('category', $likeOp, '%daging%')->orWhere('category', $likeOp, '%bumbu%');
             })->sum('quantity_delivered')
             : 0.0;
 
