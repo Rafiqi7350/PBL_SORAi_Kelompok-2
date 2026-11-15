@@ -10,6 +10,20 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
+    <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon.png') }}">
+    <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
+
+    <script>
+        try {
+            if (localStorage.getItem('sorai_theme') === 'dark' || (!('sorai_theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        } catch (e) {}
+    </script>
+
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -56,6 +70,12 @@
 <body class="bg-slate-50 text-slate-900 antialiased min-h-screen selection:bg-orange-100 selection:text-orange-900"
       x-data="{
           mobileNavOpen: false,
+          isDarkMode: document.documentElement.classList.contains('dark'),
+          toggleTheme() {
+              this.isDarkMode = !this.isDarkMode;
+              document.documentElement.classList.toggle('dark', this.isDarkMode);
+              try { localStorage.setItem('sorai_theme', this.isDarkMode ? 'dark' : 'light'); } catch (e) {}
+          },
           sidebarHidden: (() => { try { return window.localStorage.getItem('sorai_supplier_sidebar_hidden') === 'true'; } catch (e) { return false; } })(),
           toggleSidebar() {
               this.sidebarHidden = !this.sidebarHidden;
@@ -69,14 +89,14 @@
         $supplierCompany = $authSupplierUser?->supplierProfile?->company_name ?? 'Pemasok';
         $supplierInitial = strtoupper(substr(trim($supplierCompany), 0, 1)) ?: 'S';
         $activeSectionLabel = match (true) {
-            request()->routeIs('supplier.dashboard') => 'Dashboard & Analisis',
+            request()->routeIs('supplier.dashboard') => 'Dasbor & Analisis',
             request()->routeIs('supplier.pengajuan-masuk.*') => 'Pengajuan Masuk',
             request()->routeIs('supplier.pengiriman.*') => 'Pesanan & Pengiriman',
             request()->routeIs('supplier.katalog.create') => 'Kelola Stok / Tambah Komoditas',
             request()->routeIs('supplier.katalog.edit') => 'Kelola Stok / Edit Komoditas',
             request()->routeIs('supplier.katalog.*') => 'Kelola Stok',
-            request()->routeIs('supplier.supply-planning.*') || request()->routeIs('supplier.demand-planning.*') => 'Perencanaan Stok & Demand',
-            request()->routeIs('supplier.contract-monitoring.*') => 'Contract Monitoring',
+            request()->routeIs('supplier.supply-planning.*') || request()->routeIs('supplier.demand-planning.*') => 'Perencanaan Stok & Kebutuhan',
+            request()->routeIs('supplier.contract-monitoring.*') => 'Pemantauan Kontrak',
             request()->routeIs('supplier.riwayat-transaksi.*') => 'Riwayat Transaksi',
             request()->routeIs('supplier.account.*') => 'Kelola Akun',
             default => 'Panel Pemasok',
@@ -148,7 +168,7 @@
                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
                         </svg>
-                        <span class="truncate">Dashboard &amp; Analisis</span>
+                        <span class="truncate">Dasbor &amp; Analisis</span>
                     </a>
 
                     <a href="{{ route('supplier.pengajuan-masuk.index') }}"
@@ -188,7 +208,7 @@
                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                         </svg>
-                        <span class="truncate">Perencanaan Demand</span>
+                        <span class="truncate">Perencanaan Kebutuhan</span>
                     </a>
                 </nav>
             </div>
@@ -204,7 +224,7 @@
                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        <span class="truncate">Contract Monitoring</span>
+                        <span class="truncate">Pemantauan Kontrak</span>
                     </a>
 
                     <a href="{{ route('supplier.riwayat-transaksi.index') }}"
@@ -327,6 +347,21 @@
                     {{ now()->locale('id')->translatedFormat('l, d M Y') }}
                 </span>
                 <span class="h-4 w-px bg-slate-200"></span>
+
+                {{-- Mode Gelap / Mode Terang Toggle --}}
+                <button type="button"
+                        @click="toggleTheme()"
+                        class="inline-flex items-center justify-center w-8 h-8 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition cursor-pointer"
+                        :title="isDarkMode ? 'Beralih ke Mode Terang' : 'Beralih ke Mode Gelap'"
+                        aria-label="Toggle Mode Tampilan">
+                    <svg x-show="!isDarkMode" class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                    </svg>
+                    <svg x-show="isDarkMode" x-cloak class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                </button>
+
                 <a href="{{ route('supplier.account.edit') }}"
                    class="inline-flex items-center gap-2.5 pl-1.5 pr-3 py-1 rounded-xl border text-xs font-semibold transition-colors {{ request()->routeIs('supplier.account.*') ? 'bg-orange-50 text-[#c2410c] border-orange-200/90' : 'bg-white hover:bg-slate-50 text-slate-700 hover:text-[#ea580c] border-slate-200/90 hover:border-slate-300 shadow-2xs' }}"
                    title="Kelola Data Akun Pemasok">
@@ -353,5 +388,138 @@
 
     @include('partials.logout-modal')
 
+    {{-- Live-Sync & Auto-Reload Notification Component --}}
+    <div id="supplier-live-sync"
+         x-data="supplierLiveSync()"
+         x-init="init()"
+         class="relative z-50">
+        <div x-cloak
+             x-show="notificationMsg"
+             x-transition:enter="transition ease-out duration-300 transform"
+             x-transition:enter-start="opacity-0 -translate-y-2 scale-95"
+             x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+             x-transition:leave="transition ease-in duration-200 transform"
+             x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+             x-transition:leave-end="opacity-0 -translate-y-2 scale-95"
+             class="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2.5 bg-slate-900/95 text-white border border-slate-700/80 rounded-2xl shadow-xl text-xs font-medium backdrop-blur-md max-w-md w-[92vw] sm:w-auto">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+            <span x-text="notificationMsg" class="flex-1 leading-snug"></span>
+            <button type="button" @click="notificationMsg = ''" class="text-white/60 hover:text-white p-1 rounded-lg transition shrink-0" aria-label="Tutup notifikasi">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function supplierLiveSync() {
+            return {
+                notificationMsg: '',
+                lastFingerprint: '',
+                isSyncing: false,
+                hasPendingSync: false,
+                pollTimer: null,
+
+                isAnyModalOrInputActive: function() {
+                    var activeTag = document.activeElement ? document.activeElement.tagName : '';
+                    var isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeTag) && 
+                        !['button', 'submit', 'checkbox', 'radio'].includes(document.activeElement.type);
+
+                    if (isTyping) return true;
+
+                    var dirtyInputs = document.querySelectorAll('form:not([method="GET"]):not([method="get"]) input, form:not([method="GET"]):not([method="get"]) textarea');
+                    for (var j = 0; j < dirtyInputs.length; j++) {
+                        var inp = dirtyInputs[j];
+                        if (inp.type !== 'hidden' && inp.type !== 'submit' && inp.value !== inp.defaultValue) {
+                            return true;
+                        }
+                    }
+
+                    var modals = document.querySelectorAll('.fixed.inset-0.z-50, [role="dialog"]');
+                    for (var i = 0; i < modals.length; i++) {
+                        var el = modals[i];
+                        if (el.offsetParent !== null && window.getComputedStyle(el).display !== 'none') {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                },
+
+                init: function() {
+                    var self = this;
+                    this.checkForUpdates(true);
+
+                    this.pollTimer = setInterval(function() {
+                        self.checkForUpdates(false);
+                    }, 8000);
+
+                    setInterval(function() {
+                        if (self.hasPendingSync && !self.isAnyModalOrInputActive()) {
+                            self.hasPendingSync = false;
+                            self.performSafeReload();
+                        }
+                    }, 2000);
+                },
+
+                checkForUpdates: function(isInitial) {
+                    var self = this;
+                    if (self.isSyncing) return;
+
+                    fetch('{{ route("supplier.check-updates") }}', {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(function(res) {
+                        if (!res.ok) throw new Error('Network error');
+                        return res.json();
+                    })
+                    .then(function(data) {
+                        if (data && data.fingerprint) {
+                            if (!self.lastFingerprint || isInitial) {
+                                self.lastFingerprint = data.fingerprint;
+                                return;
+                            }
+
+                            if (data.fingerprint !== self.lastFingerprint) {
+                                self.lastFingerprint = data.fingerprint;
+                                self.handleNewDataDetected();
+                            }
+                        }
+                    })
+                    .catch(function() {});
+                },
+
+                handleNewDataDetected: function() {
+                    if (this.isAnyModalOrInputActive()) {
+                        this.hasPendingSync = true;
+                        this.notify('Pembaruan data masuk terdeteksi. Sistem akan menyinkronkan data secara otomatis saat Anda selesai.');
+                        return;
+                    }
+
+                    this.notify('Data baru terdeteksi! Memperbarui tampilan...');
+                    var self = this;
+                    setTimeout(function() {
+                        self.performSafeReload();
+                    }, 800);
+                },
+
+                performSafeReload: function() {
+                    window.location.reload();
+                },
+
+                notify: function(msg) {
+                    var self = this;
+                    this.notificationMsg = msg;
+                    setTimeout(function() {
+                        if (self.notificationMsg === msg) self.notificationMsg = '';
+                    }, 3500);
+                }
+            };
+        }
+    </script>
 </body>
 </html>

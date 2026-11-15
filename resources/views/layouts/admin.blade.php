@@ -4,11 +4,25 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'SORAI — Control Panel Administrator Systems')</title>
+    <title>@yield('title', 'SORAI — Panel Kontrol Administrator')</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon.png') }}">
+    <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
+
+    <script>
+        try {
+            if (localStorage.getItem('sorai_theme') === 'dark' || (!('sorai_theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        } catch (e) {}
+    </script>
 
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
@@ -57,6 +71,12 @@
 <body class="min-h-screen bg-slate-50 text-slate-900 antialiased selection:bg-orange-100 selection:text-orange-900"
       x-data="{
           mobileNavOpen: false,
+          isDarkMode: document.documentElement.classList.contains('dark'),
+          toggleTheme() {
+              this.isDarkMode = !this.isDarkMode;
+              document.documentElement.classList.toggle('dark', this.isDarkMode);
+              try { localStorage.setItem('sorai_theme', this.isDarkMode ? 'dark' : 'light'); } catch (e) {}
+          },
           sidebarHidden: (() => { try { return window.localStorage.getItem('sorai_admin_sidebar_hidden') === 'true'; } catch (e) { return false; } })(),
           toggleSidebar() {
               this.sidebarHidden = !this.sidebarHidden;
@@ -105,7 +125,7 @@
                 </div>
                 <div class="min-w-0">
                     <h1 class="font-extrabold text-lg tracking-tight text-white leading-none">SORAI</h1>
-                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest block mt-1">Admin Control Hub</span>
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest block mt-1">Pusat Kendali Admin</span>
                 </div>
             </a>
 
@@ -310,6 +330,21 @@
                     {{ now()->locale('id')->translatedFormat('l, d M Y') }}
                 </span>
                 <span class="h-4 w-px bg-slate-200"></span>
+
+                {{-- Mode Gelap / Mode Terang Toggle --}}
+                <button type="button"
+                        @click="toggleTheme()"
+                        class="inline-flex items-center justify-center w-8 h-8 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition cursor-pointer"
+                        :title="isDarkMode ? 'Beralih ke Mode Terang' : 'Beralih ke Mode Gelap'"
+                        aria-label="Toggle Mode Tampilan">
+                    <svg x-show="!isDarkMode" class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                    </svg>
+                    <svg x-show="isDarkMode" x-cloak class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                </button>
+
                 <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700">
                     <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                     <span>Super Admin</span>
@@ -345,5 +380,138 @@
     @include('partials.action-confirm-modal')
     @include('partials.logout-modal', ['logoutRoute' => route('admin.logout')])
 
+    {{-- Live-Sync & Auto-Reload Notification Component --}}
+    <div id="admin-live-sync"
+         x-data="adminLiveSync()"
+         x-init="init()"
+         class="relative z-50">
+        <div x-cloak
+             x-show="notificationMsg"
+             x-transition:enter="transition ease-out duration-300 transform"
+             x-transition:enter-start="opacity-0 -translate-y-2 scale-95"
+             x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+             x-transition:leave="transition ease-in duration-200 transform"
+             x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+             x-transition:leave-end="opacity-0 -translate-y-2 scale-95"
+             class="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2.5 bg-slate-900/95 text-white border border-slate-700/80 rounded-2xl shadow-xl text-xs font-medium backdrop-blur-md max-w-md w-[92vw] sm:w-auto">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+            <span x-text="notificationMsg" class="flex-1 leading-snug"></span>
+            <button type="button" @click="notificationMsg = ''" class="text-white/60 hover:text-white p-1 rounded-lg transition shrink-0" aria-label="Tutup notifikasi">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function adminLiveSync() {
+            return {
+                notificationMsg: '',
+                lastFingerprint: '',
+                isSyncing: false,
+                hasPendingSync: false,
+                pollTimer: null,
+
+                isAnyModalOrInputActive: function() {
+                    var activeTag = document.activeElement ? document.activeElement.tagName : '';
+                    var isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeTag) && 
+                        !['button', 'submit', 'checkbox', 'radio'].includes(document.activeElement.type);
+
+                    if (isTyping) return true;
+
+                    var dirtyInputs = document.querySelectorAll('form:not([method="GET"]):not([method="get"]) input, form:not([method="GET"]):not([method="get"]) textarea');
+                    for (var j = 0; j < dirtyInputs.length; j++) {
+                        var inp = dirtyInputs[j];
+                        if (inp.type !== 'hidden' && inp.type !== 'submit' && inp.value !== inp.defaultValue) {
+                            return true;
+                        }
+                    }
+
+                    var modals = document.querySelectorAll('.fixed.inset-0.z-50, [role="dialog"]');
+                    for (var i = 0; i < modals.length; i++) {
+                        var el = modals[i];
+                        if (el.offsetParent !== null && window.getComputedStyle(el).display !== 'none') {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                },
+
+                init: function() {
+                    var self = this;
+                    this.checkForUpdates(true);
+
+                    this.pollTimer = setInterval(function() {
+                        self.checkForUpdates(false);
+                    }, 8000);
+
+                    setInterval(function() {
+                        if (self.hasPendingSync && !self.isAnyModalOrInputActive()) {
+                            self.hasPendingSync = false;
+                            self.performSafeReload();
+                        }
+                    }, 2000);
+                },
+
+                checkForUpdates: function(isInitial) {
+                    var self = this;
+                    if (self.isSyncing) return;
+
+                    fetch('{{ route("admin.check-updates") }}', {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(function(res) {
+                        if (!res.ok) throw new Error('Network error');
+                        return res.json();
+                    })
+                    .then(function(data) {
+                        if (data && data.fingerprint) {
+                            if (!self.lastFingerprint || isInitial) {
+                                self.lastFingerprint = data.fingerprint;
+                                return;
+                            }
+
+                            if (data.fingerprint !== self.lastFingerprint) {
+                                self.lastFingerprint = data.fingerprint;
+                                self.handleNewDataDetected();
+                            }
+                        }
+                    })
+                    .catch(function() {});
+                },
+
+                handleNewDataDetected: function() {
+                    if (this.isAnyModalOrInputActive()) {
+                        this.hasPendingSync = true;
+                        this.notify('Pembaruan data sistem terdeteksi. Data akan diperbarui saat Anda selesai.');
+                        return;
+                    }
+
+                    this.notify('Data baru terdeteksi! Memperbarui tampilan...');
+                    var self = this;
+                    setTimeout(function() {
+                        self.performSafeReload();
+                    }, 800);
+                },
+
+                performSafeReload: function() {
+                    window.location.reload();
+                },
+
+                notify: function(msg) {
+                    var self = this;
+                    this.notificationMsg = msg;
+                    setTimeout(function() {
+                        if (self.notificationMsg === msg) self.notificationMsg = '';
+                    }, 3500);
+                }
+            };
+        }
+    </script>
 </body>
 </html>
