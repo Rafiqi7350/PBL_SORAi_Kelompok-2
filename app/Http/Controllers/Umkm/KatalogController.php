@@ -6,9 +6,11 @@ use App\Http\Controllers\Controller;
 use App\Models\Commodity;
 use App\Models\CommodityUnit;
 use App\Models\Order;
+use App\Models\OrderItem;
 use App\Models\Partnership;
 use App\Models\PartnershipDeliverySchedule;
 use App\Models\Payment;
+use App\Models\SupplierPerformanceScore;
 use App\Models\SupplierProduct;
 use App\Models\SupplierProfile;
 use App\Models\SupplyPlan;
@@ -384,16 +386,16 @@ class KatalogController extends Controller
             $cancelledOrdersCount = 0;
         }
 
-        // Hitung total kontrak kemitraan aktif dan pending untuk UMKM ini
+        // Hitung total kontrak kemitraan aktif dan pending untuk UMKM ini secara riil (0 jika akun baru)
         $realActiveContractsCount = $allPartnerships->filter(fn ($p) => in_array(strtolower((string) $p->status), ['active', 'approved', 'accepted', 'disetujui']))->count();
         $realPendingContractsCount = $allPartnerships->filter(fn ($p) => in_array(strtolower((string) $p->status), ['pending', 'menunggu', 'dalam_review']))->count();
 
-        // Fallback realistis untuk visual dashboard UMKM jika data kemitraan kosong
-        $activeContractsCount = $realActiveContractsCount > 0 ? $realActiveContractsCount : max(count($autoOrdersList), 2);
-        $pendingContractsCount = $realPendingContractsCount > 0 ? $realPendingContractsCount : 1;
+        // Tidak ada fallback dummy untuk akun baru (jika baru daftar maka murni 0)
+        $activeContractsCount = $realActiveContractsCount;
+        $pendingContractsCount = $realPendingContractsCount;
         $totalContractsCount = $activeContractsCount + $pendingContractsCount;
 
-        // Distribusi komoditas dalam kontrak aktif
+        // Distribusi komoditas dalam kontrak aktif (kosong jika belum ada kontrak)
         $activeContractCommodities = [];
         foreach ($allPartnerships as $p) {
             if (in_array(strtolower((string) $p->status), ['active', 'approved', 'accepted', 'disetujui'])) {
@@ -403,28 +405,199 @@ class KatalogController extends Controller
                 }
             }
         }
-        if (empty($activeContractCommodities)) {
-            $activeContractCommodities = [
-                'Daging Ayam' => 1,
-                'Bumbu Dapur' => 1,
+
+        // =========================================================================
+        // DASHBOARD ANALISIS PENGADAAN (DATA RIIL SESUAI USER LOGIN / SUPABASE)
+        // =========================================================================
+        $startOfMonth = now()->startOfMonth();
+        $endOfMonth = now()->endOfMonth();
+        $startOfLastMonth = now()->subMonth()->startOfMonth();
+        $endOfLastMonth = now()->subMonth()->endOfMonth();
+
+        // 1. Total Pengeluaran Bulan Ini & Bulan Lalu (Hanya pesanan lunas)
+        $totalPengeluaranBulanIni = ($umkm && $partnershipIds->isNotEmpty())
+            ? (float) Order::whereIn('partnership_id', $partnershipIds)
+                ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+                ->where(function ($q) {
+                    $q->whereHas('payments', function ($pq) {
+                        $pq->whereIn(DB::raw("UPPER(COALESCE(payment_status, ''))"), ['PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS', 'LUNAS']);
+                    })->orWhereIn('order_status', ['completed', 'BARANG_DITERIMA', 'completed_partial']);
+                })
+                ->sum('total_amount')
+            : 0.0;
+
+        $totalPengeluaranBulanLalu = ($umkm && $partnershipIds->isNotEmpty())
+            ? (float) Order::whereIn('partnership_id', $partnershipIds)
+                ->whereBetween('created_at', [$startOfLastMonth, $endOfLastMonth])
+                ->where(function ($q) {
+                    $q->whereHas('payments', function ($pq) {
+                        $pq->whereIn(DB::raw("UPPER(COALESCE(payment_status, ''))"), ['PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS', 'LUNAS']);
+                    })->orWhereIn('order_status', ['completed', 'BARANG_DITERIMA', 'completed_partial']);
+                })
+                ->sum('total_amount')
+            : 0.0;
+
+        $persentasePenghematan = 0.0;
+        if ($totalPengeluaranBulanLalu > 0) {
+            $persentasePenghematan = round((($totalPengeluaranBulanLalu - $totalPengeluaranBulanIni) / $totalPengeluaranBulanLalu) * 100, 1);
+        }
+
+        // 2. Total Barang Diterima Bulan Ini (Komoditas Bahan Baku Dapur: Daging & Bumbu)
+        $totalDiterimaKg = ($umkm && $partnershipIds->isNotEmpty())
+            ? (float) OrderItem::whereHas('order', function ($oq) use ($partnershipIds, $startOfMonth, $endOfMonth) {
+                $oq->whereIn('partnership_id', $partnershipIds)
+                    ->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
+            })
+            ->whereHas('supplierProduct.commodity', function ($cq) {
+                $cq->where('name', 'ilike', '%ayam%')
+                    ->orWhere('name', 'ilike', '%bumbu%')
+                    ->orWhere('category', 'ilike', '%daging%')
+                    ->orWhere('category', 'ilike', '%bumbu%');
+            })
+            ->sum('quantity_delivered')
+            : 0.0;
+
+        // 3. Skor Rata-Rata On-Time Delivery Bulan Ini
+        $onTimeDeliveryRate = ($umkm && $partnershipIds->isNotEmpty())
+            ? (float) (SupplierPerformanceScore::whereIn('partnership_id', $partnershipIds)
+                ->avg('on_time_delivery_score') ?? 0.0)
+            : 0.0;
+
+        // 4. Target Volume Kontrak Bulan Depan
+        $targetBulanDepan = ($umkm && $partnershipIds->isNotEmpty())
+            ? (float) PartnershipDeliverySchedule::whereIn('partnership_id', $partnershipIds)
+                ->whereHas('partnership', fn ($pq) => $pq->whereIn(DB::raw('LOWER(status)'), ['active', 'approved', 'disetujui']))
+                ->sum('total_contract_volume')
+            : 0.0;
+
+        // 5. Tren Pengadaan Bulanan (Mei - November 2026)
+        $trendMonths = [
+            '2026-05' => 'MEI',
+            '2026-06' => 'JUN',
+            '2026-07' => 'JUL',
+            '2026-08' => 'AGU',
+            '2026-09' => 'SEP',
+            '2026-10' => 'OKT',
+            '2026-11' => 'NOV',
+        ];
+
+        $monthlyRealization = ($umkm && $partnershipIds->isNotEmpty())
+            ? OrderItem::whereHas('order', function ($oq) use ($partnershipIds) {
+                $oq->whereIn('partnership_id', $partnershipIds);
+            })
+            ->selectRaw("TO_CHAR(created_at, 'YYYY-MM') as month_key, SUM(quantity_delivered) as delivered_vol")
+            ->groupBy(DB::raw("TO_CHAR(created_at, 'YYYY-MM')"))
+            ->pluck('delivered_vol', 'month_key')
+            ->toArray()
+            : [];
+
+        $monthlyCost = ($umkm && $partnershipIds->isNotEmpty())
+            ? OrderItem::whereHas('order', function ($oq) use ($partnershipIds) {
+                $oq->whereIn('partnership_id', $partnershipIds);
+            })
+            ->selectRaw("TO_CHAR(created_at, 'YYYY-MM') as month_key, SUM(subtotal) as cost_total")
+            ->groupBy(DB::raw("TO_CHAR(created_at, 'YYYY-MM')"))
+            ->pluck('cost_total', 'month_key')
+            ->toArray()
+            : [];
+
+        $trendsData = [];
+        $totalDeliveredAllMonths = 0.0;
+        foreach ($trendMonths as $key => $label) {
+            $vol = (float) ($monthlyRealization[$key] ?? 0.0);
+            $cost = (float) ($monthlyCost[$key] ?? 0.0);
+            $totalDeliveredAllMonths += $vol;
+            $trendsData[] = [
+                'key' => $key,
+                'label' => $label,
+                'volume' => $vol,
+                'cost' => $cost,
             ];
         }
 
-        // Ambil data performa mitra pemasok untuk Tab Monitoring & Evaluasi Kemitraan
-        $contractedSuppliersPerformance = $allPartnerships->map(function ($p) {
-            $sup = $p->supplier;
-            $score = $p->latestSupplierPerformanceScore ?? $sup?->latestPerformanceScore;
+        $currentMonthKey = now()->format('Y-m');
+        $realisasiPasokanBulanIni = (float) ($monthlyRealization[$currentMonthKey] ?? ($monthlyRealization['2026-10'] ?? 0.0));
 
-            return [
-                'partnership' => $p,
-                'supplier' => $sup,
-                'score' => $score,
-                'commodity_name' => $p->deliverySchedules->first()?->supplierProduct?->commodity?->name ?? 'Komoditas Pasokan',
-                'volume_per_delivery' => $p->deliverySchedules->sum('volume_per_delivery'),
-                'unit' => $p->deliverySchedules->first()?->unit ?? 'kg',
-                'status' => $p->status,
-            ];
-        });
+        $dashboardOrders = ($umkm && $partnershipIds->isNotEmpty())
+            ? Order::with([
+                'partnership.supplier',
+                'items.supplierProduct.commodity',
+                'payment',
+                'payments',
+                'review',
+            ])
+            ->whereIn('partnership_id', $partnershipIds)
+            ->latest('created_at')
+            ->limit(10)
+            ->get()
+            ->map(function ($ord) {
+                $firstItem = $ord->items->first();
+                $commodityName = $firstItem?->supplierProduct?->commodity?->name ?? 'Komoditas Pasokan';
+                $unit = $firstItem?->supplierProduct?->unit ?? $firstItem?->supplierProduct?->commodity?->unit ?? 'kg';
+                $deliveredQty = (float) $ord->items->sum('quantity_delivered');
+                $orderedQty = (float) $ord->items->sum('quantity');
+                $qtyDisplay = $deliveredQty > 0 ? $deliveredQty : $orderedQty;
+
+                $latestPayment = $ord->payments->last() ?? $ord->payment;
+                $paymentStatus = strtoupper($latestPayment?->payment_status ?? ($ord->order_status === 'completed' ? 'PAID' : 'UNPAID'));
+
+                return [
+                    'id' => 'TRX-'.strtoupper(substr((string) $ord->id, 0, 8)),
+                    'db_id' => $ord->id,
+                    'invoiceNumber' => 'INV-'.strtoupper(substr((string) $ord->id, 0, 8)),
+                    'supplierName' => $ord->partnership?->supplier?->company_name ?? 'Mitra Pemasok',
+                    'supplierPhone' => $ord->partnership?->supplier?->phone ?? '-',
+                    'supplierAddress' => $ord->partnership?->supplier?->warehouse_address ?? 'Malang Raya & Jawa Timur',
+                    'commodity' => $commodityName,
+                    'approvedQty' => $qtyDisplay,
+                    'unit' => $unit,
+                    'total' => (float) $ord->total_amount,
+                    'date' => $ord->created_at?->format('d/m/Y') ?? '-',
+                    'paymentStatus' => $paymentStatus,
+                    'paidAt' => $latestPayment?->paid_at?->format('d/m/Y H:i') ?? ($paymentStatus === 'PAID' ? ($ord->created_at?->format('d/m/Y H:i') ?? '-') : null),
+                    'orderStatus' => $ord->order_status ?? 'completed',
+                    'rating' => $ord->review?->rating ?? null,
+                    'review' => $ord->review?->review ?? '',
+                ];
+            })
+            ->values()
+            : collect();
+
+        // Ambil data performa mitra pemasok untuk Tab Monitoring & Evaluasi Kemitraan (Hanya kemitraan aktif)
+        $contractedSuppliersPerformance = $allPartnerships
+            ->filter(fn ($p) => in_array(strtolower((string) $p->status), ['active', 'approved', 'disetujui']))
+            ->map(function ($p) {
+                $sup = $p->supplier;
+                $score = $p->latestSupplierPerformanceScore ?? $sup?->latestPerformanceScore;
+
+                return [
+                    'partnership' => $p,
+                    'supplier' => $sup,
+                    'score' => $score,
+                    'commodity_name' => $p->deliverySchedules->first()?->supplierProduct?->commodity?->name ?? 'Komoditas Pasokan',
+                    'volume_per_delivery' => $p->deliverySchedules->sum('volume_per_delivery'),
+                    'unit' => $p->deliverySchedules->first()?->unit ?? 'kg',
+                    'status' => $p->status,
+                ];
+            })
+            ->values();
+
+        // Fingerprint untuk Auto-Reload / Live-Sync jika ada perubahan data
+        $latestOrderUpdate = ($umkm && $partnershipIds->isNotEmpty()) ? Order::whereIn('partnership_id', $partnershipIds)->max('updated_at') : null;
+        $latestPaymentUpdate = ($umkm && $partnershipIds->isNotEmpty()) ? Payment::whereHas('order', fn ($q) => $q->whereIn('partnership_id', $partnershipIds))->max('updated_at') : null;
+        $latestSupplyPlanUpdate = ($umkm && $partnershipIds->isNotEmpty()) ? SupplyPlan::whereIn('partnership_id', $partnershipIds)->max('updated_at') : null;
+        $latestPartnershipUpdate = $allPartnerships->max('updated_at');
+        $ordersCount = ($umkm && $partnershipIds->isNotEmpty()) ? Order::whereIn('partnership_id', $partnershipIds)->count() : 0;
+        $partnershipsCount = $allPartnerships->count();
+
+        $stateFingerprint = md5(implode('|', [
+            $latestOrderUpdate,
+            $latestPaymentUpdate,
+            $latestSupplyPlanUpdate,
+            $latestPartnershipUpdate,
+            $ordersCount,
+            $partnershipsCount,
+        ]));
 
         return view('umkm.katalog.index', compact(
             'products',
@@ -456,7 +629,143 @@ class KatalogController extends Controller
             'activeContractCommodities',
             'reviewOrders',
             'contractedSuppliersPerformance',
+            'totalPengeluaranBulanIni',
+            'totalPengeluaranBulanLalu',
+            'persentasePenghematan',
+            'totalDiterimaKg',
+            'onTimeDeliveryRate',
+            'targetBulanDepan',
+            'trendsData',
+            'totalDeliveredAllMonths',
+            'realisasiPasokanBulanIni',
+            'dashboardOrders',
+            'stateFingerprint',
         ));
+    }
+
+    public function checkUpdates(Request $request)
+    {
+        $umkm = Auth::user()?->umkmProfile;
+        if (! $umkm) {
+            return response()->json(['updated' => false, 'fingerprint' => '']);
+        }
+
+        $allPartnerships = Partnership::where('umkm_id', $umkm->id)->get();
+        $partnershipIds = $allPartnerships->pluck('id');
+
+        $latestOrderUpdate = Order::whereIn('partnership_id', $partnershipIds)->max('updated_at');
+        $latestPaymentUpdate = Payment::whereHas('order', fn ($q) => $q->whereIn('partnership_id', $partnershipIds))->max('updated_at');
+        $latestSupplyPlanUpdate = SupplyPlan::whereIn('partnership_id', $partnershipIds)->max('updated_at');
+        $latestPartnershipUpdate = $allPartnerships->max('updated_at');
+        $ordersCount = Order::whereIn('partnership_id', $partnershipIds)->count();
+        $partnershipsCount = $allPartnerships->count();
+
+        $stateFingerprint = md5(implode('|', [
+            $latestOrderUpdate,
+            $latestPaymentUpdate,
+            $latestSupplyPlanUpdate,
+            $latestPartnershipUpdate,
+            $ordersCount,
+            $partnershipsCount,
+        ]));
+
+        return response()->json([
+            'updated' => true,
+            'fingerprint' => $stateFingerprint,
+            'orders_count' => $ordersCount,
+            'partnerships_count' => $partnershipsCount,
+            'timestamp' => now()->timestamp,
+        ]);
+    }
+
+    public function dashboardAnalytics(Request $request)
+    {
+        $umkm = Auth::user()?->umkmProfile;
+        if (! $umkm && $request->has('umkm_id')) {
+            $umkm = \App\Models\UmkmProfile::find($request->input('umkm_id'));
+        }
+
+        $allPartnerships = $umkm ? Partnership::where('umkm_id', $umkm->id)->get() : collect();
+        $partnershipIds = $allPartnerships->pluck('id');
+
+        $startOfMonth = now()->startOfMonth();
+        $endOfMonth = now()->endOfMonth();
+        $startOfLastMonth = now()->subMonth()->startOfMonth();
+        $endOfLastMonth = now()->subMonth()->endOfMonth();
+
+        $curSpend = ($umkm && $partnershipIds->isNotEmpty())
+            ? (float) Order::whereIn('partnership_id', $partnershipIds)
+                ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+                ->where(function ($q) {
+                    $q->whereHas('payments', fn ($pq) => $pq->whereIn(DB::raw("UPPER(COALESCE(payment_status, ''))"), ['PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS', 'LUNAS']))
+                      ->orWhereIn('order_status', ['completed', 'BARANG_DITERIMA', 'completed_partial']);
+                })->sum('total_amount')
+            : 0.0;
+
+        $prevSpend = ($umkm && $partnershipIds->isNotEmpty())
+            ? (float) Order::whereIn('partnership_id', $partnershipIds)
+                ->whereBetween('created_at', [$startOfLastMonth, $endOfLastMonth])
+                ->where(function ($q) {
+                    $q->whereHas('payments', fn ($pq) => $pq->whereIn(DB::raw("UPPER(COALESCE(payment_status, ''))"), ['PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS', 'LUNAS']))
+                      ->orWhereIn('order_status', ['completed', 'BARANG_DITERIMA', 'completed_partial']);
+                })->sum('total_amount')
+            : 0.0;
+
+        $savingsPct = $prevSpend > 0 ? round((($prevSpend - $curSpend) / $prevSpend) * 100, 1) : 0.0;
+
+        $activeOrders = ($umkm && $partnershipIds->isNotEmpty())
+            ? Order::whereIn('partnership_id', $partnershipIds)
+                ->whereIn('order_status', ['pending', 'confirmed', 'MENUNGGU_KONFIRMASI_BARANG', 'DIKIRIM', 'shipped', 'partially_shipped', Order::STATUS_WAITING_BACKORDER_APPROVAL, Order::STATUS_BACKORDER_PENDING])
+                ->count()
+            : 0;
+
+        $needConfirmation = ($umkm && $partnershipIds->isNotEmpty())
+            ? Order::whereIn('partnership_id', $partnershipIds)
+                ->whereIn('order_status', ['MENUNGGU_KONFIRMASI_BARANG', 'DIKIRIM', 'shipped', 'partially_shipped'])
+                ->whereHas('shipmentConfirmations', function ($sq) {
+                    $sq->where('shipment_batch', 1)->whereNotNull('shipped_at')->whereNull('received_at');
+                })->count()
+            : 0;
+
+        $deliveredKg = ($umkm && $partnershipIds->isNotEmpty())
+            ? (float) OrderItem::whereHas('order', function ($oq) use ($partnershipIds, $startOfMonth, $endOfMonth) {
+                $oq->whereIn('partnership_id', $partnershipIds)->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
+            })->whereHas('supplierProduct.commodity', function ($cq) {
+                $cq->where('name', 'ilike', '%ayam%')->orWhere('name', 'ilike', '%bumbu%')->orWhere('category', 'ilike', '%daging%')->orWhere('category', 'ilike', '%bumbu%');
+            })->sum('quantity_delivered')
+            : 0.0;
+
+        $onTimeRate = ($umkm && $partnershipIds->isNotEmpty())
+            ? (float) (SupplierPerformanceScore::whereIn('partnership_id', $partnershipIds)->avg('on_time_delivery_score') ?? 0.0)
+            : 0.0;
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'summary_cards' => [
+                    'total_pengeluaran' => [
+                        'amount' => $curSpend,
+                        'formatted' => 'Rp '.number_format($curSpend, 0, ',', '.'),
+                        'savings_pct' => $savingsPct,
+                        'label' => $savingsPct > 0 ? "Hemat {$savingsPct}% dibanding bulan lalu" : 'Belum ada penghematan',
+                    ],
+                    'pesanan_aktif' => [
+                        'total' => $activeOrders,
+                        'need_confirmation' => $needConfirmation,
+                        'label' => "{$needConfirmation} Perlu Konfirmasi Penerimaan",
+                    ],
+                    'total_diterima' => [
+                        'quantity_kg' => $deliveredKg,
+                        'formatted' => number_format($deliveredKg, 0, ',', '.').' kg',
+                        'categories' => ['Daging Ayam', 'Bumbu Dapur'],
+                    ],
+                    'on_time_delivery' => [
+                        'score_pct' => $onTimeRate,
+                        'formatted' => number_format($onTimeRate, 1).'%',
+                    ],
+                ],
+            ],
+        ]);
     }
 
     public function ajukanKemitraan(Request $request)
@@ -475,6 +784,8 @@ class KatalogController extends Controller
             'start_date' => 'nullable|date',
             'is_auto_order_active' => 'nullable|boolean',
             'submission_details' => 'nullable|string',
+            'terms' => 'nullable|array',
+            'terms.*' => 'nullable|string',
         ]);
 
         $product = SupplierProduct::find($request->input('supplier_product_id'));
@@ -538,10 +849,24 @@ class KatalogController extends Controller
             ? $daysPerWeek.'x Seminggu ('.implode(', ', $deliveryDays).')'
             : $frequencyType;
 
+        $selectedTerms = $request->input('terms', []);
+        $termsList = is_array($selectedTerms)
+            ? array_values(array_filter(array_map('trim', $selectedTerms)))
+            : [];
+
+        $customNote = trim((string) $request->input('submission_details', ''));
+
+        if (! empty($termsList)) {
+            $termsFormatted = '[Ketentuan Mutu: '.implode(' | ', $termsList).']';
+            $finalSubmissionDetails = $customNote !== '' ? ($termsFormatted.' '.$customNote) : $termsFormatted;
+        } else {
+            $finalSubmissionDetails = $customNote !== '' ? $customNote : null;
+        }
+
         $partnership = Partnership::create([
             'umkm_id' => $umkm->id,
             'supplier_id' => $request->input('supplier_id'),
-            'submission_details' => $request->input('submission_details'),
+            'submission_details' => $finalSubmissionDetails,
             'status' => 'pending',
         ]);
 
@@ -556,7 +881,7 @@ class KatalogController extends Controller
             'delivery_time' => $deliveryTime,
             'start_date' => $request->input('start_date', now()->addDay()->toDateString()),
             'is_auto_order_active' => $request->boolean('is_auto_order_active', true),
-            'special_instructions' => $request->input('submission_details'),
+            'special_instructions' => $finalSubmissionDetails,
         ]);
 
         return redirect()->route('umkm.katalog.index')->with('success', 'Pengajuan kemitraan pasokan & jadwal rutin berhasil dikirim ke pemasok!');

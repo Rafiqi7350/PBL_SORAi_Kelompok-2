@@ -5,7 +5,15 @@
     function umkmCatalogPage() {
         return {
             selectedCommodity: null,
-            orderSubTab: (new URLSearchParams(window.location.search).get('subtab') || 'auto-order'), // 'auto-order' | 'confirm' | 'backorder' | 'payment' | 'rating'
+            orderSubTab: (function() {
+                try {
+                    var fromUrl = (new URLSearchParams(window.location.search)).get('subtab');
+                    if (fromUrl) return fromUrl;
+                    var fromStorage = sessionStorage.getItem('sorai_umkm_order_subtab');
+                    if (fromStorage) return fromStorage;
+                } catch (e) {}
+                return 'auto-order';
+            })(),
             backorderFilter: 'all', // 'all' | 'pending' | 'approved' | 'rejected'
             payingOrder: null,
             selectedPaymentMethod: 'bca',
@@ -16,7 +24,143 @@
             showReviewModal: false,
             isSubmittingReview: false,
             notificationMsg: '',
-            init() {},
+            // Auto-Reload / Live-Sync State
+            lastFingerprint: '{{ $stateFingerprint ?? "" }}',
+            isSyncing: false,
+            hasPendingSync: false,
+            pollTimer: null,
+            liveSyncActive: true,
+
+            isAnyModalOpen: function() {
+                var isTyping = Boolean(
+                    document.activeElement &&
+                    ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName) &&
+                    document.activeElement.type !== 'button' &&
+                    document.activeElement.type !== 'submit'
+                );
+
+                return Boolean(
+                    isTyping ||
+                    this.selectedCommodity ||
+                    this.confirmingOrderId ||
+                    this.confirmingBackorderId ||
+                    this.rejectingBackorderId ||
+                    this.approvingBackorderOrder ||
+                    this.previewAutoOrder ||
+                    this.payingOrder ||
+                    this.payingInvoice ||
+                    this.showReviewModal ||
+                    this.ratingInputOrder ||
+                    (this.selectedSupplierPerformance && !this.selectedSupplierPerformance.isClosed)
+                );
+            },
+
+            init: function() {
+                var self = this;
+
+                // Pantau orderSubTab secara reaktif: simpan ke sessionStorage & URL replaceState
+                this.$watch('orderSubTab', function(val) {
+                    if (!val) return;
+                    try {
+                        sessionStorage.setItem('sorai_umkm_order_subtab', val);
+                        var url = new URL(window.location.href);
+                        url.searchParams.set('tab', 'pemesanan');
+                        url.searchParams.set('subtab', val);
+                        window.history.replaceState({}, '', url.toString());
+                    } catch (e) {}
+                });
+
+                // Polling setiap 8 detik untuk memeriksa data baru dari pemasok/sistem
+                this.pollTimer = setInterval(function() {
+                    self.checkForUpdates();
+                }, 8000);
+
+                // Jika ada update tertunda karena modal terbuka, reload segera setelah modal ditutup
+                setInterval(function() {
+                    if (self.hasPendingSync && !self.isAnyModalOpen()) {
+                        self.hasPendingSync = false;
+                        self.performSafeReload();
+                    }
+                }, 2000);
+            },
+
+            performSafeReload: function() {
+                var self = this;
+                try {
+                    var targetUrl = new URL(window.location.href);
+                    // Ambil tab aktif dari URL atau sessionStorage atau 'katalog'
+                    var currentTab = (new URLSearchParams(window.location.search)).get('tab') 
+                        || sessionStorage.getItem('sorai_umkm_active_tab') 
+                        || 'katalog';
+                    
+                    targetUrl.searchParams.set('tab', currentTab);
+
+                    if (currentTab === 'pemesanan') {
+                        var currentSubTab = self.orderSubTab 
+                            || (new URLSearchParams(window.location.search)).get('subtab')
+                            || sessionStorage.getItem('sorai_umkm_order_subtab') 
+                            || 'auto-order';
+                        targetUrl.searchParams.set('subtab', currentSubTab);
+                    } else {
+                        targetUrl.searchParams.delete('subtab');
+                    }
+
+                    window.location.href = targetUrl.toString();
+                } catch (e) {
+                    window.location.reload();
+                }
+            },
+
+            checkForUpdates: function() {
+                var self = this;
+                if (!self.liveSyncActive || self.isSyncing) return;
+
+                fetch('{{ route("umkm.check-updates") }}', {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(function(res) {
+                    if (!res.ok) throw new Error('Network error');
+                    return res.json();
+                })
+                .then(function(data) {
+                    if (data && data.fingerprint) {
+                        if (!self.lastFingerprint) {
+                            self.lastFingerprint = data.fingerprint;
+                            return;
+                        }
+
+                        if (data.fingerprint !== self.lastFingerprint) {
+                            self.lastFingerprint = data.fingerprint;
+                            self.handleNewDataDetected();
+                        }
+                    }
+                })
+                .catch(function() {
+                    // Silent fail agar tidak mengganggu interaksi UI
+                });
+            },
+
+            handleNewDataDetected: function() {
+                var self = this;
+                if (this.isAnyModalOpen()) {
+                    this.hasPendingSync = true;
+                    if (typeof this.notify === 'function') {
+                        this.notify('Pembaruan data masuk terdeteksi. Sistem akan menyinkronkan data secara otomatis saat Anda selesai.');
+                    }
+                    return;
+                }
+
+                if (typeof this.notify === 'function') {
+                    this.notify('Data baru terdeteksi! Memperbarui tampilan...');
+                }
+
+                setTimeout(function() {
+                    self.performSafeReload();
+                }, 700);
+            },
             pendingValidationCount: {{ $pendingValidationCount ?? 0 }},
             pendingBackorderCount: {{ $pendingBackorderCount ?? 0 }},
             pendingBackorderApprovalCount: {{ $pendingBackorderApprovalCount ?? 0 }},
@@ -85,6 +229,23 @@
             formStartDate: '{{ now()->addDay()->toDateString() }}',
             formAutoOrder: true,
             availableDays: ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'],
+            selectedQualityTerms: ['Garansi Segar & Bebas Busuk', 'Wajib Tiba Tepat Waktu', 'Kemasan Tertutup & Higienis'],
+            availableQualityTerms: [
+                { id: 'freshness', label: 'Garansi Segar & Bebas Busuk', desc: 'Bebas aroma tidak sedap / ganti baru jika cacat' },
+                { id: 'ontime', label: 'Wajib Tiba Tepat Waktu', desc: 'Sesuai jam buka dapur (toleransi maks. 30 menit)' },
+                { id: 'packaging', label: 'Kemasan Tertutup & Higienis', desc: 'Bahan baku terlindung dari debu & kontaminasi' },
+                { id: 'return_claim', label: 'Klaim Retur Maks. 2 Jam', desc: 'Waktu inspeksi fisik dapur pasca terima bahan' },
+                { id: 'cold_chain', label: 'Suhu Dingin Terjaga (Chilled)', desc: 'Komoditas daging / sayur tetap dingin di jalan' }
+            ],
+
+            toggleQualityTerm: function(label) {
+                var idx = this.selectedQualityTerms.indexOf(label);
+                if (idx > -1) {
+                    this.selectedQualityTerms.splice(idx, 1);
+                } else {
+                    this.selectedQualityTerms.push(label);
+                }
+            },
 
             openAjukanModal: function(commodity) {
                 this.selectedCommodity = commodity;
@@ -94,6 +255,7 @@
                 this.formTime = '05:30';
                 this.formStartDate = '{{ now()->addDay()->toDateString() }}';
                 this.formAutoOrder = true;
+                this.selectedQualityTerms = ['Garansi Segar & Bebas Busuk', 'Wajib Tiba Tepat Waktu', 'Kemasan Tertutup & Higienis'];
             },
 
             syncFrequencyFromDays: function() {
@@ -165,12 +327,7 @@
                 return this.calculateDeliverySubtotal();
             },
 
-            orders: [
-                { id: 'ORD-2026-001', umkmName: 'Dapur Sambal Malang', supplierName: 'Kelompok Tani Poultry Malang', commodity: 'Daging Ayam Broiler Segar', requestedQty: 100, approvedQty: 100, unit: 'kg', pricePerUnit: 34000, total: 3400000, date: '01/10/2026', status: 'BARANG_DITERIMA', stockNote: 'Barang Tiba Di Dapur Subuh Tadi', paymentStatus: 'PAID', rating: null, review: '' },
-                { id: 'ORD-2026-002', umkmName: 'Dapur Sambal Malang', supplierName: 'Kelompok Tani Poultry Malang', commodity: 'Daging Ayam Broiler Segar', requestedQty: 200, approvedQty: 120, unit: 'kg', pricePerUnit: 34000, total: 4080000, date: '28/09/2026', status: 'PENYESUAIAN_STOK', stockNote: 'Stok Terbatas (Dikirim 120kg dari 200kg)', paymentStatus: 'PAID', rating: null, review: '' },
-                { id: 'ORD-2026-003', umkmName: 'Dapur Sambal Malang', supplierName: 'Distributor Rempah Nusantara', commodity: 'Bawang Merah Biru Probolinggo', requestedQty: 50, approvedQty: 50, unit: 'kg', pricePerUnit: 28000, total: 1400000, date: '22/09/2026', status: 'BARANG_DITERIMA', stockNote: 'Pengiriman Subuh Dalam Perjalanan', paymentStatus: 'PAID', rating: null, review: '' },
-                { id: 'ORD-2026-004', umkmName: 'Dapur Sambal Malang', supplierName: 'Kelompok Tani Poultry Malang', commodity: 'Daging Ayam Broiler Segar', requestedQty: 150, approvedQty: 150, unit: 'kg', pricePerUnit: 34000, total: 5100000, date: '15/09/2026', status: 'SELESAI', stockNote: 'Selesai & Diterima Dapur', paymentStatus: 'PAID', rating: 5, review: 'Kualitas daging sangat segar dan datang tepat waktu.' }
-            ],
+            orders: @json($dashboardOrders ?? []),
 
             autoOrdersList: @json($autoOrdersList ?? []),
 
@@ -216,7 +373,7 @@
                 var newId = 'ORD-2026-00' + (this.orders.length + 1);
                 var newOrd = {
                     id: newId,
-                    umkmName: 'Dapur Sambal Malang',
+                    umkmName: '{{ addslashes($authUser?->umkmProfile?->business_name ?? 'Dapur UMKM') }}',
                     supplierName: autoOrd.supplierName,
                     commodity: autoOrd.commodity,
                     requestedQty: autoOrd.qty,
@@ -507,7 +664,7 @@
 
             get monitoringAvgScore() {
                 var keys = Object.keys(this.supplierScores);
-                if (!keys.length) return '{{ number_format($avgScore ?? 92.5, 1) }}';
+                if (!keys.length) return '0.0';
                 var sum = 0;
                 for (var i = 0; i < keys.length; i++) {
                     sum += Number(this.supplierScores[keys[i]].final_score || 0);
@@ -517,7 +674,7 @@
 
             get monitoringAvgStar() {
                 var keys = Object.keys(this.supplierScores);
-                if (!keys.length) return '{{ number_format($avgStar ?? 4.8, 1) }}';
+                if (!keys.length) return '0.0';
                 var sum = 0;
                 for (var i = 0; i < keys.length; i++) {
                     sum += Number(this.supplierScores[keys[i]].star_rating || 0);
@@ -527,7 +684,7 @@
 
             get monitoringAvgOtd() {
                 var keys = Object.keys(this.supplierScores);
-                if (!keys.length) return '{{ number_format($avgOtd ?? 98.5, 1) }}';
+                if (!keys.length) return '0.0';
                 var sum = 0;
                 for (var i = 0; i < keys.length; i++) {
                     sum += Number(this.supplierScores[keys[i]].otd_rate || 0);
@@ -537,7 +694,7 @@
 
             get monitoringAvgFill() {
                 var keys = Object.keys(this.supplierScores);
-                if (!keys.length) return '{{ number_format($avgFulfillment ?? 99.2, 1) }}';
+                if (!keys.length) return '0.0';
                 var sum = 0;
                 for (var i = 0; i < keys.length; i++) {
                     sum += Number(this.supplierScores[keys[i]].fill_rate || 0);
@@ -640,6 +797,320 @@
                 this.isLoadingPerformance = false;
             },
 
+            triggerPrint: function(docTitle, contentHtml) {
+                var printWindow = window.open('', '_blank', 'width=900,height=900,menubar=no,toolbar=no,location=no,status=no');
+                if (!printWindow) {
+                    alert('Mohon izinkan pop-up pada browser Anda untuk mencetak atau menyimpan invoice.');
+                    return;
+                }
+
+                var topToolbar = '<div class="no-print-bar" style="background:#f8fafc;border:1px solid #e2e8f0;padding:12px 20px;margin-bottom:24px;border-radius:12px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 3px rgba(0,0,0,0.05);font-family:sans-serif;">'
+                    + '<div style="font-size:13px;color:#334155;font-weight:700;">Pratinjau Faktur Invoice &bull; ' + docTitle + '</div>'
+                    + '<div style="display:flex;gap:8px;">'
+                    + '<button type="button" onclick="window.print()" style="background:#ea580c;color:#fff;border:none;padding:9px 20px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;">🖨️ Cetak / Simpan PDF</button>'
+                    + '<button type="button" onclick="window.close()" style="background:#fff;color:#475569;border:1px solid #cbd5e1;padding:9px 18px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;">Tutup</button>'
+                    + '</div></div>';
+
+                var printStyle = '<' + 'style>'
+                    + '@page { size: A4 portrait; margin: 12mm 10mm; }'
+                    + '* { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }'
+                    + 'body { margin: 0; padding: 24px; background: #ffffff !important; color: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }'
+                    + '@media print { .no-print-bar { display: none !important; } body { padding: 0 !important; } }'
+                    + '<' + '/style>';
+
+                var fullDoc = '<' + '!DOCTYPE html><' + 'html lang="id"><' + 'head>'
+                    + '<' + 'meta charset="utf-8">'
+                    + '<' + 'meta name="viewport" content="width=device-width, initial-scale=1.0">'
+                    + '<' + 'title>' + docTitle + '<' + '/title>'
+                    + printStyle
+                    + '<' + '/head><' + 'body>'
+                    + topToolbar
+                    + contentHtml
+                    + '<' + '/body><' + '/html>';
+
+                printWindow.document.open();
+                printWindow.document.write(fullDoc);
+                printWindow.document.close();
+                printWindow.focus();
+
+                setTimeout(function() {
+                    try { printWindow.print(); } catch (e) {}
+                }, 400);
+            },
+
+            printUmkmBatchInvoice: function(inv) {
+                const invoiceHtml = `
+                    <div style="max-width:850px; margin:0 auto; padding:20px; color:#0f172a; background:#ffffff;">
+                        <table style="width:100%; border-collapse:collapse; margin-bottom:24px; border-bottom:2px solid #0f172a; padding-bottom:14px;">
+                            <tr>
+                                <td style="vertical-align:top; width:58%;">
+                                    <div style="font-size:26px; font-weight:800; color:#ea580c; letter-spacing:1px; line-height:1;">
+                                        SORAI <span style="font-size:11px; font-weight:700; color:#64748b; letter-spacing:1.5px; border-left:1px solid #cbd5e1; padding-left:8px;">PORTAL UMKM B2B</span>
+                                    </div>
+                                    <div style="margin-top:10px; font-size:14px; font-weight:700; color:#0f172a;">${inv.umkmName}</div>
+                                    <div style="font-size:11px; color:#475569;">Penanggung Jawab: ${inv.umkmOwner} | Telp: ${inv.umkmPhone}</div>
+                                    <div style="font-size:11px; color:#475569; margin-top:2px;">Alamat Dapur: ${inv.umkmAddress}</div>
+                                </td>
+                                <td style="vertical-align:top; text-align:right; width:42%;">
+                                    <div style="font-size:24px; font-weight:800; color:#0f172a; letter-spacing:1.5px; line-height:1;">BUKTI PEMBAYARAN</div>
+                                    <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-top:3px;">FAKTUR RESMI BATCH INVOICE</div>
+                                    <table style="font-size:11px; margin-top:10px; margin-left:auto; text-align:left; border-collapse:collapse; font-variant-numeric:tabular-nums;">
+                                        <tr>
+                                            <td style="padding:2px 8px; color:#64748b;">No. Faktur</td>
+                                            <td style="padding:2px 8px; font-weight:700; color:#ea580c;">: ${inv.invoiceNumber}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding:2px 8px; color:#64748b;">Ref. Pesanan</td>
+                                            <td style="padding:2px 8px; font-weight:700;">: ${inv.orderCode}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding:2px 8px; color:#64748b;">Tanggal Lunas</td>
+                                            <td style="padding:2px 8px; font-weight:600;">: ${inv.paidAt}</td>
+                                        </tr>
+                                    </table>
+                                    <div style="margin-top:10px;">
+                                        <span style="display:inline-block; border:2px solid #059669; color:#059669; background:#ecfdf5; font-weight:800; font-size:11px; padding:4px 14px; border-radius:4px; text-transform:uppercase; letter-spacing:1.2px;">
+                                            ✓ LUNAS / TERVERIFIKASI
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <table style="width:100%; border-collapse:collapse; margin-bottom:20px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px;">
+                            <tr>
+                                <td style="padding:14px; width:50%; vertical-align:top; border-right:1px solid #e2e8f0;">
+                                    <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">DITERBITKAN OLEH (MITRA PEMASOK):</div>
+                                    <div style="font-size:14px; font-weight:700; color:#0f172a;">${inv.supplierName}</div>
+                                    <div style="font-size:11px; color:#475569; margin-top:2px;">Kontak Supplier: <strong>${inv.supplierPhone}</strong></div>
+                                    <div style="font-size:11px; color:#475569; margin-top:2px;">Gudang / Distribusi: ${inv.supplierAddress}</div>
+                                </td>
+                                <td style="padding:14px; width:50%; vertical-align:top;">
+                                    <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-bottom:4px;">INFORMASI PENYELESAIAN TRANSAKSI:</div>
+                                    <div style="font-size:11px; color:#475569; line-height:1.6;">
+                                        <div>Metode Bayar: <strong>${inv.paymentMethod}</strong></div>
+                                        <div>Nomor Referensi: <strong>${inv.refNumber}</strong></div>
+                                        <div>Jaminan Transaksi: <strong>Escrow Resmi Sorai B2B</strong></div>
+                                        <div>Tahapan Pengiriman: <strong>${inv.batchName}</strong></div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <table style="width:100%; border-collapse:collapse; margin-bottom:20px; font-size:11px;">
+                            <thead>
+                                <tr style="background:#0f172a; color:#ffffff;">
+                                    <th style="padding:9px 12px; text-align:center; width:35px; border:1px solid #0f172a;">NO</th>
+                                    <th style="padding:9px 12px; text-align:left; border:1px solid #0f172a;">DESKRIPSI BAHAN BAKU / KOMODITAS</th>
+                                    <th style="padding:9px 12px; text-align:center; width:110px; border:1px solid #0f172a;">KLOTER</th>
+                                    <th style="padding:9px 12px; text-align:center; width:100px; border:1px solid #0f172a;">VOLUME</th>
+                                    <th style="padding:9px 12px; text-align:right; width:140px; border:1px solid #0f172a;">TOTAL LUNAS (IDR)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="padding:12px; text-align:center; border:1px solid #e2e8f0; vertical-align:top;">1</td>
+                                    <td style="padding:12px; border:1px solid #e2e8f0; vertical-align:top;">
+                                        <div style="font-weight:700; font-size:12px; color:#0f172a;">${inv.commodityName}</div>
+                                        <div style="font-size:10px; color:#64748b; margin-top:3px;">Pasokan bahan baku berkualitas sesuai penerimaan fisik dapur.</div>
+                                    </td>
+                                    <td style="padding:12px; text-align:center; border:1px solid #e2e8f0; vertical-align:top;">
+                                        <span style="background:#f1f5f9; padding:2px 8px; border-radius:4px; font-weight:700;">${inv.batchName}</span>
+                                    </td>
+                                    <td style="padding:12px; text-align:center; font-weight:700; font-variant-numeric:tabular-nums; border:1px solid #e2e8f0; vertical-align:top;">
+                                        ${inv.quantity}
+                                    </td>
+                                    <td style="padding:12px; text-align:right; font-weight:700; font-size:13px; font-variant-numeric:tabular-nums; border:1px solid #e2e8f0; vertical-align:top;">
+                                        ${inv.amount}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <table style="width:100%; border-collapse:collapse; margin-bottom:25px;">
+                            <tr>
+                                <td style="width:55%; vertical-align:top; padding-right:20px;">
+                                    <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:4px;">STATUS KEABSAHAN TRANSAKSI:</div>
+                                    <div style="padding:10px 12px; background:#f0fdf4; border-left:3px solid #16a34a; font-size:11px; color:#166534; line-height:1.4; border-radius:2px;">
+                                        Tagihan kloter ini telah terverifikasi lunas secara otomatis melalui gateway pembayaran resmi. Dana diteruskan ke pemasok dengan aman.
+                                    </div>
+                                    <div style="font-size:10px; color:#64748b; margin-top:8px; line-height:1.4;">
+                                        <em>*Dokumen ini diterbitkan secara sah oleh sistem Sorai B2B Procurement dan dapat digunakan sebagai bukti pembukuan / arsip pengeluaran resmi UMKM.</em>
+                                    </div>
+                                </td>
+                                <td style="width:45%; vertical-align:top;">
+                                    <table style="width:100%; font-size:11px; border-collapse:collapse; font-variant-numeric:tabular-nums;">
+                                        <tr>
+                                            <td style="padding:6px 8px; color:#475569;">Subtotal Batch</td>
+                                            <td style="padding:6px 8px; text-align:right; font-weight:700;">${inv.amount}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding:6px 8px; color:#475569;">PPN Pangan (0%)</td>
+                                            <td style="padding:6px 8px; text-align:right; color:#64748b;">Rp 0</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding:6px 8px; color:#475569;">Biaya Layanan Platform</td>
+                                            <td style="padding:6px 8px; text-align:right; color:#059669; font-weight:700;">Rp 0 (Gratis)</td>
+                                        </tr>
+                                        <tr style="border-top:2px solid #0f172a; border-bottom:2px solid #0f172a; background:#f8fafc;">
+                                            <td style="padding:10px 8px; font-size:12px; font-weight:800; color:#0f172a;">TOTAL DIBAYAR:</td>
+                                            <td style="padding:10px 8px; text-align:right; font-size:16px; font-weight:800; color:#ea580c;">${inv.amount}</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <table style="width:100%; border-collapse:collapse; margin-top:35px; padding-top:20px; border-top:1px dashed #cbd5e1; text-align:center; font-size:11px;">
+                            <tr>
+                                <td style="width:50%; vertical-align:bottom; padding-bottom:5px;">
+                                    <div style="color:#64748b; font-size:10px; text-transform:uppercase; font-weight:700;">Dapur Pemesan / Mitra UMKM</div>
+                                    <div style="height:60px;"></div>
+                                    <div style="font-weight:700; border-top:1px solid #94a3b8; display:inline-block; min-width:180px; padding-top:4px;">${inv.umkmOwner}</div>
+                                    <div style="color:#64748b; font-size:10px;">${inv.umkmName}</div>
+                                </td>
+                                <td style="width:50%; vertical-align:bottom; padding-bottom:5px;">
+                                    <div style="color:#64748b; font-size:10px; text-transform:uppercase; font-weight:700;">Mitra Pemasok Terverifikasi</div>
+                                    <div style="height:60px;"></div>
+                                    <div style="font-weight:700; border-top:1px solid #94a3b8; display:inline-block; min-width:180px; padding-top:4px;">${inv.supplierName}</div>
+                                    <div style="color:#64748b; font-size:10px;">Distributor Resmi Sorai</div>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                `;
+                this.triggerPrint("Faktur_Invoice_" + inv.invoiceNumber.replace(/[^a-zA-Z0-9]/g, '_'), invoiceHtml);
+            },
+
+            printUmkmOrderInvoice: function(ord) {
+                const totalFormatted = 'Rp ' + Number(ord.total || 0).toLocaleString('id-ID');
+                const isPaid = ord.paymentStatus === 'PAID';
+                const invoiceNum = ord.invoiceNumber || ('INV-' + ord.id);
+                const orderDate = ord.date || new Date().toLocaleDateString('id-ID');
+
+                const invoiceHtml = `
+                    <div style="max-width:850px; margin:0 auto; padding:20px; color:#0f172a; background:#ffffff;">
+                        <table style="width:100%; border-collapse:collapse; margin-bottom:24px; border-bottom:2px solid #0f172a; padding-bottom:14px;">
+                            <tr>
+                                <td style="vertical-align:top; width:58%;">
+                                    <div style="font-size:26px; font-weight:800; color:#ea580c; letter-spacing:1px; line-height:1;">
+                                        SORAI <span style="font-size:11px; font-weight:700; color:#64748b; letter-spacing:1.5px; border-left:1px solid #cbd5e1; padding-left:8px;">FAKTUR PENGADAAN DAPUR</span>
+                                    </div>
+                                    <div style="margin-top:10px; font-size:14px; font-weight:700; color:#0f172a;">Dapur UMKM Pemesan</div>
+                                    <div style="font-size:11px; color:#475569;">Pemasok Mitra: <strong>${ord.supplierName}</strong></div>
+                                    <div style="font-size:11px; color:#475569; margin-top:2px;">Alamat Pemasok: ${ord.supplierAddress || 'Malang Raya'} | Telp: ${ord.supplierPhone || '-'}</div>
+                                </td>
+                                <td style="vertical-align:top; text-align:right; width:42%;">
+                                    <div style="font-size:24px; font-weight:800; color:#0f172a; letter-spacing:1.5px; line-height:1;">FAKTUR TRANSAKSI</div>
+                                    <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:1px; margin-top:3px;">ARSIP KESELURUHAN PENGADAAN</div>
+                                    <table style="font-size:11px; margin-top:10px; margin-left:auto; text-align:left; border-collapse:collapse; font-variant-numeric:tabular-nums;">
+                                        <tr>
+                                            <td style="padding:2px 8px; color:#64748b;">No. Transaksi</td>
+                                            <td style="padding:2px 8px; font-weight:700; color:#ea580c;">: ${ord.id}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding:2px 8px; color:#64748b;">No. Faktur</td>
+                                            <td style="padding:2px 8px; font-weight:700;">: ${invoiceNum}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding:2px 8px; color:#64748b;">Tanggal Transaksi</td>
+                                            <td style="padding:2px 8px; font-weight:600;">: ${orderDate}</td>
+                                        </tr>
+                                    </table>
+                                    <div style="margin-top:10px;">
+                                        ${isPaid
+                                            ? '<span style="display:inline-block; border:2px solid #059669; color:#059669; background:#ecfdf5; font-weight:800; font-size:11px; padding:4px 14px; border-radius:4px; text-transform:uppercase; letter-spacing:1.2px;">✓ LUNAS / PAID</span>'
+                                            : '<span style="display:inline-block; border:2px solid #d97706; color:#d97706; background:#fffbeb; font-weight:800; font-size:11px; padding:4px 14px; border-radius:4px; text-transform:uppercase; letter-spacing:1.2px;">MENUNGGU PEMBAYARAN</span>'
+                                        }
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <table style="width:100%; border-collapse:collapse; margin-bottom:20px; font-size:11px;">
+                            <thead>
+                                <tr style="background:#0f172a; color:#ffffff;">
+                                    <th style="padding:9px 12px; text-align:center; width:35px; border:1px solid #0f172a;">NO</th>
+                                    <th style="padding:9px 12px; text-align:left; border:1px solid #0f172a;">RINCIAN KOMODITAS BAHAN BAKU</th>
+                                    <th style="padding:9px 12px; text-align:center; width:120px; border:1px solid #0f172a;">VOLUME TOTAL</th>
+                                    <th style="padding:9px 12px; text-align:center; width:120px; border:1px solid #0f172a;">STATUS BAYAR</th>
+                                    <th style="padding:9px 12px; text-align:right; width:150px; border:1px solid #0f172a;">TOTAL NILAI TRANSAKSI</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td style="padding:12px; text-align:center; border:1px solid #e2e8f0; vertical-align:top;">1</td>
+                                    <td style="padding:12px; border:1px solid #e2e8f0; vertical-align:top;">
+                                        <div style="font-weight:700; font-size:12px; color:#0f172a;">${ord.commodity}</div>
+                                        <div style="font-size:10px; color:#64748b; margin-top:3px;">Pemasok: ${ord.supplierName} &bull; Pengiriman langsung ke dapur operasional.</div>
+                                        ${ord.rating ? `<div style="margin-top:5px; font-size:10px; color:#d97706; font-weight:700;">★ Rating Dapur: ${ord.rating}.0 / 5</div>` : ''}
+                                    </td>
+                                    <td style="padding:12px; text-align:center; font-weight:700; font-variant-numeric:tabular-nums; border:1px solid #e2e8f0; vertical-align:top;">
+                                        ${ord.approvedQty} ${ord.unit}
+                                    </td>
+                                    <td style="padding:12px; text-align:center; border:1px solid #e2e8f0; vertical-align:top;">
+                                        <span style="display:inline-block; padding:2px 8px; border-radius:4px; font-weight:700; ${isPaid ? 'color:#059669; background:#ecfdf5;' : 'color:#d97706; background:#fffbeb;'}">
+                                            ${ord.paymentStatus}
+                                        </span>
+                                    </td>
+                                    <td style="padding:12px; text-align:right; font-weight:700; font-size:13px; font-variant-numeric:tabular-nums; border:1px solid #e2e8f0; vertical-align:top;">
+                                        ${totalFormatted}
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <table style="width:100%; border-collapse:collapse; margin-bottom:25px;">
+                            <tr>
+                                <td style="width:55%; vertical-align:top; padding-right:20px;">
+                                    <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:4px;">CATATAN TRANSAKSI:</div>
+                                    <div style="padding:10px 12px; background:#f8fafc; border-left:3px solid #ea580c; font-size:11px; color:#334155; line-height:1.4; border-radius:2px;">
+                                        Faktur pengadaan ini merupakan ringkasan resmi transaksi pemesanan bahan baku dapur yang dikelola melalui ekosistem B2B SORAI.
+                                    </div>
+                                    <div style="font-size:10px; color:#64748b; margin-top:8px; line-height:1.4;">
+                                        <em>*Validasi digital otomatis. Tidak membutuhkan stempel basah.</em>
+                                    </div>
+                                </td>
+                                <td style="width:45%; vertical-align:top;">
+                                    <table style="width:100%; font-size:11px; border-collapse:collapse; font-variant-numeric:tabular-nums;">
+                                        <tr>
+                                            <td style="padding:6px 8px; color:#475569;">Subtotal Transaksi</td>
+                                            <td style="padding:6px 8px; text-align:right; font-weight:700;">${totalFormatted}</td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding:6px 8px; color:#475569;">PPN Pangan 0%</td>
+                                            <td style="padding:6px 8px; text-align:right; color:#64748b;">Rp 0</td>
+                                        </tr>
+                                        <tr style="border-top:2px solid #0f172a; border-bottom:2px solid #0f172a; background:#f8fafc;">
+                                            <td style="padding:10px 8px; font-size:12px; font-weight:800; color:#0f172a;">TOTAL TAGIHAN:</td>
+                                            <td style="padding:10px 8px; text-align:right; font-size:16px; font-weight:800; color:#ea580c;">${totalFormatted}</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <table style="width:100%; border-collapse:collapse; margin-top:30px; text-align:center; font-size:11px; border-top:1px dashed #cbd5e1; padding-top:20px;">
+                            <tr>
+                                <td style="width:50%; vertical-align:bottom; padding-bottom:5px;">
+                                    <div style="color:#64748b; font-size:10px; text-transform:uppercase; font-weight:700;">Pengelola Dapur UMKM</div>
+                                    <div style="height:55px;"></div>
+                                    <div style="font-weight:700; border-top:1px solid #94a3b8; display:inline-block; min-width:180px; padding-top:4px;">Dapur UMKM</div>
+                                    <div style="color:#64748b; font-size:10px;">Pembeli Terverifikasi</div>
+                                </td>
+                                <td style="width:50%; vertical-align:bottom; padding-bottom:5px;">
+                                    <div style="color:#64748b; font-size:10px; text-transform:uppercase; font-weight:700;">Pemasok Terdaftar</div>
+                                    <div style="height:55px;"></div>
+                                    <div style="font-weight:700; border-top:1px solid #94a3b8; display:inline-block; min-width:180px; padding-top:4px;">${ord.supplierName}</div>
+                                    <div style="color:#64748b; font-size:10px;">Mitra Suplai B2B Sorai</div>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                `;
+                this.triggerPrint("Faktur_Transaksi_" + ord.id, invoiceHtml);
+            },
+
             notify: function(msg) {
                 var self = this;
                 this.notificationMsg = msg;
@@ -685,14 +1156,10 @@
     <div x-show="activeTab === 'katalog'" class="space-y-6">
 
         <!-- PAGE HEADER -->
-        <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-5">
+        <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-4">
             <div>
-                <span class="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#ea580c] tracking-[0.14em] uppercase">
-                    <span class="w-1.5 h-1.5 rounded-full bg-[#ea580c]"></span>
-                    <span>Katalog Lokal</span>
-                </span>
-                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mt-1">Pilih &amp; Ajukan Kemitraan Pasokan</h2>
-                <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">Bandingkan komoditas dari pemasok terverifikasi, periksa skor SLA, dan ajukan jadwal pengiriman rutin untuk dapur Anda.</p>
+                <h2 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Katalog Bahan Baku</h2>
+                <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Pilih komoditas segar berkualitas dari mitra pemasok terverifikasi untuk dapur Anda.</p>
             </div>
             <div class="shrink-0 self-start sm:self-end">
                 <span class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200/90 shadow-2xs text-xs font-semibold text-slate-700 tabular-nums">
@@ -1006,14 +1473,10 @@
     <div x-cloak x-show="activeTab === 'supply-planning'" class="space-y-6">
 
         <!-- 1. ARCHITECTURAL HEADER -->
-        <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-5">
+        <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-4">
             <div>
-                <span class="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#ea580c] tracking-[0.14em] uppercase">
-                    <span class="w-1.5 h-1.5 rounded-full bg-[#ea580c]"></span>
-                    <span>Kolaborasi Rantai Pasok</span>
-                </span>
-                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mt-1">Collaborative Supply Planning</h2>
-                <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">Sampaikan proyeksi kebutuhan bahan baku dapur untuk periode mendatang agar pemasok dapat menyiapkan kuota panen dan stok secara presisi.</p>
+                <h2 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Perencanaan Pasokan</h2>
+                <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Kelola proyeksi kebutuhan bahan baku dapur secara terencana bersama mitra.</p>
             </div>
             <div class="shrink-0 self-start sm:self-end">
                 <span class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white border border-slate-200/90 shadow-2xs text-xs font-semibold text-slate-700 tabular-nums">
@@ -1180,60 +1643,21 @@
                         </h4>
                     </div>
 
-                    <div class="space-y-4 text-xs">
-                        <div class="flex items-start gap-3">
-                            <div class="w-8 h-8 rounded-xl bg-orange-50 text-[#ea580c] border border-orange-200/60 flex items-center justify-center shrink-0">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                            <div>
-                                <h5 class="font-bold text-slate-900">Sinkronisasi Siklus Panen</h5>
-                                <p class="text-[11px] text-slate-500 leading-relaxed mt-0.5">Pemasok menyiapkan kapasitas kandang dan panen sesuai kebutuhan bulanan Anda.</p>
-                            </div>
+                    <div class="space-y-3 text-xs">
+                        <div class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                            <span class="w-2 h-2 rounded-full bg-orange-500 shrink-0"></span>
+                            <span class="font-semibold text-slate-800">Sinkronisasi Panen:</span>
+                            <span class="text-slate-500">Kapasitas disiapkan sesuai kebutuhan.</span>
                         </div>
-
-                        <div class="flex items-start gap-3">
-                            <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center shrink-0">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                                </svg>
-                            </div>
-                            <div>
-                                <h5 class="font-bold text-slate-900">Stabilitas Harga Grosir</h5>
-                                <p class="text-[11px] text-slate-500 leading-relaxed mt-0.5">Dapur terhindar dari lonjakan harga mendadak akibat kelangkaan stok di pasar.</p>
-                            </div>
+                        <div class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                            <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                            <span class="font-semibold text-slate-800">Stabilitas Harga:</span>
+                            <span class="text-slate-500">Aman dari lonjakan harga pasar.</span>
                         </div>
-
-                        <div class="flex items-start gap-3">
-                            <div class="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 border border-sky-200/60 flex items-center justify-center shrink-0">
-                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.9">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
-                            </div>
-                            <div>
-                                <h5 class="font-bold text-slate-900">Prioritas Pasokan Subuh</h5>
-                                <p class="text-[11px] text-slate-500 leading-relaxed mt-0.5">Dapur Anda masuk antrean alokasi pengiriman pertama sebelum operasional dimulai.</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 3-Step Flow Checklist -->
-                    <div class="pt-4 border-t border-slate-100 space-y-2.5">
-                        <span class="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">Alur Kerja Kolaborasi</span>
-                        <div class="space-y-2 text-[11px] text-slate-600 font-medium">
-                            <div class="flex items-center gap-2.5">
-                                <span class="w-5 h-5 rounded-md bg-orange-50 border border-orange-200/70 text-[#ea580c] text-[10px] font-bold flex items-center justify-center shrink-0 tabular-nums">1</span>
-                                <span>UMKM kirim estimasi kebutuhan</span>
-                            </div>
-                            <div class="flex items-center gap-2.5">
-                                <span class="w-5 h-5 rounded-md bg-orange-50 border border-orange-200/70 text-[#ea580c] text-[10px] font-bold flex items-center justify-center shrink-0 tabular-nums">2</span>
-                                <span>Pemasok konfirmasi kuota pasokan</span>
-                            </div>
-                            <div class="flex items-center gap-2.5">
-                                <span class="w-5 h-5 rounded-md bg-orange-50 border border-orange-200/70 text-[#ea580c] text-[10px] font-bold flex items-center justify-center shrink-0 tabular-nums">3</span>
-                                <span>Pasokan terjamin aman &amp; stabil</span>
-                            </div>
+                        <div class="flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                            <span class="w-2 h-2 rounded-full bg-sky-500 shrink-0"></span>
+                            <span class="font-semibold text-slate-800">Prioritas Pasokan:</span>
+                            <span class="text-slate-500">Pengiriman sebelum dapur beroperasi.</span>
                         </div>
                     </div>
                 </div>
@@ -1432,15 +1856,9 @@
     <div x-cloak x-show="activeTab === 'pemesanan'" class="space-y-6">
 
         <!-- HEADER TITLE -->
-        <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-5">
-            <div>
-                <span class="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#ea580c] tracking-[0.14em] uppercase">
-                    <span class="w-1.5 h-1.5 rounded-full bg-[#ea580c]"></span>
-                    <span>Daftar Transaksi Aktif</span>
-                </span>
-                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mt-1">Pesanan &amp; Pengiriman</h2>
-                <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">Kelola jadwal pemesanan otomatis kontrak terikat, konfirmasi kedatangan fisik bahan baku, pembayaran Midtrans, serta evaluasi mutu pemasok.</p>
-            </div>
+        <div class="border-b border-slate-200/80 pb-4">
+            <h2 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Pesanan &amp; Pengiriman</h2>
+            <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Pantau status pengiriman pesanan, penerimaan bahan baku, dan pembayaran.</p>
         </div>
 
         <!-- SUB-NAVIGASI TAB CLEAN UNDERLINE DESIGN -->
@@ -2646,7 +3064,7 @@
                                                 </form>
                                             </div>
                                         @else
-                                            <div class="inline-flex flex-col items-center">
+                                            <div class="inline-flex flex-col items-center gap-1.5">
                                                 <span class="text-emerald-700 font-semibold text-[11px] inline-flex items-center gap-1">
                                                     <svg class="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7" />
@@ -2654,8 +3072,32 @@
                                                     <span>Lunas via {{ $inv->payment_method ?? 'Midtrans' }}</span>
                                                 </span>
                                                 @if($inv->midtrans_transaction_id)
-                                                    <span class="text-[10px] text-slate-400 mt-0.5 tabular-nums">Ref: {{ $inv->midtrans_transaction_id }}</span>
+                                                    <span class="text-[10px] text-slate-400 tabular-nums">Ref: {{ $inv->midtrans_transaction_id }}</span>
                                                 @endif
+                                                <button type="button"
+                                                        @click="printUmkmBatchInvoice({
+                                                            invoiceNumber: '{{ $inv->invoice_number ?? ('INV/' . strtoupper(substr($inv->order_id, 0, 8)) . '/B' . $inv->shipment_batch) }}',
+                                                            orderCode: 'ORD-{{ strtoupper(substr($inv->order_id, 0, 8)) }}',
+                                                            date: '{{ ($inv->paid_at ?? $inv->created_at)->format('d F Y') }}',
+                                                            supplierName: '{{ addslashes($invOrder?->partnership?->supplier?->company_name ?? 'Pemasok Mitra') }}',
+                                                            supplierPhone: '{{ addslashes($invOrder?->partnership?->supplier?->phone ?? '-') }}',
+                                                            supplierAddress: '{{ addslashes($invOrder?->partnership?->supplier?->warehouse_address ?? 'Malang Raya') }}',
+                                                            umkmName: '{{ addslashes($umkmBusinessName ?? 'Dapur UMKM') }}',
+                                                            umkmOwner: '{{ addslashes($authUser?->umkmProfile?->owner_name ?? $authUser?->name ?? 'Pemilik Dapur') }}',
+                                                            umkmPhone: '{{ addslashes($authUser?->umkmProfile?->phone ?? '-') }}',
+                                                            umkmAddress: '{{ addslashes($authUser?->umkmProfile?->address ?? 'Malang') }}',
+                                                            commodityName: '{{ addslashes($commodityName) }}',
+                                                            batchName: '{{ $batchBadge }}',
+                                                            quantity: '{{ number_format((float) ($inv->quantity_billed ?: 0), 1) }} {{ $unit }}',
+                                                            amount: 'Rp {{ number_format($inv->amount, 0, ',', '.') }}',
+                                                            paymentMethod: '{{ $inv->payment_method ?? 'Midtrans Instant' }}',
+                                                            paidAt: '{{ ($inv->paid_at ?? $inv->transaction_time ?? now())->format('d/m/Y H:i') }} WIB',
+                                                            refNumber: '{{ $inv->midtrans_transaction_id ?? '-' }}'
+                                                        })"
+                                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 hover:bg-orange-100 text-[#ea580c] border border-orange-200/80 rounded-xl font-bold text-[10px] transition cursor-pointer">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                                                    <span>Cetak / Simpan Invoice</span>
+                                                </button>
                                             </div>
                                         @endif
                                     </td>
@@ -2881,50 +3323,35 @@
     <div x-show="activeTab === 'dashboard'" class="space-y-6">
 
         <!-- PAGE HEADER -->
-        <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-5">
-            <div>
-                <span class="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#ea580c] tracking-[0.14em] uppercase">
-                    <span class="w-1.5 h-1.5 rounded-full bg-[#ea580c]"></span>
-                    <span>Ringkasan Eksekutif</span>
-                </span>
-                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mt-1">Dashboard Analisis Pengadaan</h2>
-                <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">Pantau tren pengeluaran bulanan, sebaran kontrak kemitraan aktif, dan histori transaksi bahan baku dapur UMKM Anda.</p>
-            </div>
+        <div class="border-b border-slate-200/80 pb-4">
+            <h2 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Analisis Pengadaan</h2>
+            <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Pantau ringkasan pengeluaran bulanan, kemitraan aktif, dan riwayat belanja dapur.</p>
         </div>
 
         <!-- METRICS CARDS UMKM -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 tabular-nums">
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-xs border border-slate-200/80 space-y-1.5">
                 <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Total Pengeluaran Bulan Ini</span>
-                <p class="text-2xl font-bold text-[#ea580c]">Rp 12.220.000</p>
-                <p class="text-[11px] text-emerald-600 font-semibold inline-flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                    <span>Hemat 12% via Harga Grosir</span>
-                </p>
+                <p class="text-2xl font-bold text-[#ea580c]">Rp {{ number_format($totalPengeluaranBulanIni ?? 0, 0, ',', '.') }}</p>
             </div>
 
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-xs border border-slate-200/80 space-y-1.5">
                 <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Pesanan Aktif</span>
-                <p class="text-2xl font-bold text-slate-900">2 Transaksi</p>
-                <p class="text-[11px] text-amber-600 font-semibold inline-flex items-center gap-1.5">
-                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                    <span>1 Perlu Konfirmasi Penerimaan</span>
-                </p>
+                <p class="text-2xl font-bold text-slate-900">{{ $activeOrdersCount ?? 0 }} Transaksi</p>
             </div>
 
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-xs border border-slate-200/80 space-y-1.5">
                 <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Total Diterima</span>
-                <p class="text-2xl font-bold text-slate-900">380 kg</p>
-                <p class="text-[11px] text-slate-500 font-medium">Daging Ayam &amp; Bumbu Dapur</p>
+                <p class="text-2xl font-bold text-slate-900">{{ number_format($totalDiterimaKg ?? 0, 0, ',', '.') }} kg</p>
             </div>
 
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-xs border border-slate-200/80 space-y-1.5">
-                <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">On-Time Delivery</span>
-                <p class="text-2xl font-bold text-emerald-600">100%</p>
-                <p class="text-[11px] text-emerald-600 font-semibold inline-flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                    <span>Tiba Sebelum Jam 07.00 WIB</span>
-                </p>
+                <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Ketepatan Waktu Kirim</span>
+                @if(($onTimeDeliveryRate ?? 0) > 0)
+                    <p class="text-2xl font-bold text-emerald-600">{{ number_format($onTimeDeliveryRate, 1) }}%</p>
+                @else
+                    <p class="text-2xl font-bold text-slate-400">0%</p>
+                @endif
             </div>
         </div>
 
@@ -2937,7 +3364,7 @@
                     <div>
                         <div class="flex items-center gap-2">
                             <h3 class="font-bold text-base sm:text-lg text-slate-900 tracking-tight">Tren Pengadaan &amp; Realisasi Pasokan</h3>
-                            <span class="text-[10px] font-semibold bg-orange-50 text-[#ea580c] border border-orange-200/70 px-2 py-0.5 rounded-md">B2B Analytics</span>
+                            <span class="text-[10px] font-semibold bg-orange-50 text-[#ea580c] border border-orange-200/70 px-2 py-0.5 rounded-md">Analisis Pasokan</span>
                         </div>
                         <p class="text-xs text-slate-500 mt-0.5">Pemantauan realisasi volume pasokan komoditas bulanan dari kontrak kemitraan aktif</p>
                     </div>
@@ -2960,6 +3387,48 @@
                 </div>
 
                 <!-- WAVE SVG LINE CHART -->
+                @php
+                    $chartPoints = [];
+                    $xList = [45, 150, 260, 370, 480, 585, 685];
+                    $maxVolumeInChart = 500;
+                    if (!empty($trendsData)) {
+                        foreach ($trendsData as $td) {
+                            if ($td['volume'] > $maxVolumeInChart) {
+                                $maxVolumeInChart = $td['volume'] * 1.25;
+                            }
+                        }
+                    }
+
+                    $hasVolume = ($totalDeliveredAllMonths ?? 0) > 0;
+                    foreach (($trendsData ?? []) as $i => $td) {
+                        $cx = $xList[$i] ?? (45 + $i * 105);
+                        $cy = $hasVolume && $maxVolumeInChart > 0
+                            ? (200 - round(($td['volume'] / $maxVolumeInChart) * 170))
+                            : 200;
+                        $chartPoints[] = [
+                            'cx' => $cx,
+                            'cy' => $cy,
+                            'vol' => $td['volume'],
+                            'cost' => $td['cost'],
+                            'label' => $td['label'],
+                            'is_active' => ($i === 5 || $i === 6)
+                        ];
+                    }
+
+                    if ($hasVolume && count($chartPoints) > 1) {
+                        $wavePath = "M" . $chartPoints[0]['cx'] . "," . $chartPoints[0]['cy'];
+                        for ($i = 0; $i < count($chartPoints) - 1; $i++) {
+                            $curr = $chartPoints[$i];
+                            $next = $chartPoints[$i+1];
+                            $midX = ($curr['cx'] + $next['cx']) / 2;
+                            $wavePath .= " C" . $midX . "," . $curr['cy'] . " " . $midX . "," . $next['cy'] . " " . $next['cx'] . "," . $next['cy'];
+                        }
+                        $areaPath = $wavePath . " L685,200 L45,200 Z";
+                    } else {
+                        $wavePath = "M45,200 L685,200";
+                        $areaPath = "M45,200 L685,200 Z";
+                    }
+                @endphp
                 <div class="relative w-full overflow-hidden pt-2">
                     <svg viewBox="0 0 700 240" class="w-full h-auto overflow-visible">
                         <defs>
@@ -2990,42 +3459,26 @@
                         <text x="35" y="204" class="text-[10px] fill-slate-400 font-semibold" text-anchor="end">0</text>
 
                         <!-- Area Fill Under Path -->
-                        <path
-                            d="M45,160 C110,150 160,135 220,115 C280,95 330,120 390,85 C450,50 510,75 570,45 C620,25 655,35 685,30 L685,200 L45,200 Z"
-                            fill="url(#umkmWaveGrad)"
-                        />
+                        <path d="{{ $areaPath }}" fill="url(#umkmWaveGrad)" />
 
                         <!-- Smooth Wave Line Path -->
-                        <path
-                            d="M45,160 C110,150 160,135 220,115 C280,95 330,120 390,85 C450,50 510,75 570,45 C620,25 655,35 685,30"
-                            fill="none"
-                            stroke="url(#umkmLineGrad)"
-                            stroke-width="3"
-                            stroke-linecap="round"
-                        />
+                        <path d="{{ $wavePath }}" fill="none" stroke="url(#umkmLineGrad)" stroke-width="3" stroke-linecap="round" />
 
                         <!-- Data Points (Circles) -->
-                        <g class="cursor-pointer group">
-                            <circle cx="45" cy="160" r="4" fill="#ffffff" stroke="#ea580c" stroke-width="2.5" />
-                        </g>
-                        <g class="cursor-pointer group">
-                            <circle cx="150" cy="138" r="4" fill="#ffffff" stroke="#ea580c" stroke-width="2.5" />
-                        </g>
-                        <g class="cursor-pointer group">
-                            <circle cx="260" cy="102" r="4" fill="#ffffff" stroke="#ea580c" stroke-width="2.5" />
-                        </g>
-                        <g class="cursor-pointer group">
-                            <circle cx="370" cy="92" r="4" fill="#ffffff" stroke="#ea580c" stroke-width="2.5" />
-                        </g>
-                        <g class="cursor-pointer group">
-                            <circle cx="480" cy="62" r="4" fill="#ffffff" stroke="#ea580c" stroke-width="2.5" />
-                        </g>
-                        <g class="cursor-pointer group">
-                            <circle cx="585" cy="42" r="5" fill="#ea580c" stroke="#ffffff" stroke-width="2.5" class="animate-pulse" />
-                        </g>
-                        <g class="cursor-pointer group">
-                            <circle cx="685" cy="30" r="4" fill="#ffffff" stroke="#ea580c" stroke-width="2.5" />
-                        </g>
+                        @foreach($chartPoints as $pt)
+                            <g class="cursor-pointer group">
+                                <circle cx="{{ $pt['cx'] }}" cy="{{ $pt['cy'] }}" r="{{ $pt['is_active'] && $hasVolume ? '5' : '4' }}"
+                                        fill="{{ $pt['is_active'] && $hasVolume ? '#ea580c' : '#ffffff' }}"
+                                        stroke="{{ $pt['is_active'] && $hasVolume ? '#ffffff' : '#ea580c' }}"
+                                        stroke-width="2.5"
+                                        class="{{ $pt['is_active'] && $hasVolume ? 'animate-pulse' : '' }}" />
+                                <title>{{ $pt['label'] }}: {{ number_format($pt['vol'], 0, ',', '.') }} kg</title>
+                            </g>
+                        @endforeach
+
+                        @if(!$hasVolume)
+                            <text x="365" y="105" class="text-xs fill-slate-400 font-medium" text-anchor="middle">Belum ada histori pengadaan. Grafik akan otomatis terbentuk setelah transaksi pertama.</text>
+                        @endif
 
                         <!-- X-Axis Labels -->
                         <text x="45" y="222" class="text-[10px] fill-slate-400 font-bold" text-anchor="middle">MEI</text>
@@ -3033,18 +3486,18 @@
                         <text x="260" y="222" class="text-[10px] fill-slate-400 font-bold" text-anchor="middle">JUL</text>
                         <text x="370" y="222" class="text-[10px] fill-slate-400 font-bold" text-anchor="middle">AGU</text>
                         <text x="480" y="222" class="text-[10px] fill-slate-400 font-bold" text-anchor="middle">SEP</text>
-                        <text x="585" y="222" class="text-[10px] fill-[#ea580c] font-bold" text-anchor="middle">OKT (AKTIF)</text>
-                        <text x="685" y="222" class="text-[10px] fill-slate-400 font-bold" text-anchor="middle">EST. NOV</text>
+                        <text x="585" y="222" class="text-[10px] fill-[#ea580c] font-bold" text-anchor="middle">OKT</text>
+                        <text x="685" y="222" class="text-[10px] fill-slate-400 font-bold" text-anchor="middle">NOV (AKTIF)</text>
                     </svg>
                 </div>
 
                 <!-- Footer Summary Line Chart -->
                 <div class="flex items-center justify-between text-xs text-slate-500 pt-3 border-t border-slate-100 flex-wrap gap-2 tabular-nums">
                     <span class="inline-flex items-center gap-1.5 font-medium">
-                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                        Realisasi Pasokan: <strong class="text-slate-900 font-semibold">380 Kg</strong> bulan ini (100% tepat waktu sebelum 07.00 WIB)
+                        <span class="w-2 h-2 rounded-full {{ ($realisasiPasokanBulanIni ?? 0) > 0 ? 'bg-emerald-500' : 'bg-slate-300' }}"></span>
+                        Realisasi Pasokan: <strong class="text-slate-900 font-semibold">{{ number_format($realisasiPasokanBulanIni ?? 0, 0, ',', '.') }} Kg</strong> bulan ini
                     </span>
-                    <span class="text-[11px] font-medium text-slate-400">Target Bulan Depan: 420 Kg</span>
+                    <span class="text-[11px] font-medium text-slate-400">Target Bulan Depan: {{ number_format($targetBulanDepan ?? 0, 0, ',', '.') }} Kg</span>
                 </div>
             </div>
 
@@ -3056,19 +3509,25 @@
                 </div>
 
                 @php
-                    $safeActive = max(1, $activeContractsCount ?? 2);
-                    $safePending = max(0, $pendingContractsCount ?? 0);
-                    $totalC = max(1, $safeActive + $safePending);
+                    $safeActive = (int) ($activeContractsCount ?? 0);
+                    $safePending = (int) ($pendingContractsCount ?? 0);
+                    $totalC = $safeActive + $safePending;
                     $circumference = 240;
 
-                    if ($safePending > 0) {
-                        $activeRatio = $safeActive / $totalC;
-                        $pendingRatio = $safePending / $totalC;
-                        $activeDash = max(30, round($activeRatio * ($circumference - 30)));
-                        $pendingDash = max(20, round($pendingRatio * ($circumference - 30)));
-                        $pendingOffset = -($activeDash + 15);
+                    if ($totalC > 0) {
+                        if ($safePending > 0) {
+                            $activeRatio = $safeActive / $totalC;
+                            $pendingRatio = $safePending / $totalC;
+                            $activeDash = max(20, round($activeRatio * ($circumference - 30)));
+                            $pendingDash = max(20, round($pendingRatio * ($circumference - 30)));
+                            $pendingOffset = -($activeDash + 15);
+                        } else {
+                            $activeDash = 230;
+                            $pendingDash = 0;
+                            $pendingOffset = 0;
+                        }
                     } else {
-                        $activeDash = 230;
+                        $activeDash = 0;
                         $pendingDash = 0;
                         $pendingOffset = 0;
                     }
@@ -3078,17 +3537,19 @@
                 <div class="relative w-44 h-44 sm:w-48 sm:h-48 flex items-center justify-center my-2">
                     <svg viewBox="0 0 100 100" class="w-full h-full transform -rotate-90">
                         <circle cx="50" cy="50" r="38" fill="none" stroke="#f1f5f9" stroke-width="11" />
-                        <circle
-                            cx="50"
-                            cy="50"
-                            r="38"
-                            fill="none"
-                            stroke="#ea580c"
-                            stroke-width="11"
-                            stroke-dasharray="{{ $activeDash }} {{ $circumference }}"
-                            stroke-linecap="round"
-                            class="transition-all duration-700 ease-out"
-                        />
+                        @if($safeActive > 0)
+                            <circle
+                                cx="50"
+                                cy="50"
+                                r="38"
+                                fill="none"
+                                stroke="#ea580c"
+                                stroke-width="11"
+                                stroke-dasharray="{{ $activeDash }} {{ $circumference }}"
+                                stroke-linecap="round"
+                                class="transition-all duration-700 ease-out"
+                            />
+                        @endif
 
                         @if($safePending > 0)
                             <circle
@@ -3108,8 +3569,10 @@
 
                     <div class="absolute inset-0 flex flex-col items-center justify-center text-center select-none pointer-events-none tabular-nums">
                         <span class="text-[10px] font-semibold text-slate-400 tracking-wider uppercase block leading-none">Total Kontrak</span>
-                        <span class="text-3xl font-bold text-slate-900 mt-1.5 leading-none tracking-tight">{{ $activeContractsCount ?? 2 }}</span>
-                        <span class="text-[10px] text-[#ea580c] font-bold uppercase tracking-wide mt-1">Aktif Berjalan</span>
+                        <span class="text-3xl font-bold text-slate-900 mt-1.5 leading-none tracking-tight">{{ $safeActive }}</span>
+                        <span class="text-[10px] {{ $safeActive > 0 ? 'text-[#ea580c]' : 'text-slate-400' }} font-bold uppercase tracking-wide mt-1">
+                            {{ $safeActive > 0 ? 'Aktif Berjalan' : 'Belum Ada Kontrak' }}
+                        </span>
                     </div>
                 </div>
 
@@ -3117,21 +3580,25 @@
                 <div class="w-full pt-3 border-t border-slate-100 space-y-2.5 tabular-nums">
                     <div class="flex items-center justify-center gap-5">
                         <div class="flex items-center gap-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-[#ea580c]"></span>
-                            <span class="text-xs font-semibold text-slate-700">Aktif ({{ $activeContractsCount ?? 2 }})</span>
+                            <span class="w-2.5 h-2.5 rounded-full {{ $safeActive > 0 ? 'bg-[#ea580c]' : 'bg-slate-300' }}"></span>
+                            <span class="text-xs font-semibold text-slate-700">Aktif ({{ $safeActive }})</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-[#0284c7]"></span>
-                            <span class="text-xs font-medium text-slate-500">Menunggu ({{ $pendingContractsCount ?? 0 }})</span>
+                            <span class="w-2.5 h-2.5 rounded-full {{ $safePending > 0 ? 'bg-[#0284c7]' : 'bg-slate-300' }}"></span>
+                            <span class="text-xs font-medium text-slate-500">Menunggu ({{ $safePending }})</span>
                         </div>
                     </div>
 
                     <div class="flex items-center justify-center gap-1.5 flex-wrap pt-1">
-                        @foreach(array_slice($activeContractCommodities ?? ['Daging Ayam' => 1, 'Bumbu Dapur' => 1], 0, 3, true) as $cName => $cQty)
+                        @forelse(array_slice($activeContractCommodities ?? [], 0, 3, true) as $cName => $cQty)
                             <span class="text-[10px] font-semibold bg-slate-50 border border-slate-200/80 text-slate-600 px-2.5 py-0.5 rounded-lg truncate max-w-[140px]">
                                 {{ $cName }}
                             </span>
-                        @endforeach
+                        @empty
+                            <span class="text-[10px] font-medium text-slate-400 italic">
+                                Belum ada kontrak aktif
+                            </span>
+                        @endforelse
                     </div>
                 </div>
             </div>
@@ -3155,6 +3622,7 @@
                             <th class="px-4 py-3.5">Total Tagihan</th>
                             <th class="px-4 py-3.5">Status Bayar</th>
                             <th class="px-4 py-3.5">Ulasan Rating</th>
+                            <th class="px-4 py-3.5 text-center">Faktur Invoice</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 font-medium tabular-nums">
@@ -3181,6 +3649,33 @@
                                         <span class="text-[11px] text-slate-400">Belum Ada Rating</span>
                                     </template>
                                 </td>
+                                <td class="px-4 py-3.5 text-center whitespace-nowrap">
+                                    <button type="button"
+                                            @click="printUmkmOrderInvoice(ord)"
+                                            title="Cetak / Simpan Faktur Transaksi"
+                                            class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-orange-50 text-slate-700 hover:text-[#ea580c] border border-slate-200 hover:border-orange-200/80 rounded-xl font-semibold text-[11px] transition shadow-2xs cursor-pointer">
+                                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+                                        <span>Faktur Invoice</span>
+                                    </button>
+                                </td>
+                            </tr>
+                        </template>
+                        <template x-if="orders.length === 0">
+                            <tr>
+                                <td colspan="7" class="px-4 py-12 text-center">
+                                    <div class="max-w-xs mx-auto space-y-3">
+                                        <div class="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+                                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                                        </div>
+                                        <div>
+                                            <p class="font-bold text-slate-800 text-sm">Belum Ada Riwayat Transaksi</p>
+                                            <p class="text-xs text-slate-500 mt-0.5">Transaksi bahan baku dapur Anda akan tercatat di sini setelah pesanan diterbitkan.</p>
+                                        </div>
+                                        <button type="button" @click="setTab('katalog')" class="inline-flex items-center gap-1.5 px-4 py-2 bg-[#ea580c] hover:bg-[#c2410c] text-white rounded-xl text-xs font-semibold transition shadow-xs cursor-pointer">
+                                            <span>Mulai Belanja di Katalog</span>
+                                        </button>
+                                    </div>
+                                </td>
                             </tr>
                         </template>
                     </tbody>
@@ -3195,68 +3690,41 @@
     <!-- ========================================================= -->
     <div x-show="activeTab === 'monitoring'" class="space-y-6">
 
-        <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200/80 pb-5">
-            <div>
-                <span class="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#ea580c] tracking-[0.14em] uppercase">
-                    <span class="w-1.5 h-1.5 rounded-full bg-[#ea580c]"></span>
-                    <span>Logistik &amp; Kepatuhan Kontrak</span>
-                </span>
-                <h2 class="text-2xl font-bold text-slate-900 tracking-tight mt-1">Monitoring Performa &amp; SLA Pemasok</h2>
-                <p class="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl">Pemantauan realisasi jadwal kirim (OTD), pemenuhan volume pasokan, dan kepatuhan kontrak setiap pemasok mitra.</p>
-            </div>
-            <div class="flex items-center gap-2 shrink-0 self-start md:self-end">
-                <span class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <span>SLA Tracking Aktif</span>
-                </span>
-            </div>
+        <div class="border-b border-slate-200/80 pb-4">
+            <h2 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Pemantauan &amp; SLA Pemasok</h2>
+            <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Pantau ketepatan waktu kirim dan tingkat pemenuhan pasokan setiap mitra.</p>
         </div>
 
         @php
             $perfItems = $contractedSuppliersPerformance ?? collect();
             $scoredItems = $perfItems->filter(fn($item) => !empty($item['score']));
-            $avgScore = $scoredItems->isNotEmpty() ? $scoredItems->avg(fn($item) => (float) $item['score']->final_score) : 92.5;
-            $avgOtd = $scoredItems->isNotEmpty() ? $scoredItems->avg(fn($item) => (float) ($item['score']->metrics_breakdown['delivery']['otd_rate'] ?? 98.0)) : 98.5;
-            $avgFulfillment = $scoredItems->isNotEmpty() ? $scoredItems->avg(fn($item) => (float) ($item['score']->metrics_breakdown['fulfillment']['fill_rate'] ?? 99.0)) : 99.2;
-            $avgStar = $scoredItems->isNotEmpty() ? $scoredItems->avg(fn($item) => (float) $item['score']->star_rating) : 4.8;
+            $avgScore = $scoredItems->isNotEmpty() ? $scoredItems->avg(fn($item) => (float) $item['score']->final_score) : 0.0;
+            $avgOtd = $scoredItems->isNotEmpty() ? $scoredItems->avg(fn($item) => (float) ($item['score']->metrics_breakdown['delivery']['otd_rate'] ?? 0.0)) : 0.0;
+            $avgFulfillment = $scoredItems->isNotEmpty() ? $scoredItems->avg(fn($item) => (float) ($item['score']->metrics_breakdown['fulfillment']['fill_rate'] ?? 0.0)) : 0.0;
+            $avgStar = $scoredItems->isNotEmpty() ? $scoredItems->avg(fn($item) => (float) $item['score']->star_rating) : 0.0;
         @endphp
 
         <!-- 4 KARTU RINGKASAN METRIK UTAMA SLA -->
         <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 tabular-nums">
             <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-2">
-                <div class="flex items-center justify-between gap-2">
-                    <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Skor Rata-Rata</span>
-                    <span class="text-amber-600 font-semibold text-xs inline-flex items-center gap-1 bg-amber-50 border border-amber-200/70 px-2 py-0.5 rounded-lg">
-                        <svg class="w-3 h-3 text-amber-500 fill-amber-500" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                        <span x-text="monitoringAvgStar">{{ number_format($avgStar, 1) }}</span>
-                    </span>
-                </div>
+                <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Skor Rata-Rata</span>
                 <div class="text-2xl sm:text-3xl font-bold text-[#ea580c] tracking-tight">
                     <span x-text="monitoringAvgScore">{{ number_format($avgScore, 1) }}</span><span class="text-xs font-medium text-slate-400">/100</span>
                 </div>
-                <p class="text-[11px] text-slate-400">Indeks komposit mitra pasokan</p>
             </div>
 
             <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-2">
-                <div class="flex items-center justify-between gap-2">
-                    <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">On-Time Delivery</span>
-                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-emerald-50 border border-emerald-200/70 text-emerald-700">Bobot 40%</span>
-                </div>
+                <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Ketepatan Waktu Kirim</span>
                 <div class="text-2xl sm:text-3xl font-bold text-emerald-600 tracking-tight">
                     <span x-text="monitoringAvgOtd">{{ number_format($avgOtd, 1) }}</span><span class="text-sm font-semibold text-emerald-600/75">%</span>
                 </div>
-                <p class="text-[11px] text-slate-400">Tiba sebelum batas jam dapur</p>
             </div>
 
             <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-2">
-                <div class="flex items-center justify-between gap-2">
-                    <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">Pemenuhan Kuota</span>
-                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded-lg bg-sky-50 border border-sky-200/70 text-sky-700">Bobot 35%</span>
-                </div>
+                <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Pemenuhan Kuota</span>
                 <div class="text-2xl sm:text-3xl font-bold text-sky-600 tracking-tight">
                     <span x-text="monitoringAvgFill">{{ number_format($avgFulfillment, 1) }}</span><span class="text-sm font-semibold text-sky-600/75">%</span>
                 </div>
-                <p class="text-[11px] text-slate-400">Pengiriman utuh tanpa retur</p>
             </div>
 
             <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-2">
@@ -3267,7 +3735,6 @@
                 <div class="text-2xl sm:text-3xl font-bold text-purple-700 tracking-tight">
                     <span>{{ $perfItems->count() }}</span> <span class="text-xs font-medium text-slate-400">Pemasok</span>
                 </div>
-                <p class="text-[11px] text-slate-400">Mitra terikat kontrak formal</p>
             </div>
         </div>
 
@@ -3411,7 +3878,6 @@
                                     </div>
                                     <div class="flex justify-between text-[11px] text-slate-500">
                                         <span x-text="'Rerata telat: ' + Number(supplierScores['{{ $sup?->id }}']?.avg_delay ?? {{ $avgDelay }}).toFixed(1) + ' jam'">Rerata telat: {{ number_format($avgDelay, 1) }} jam</span>
-                                        <span class="text-emerald-700 font-semibold">Bobot 40%</span>
                                     </div>
                                 </div>
 
@@ -3426,7 +3892,6 @@
                                     </div>
                                     <div class="flex justify-between text-[11px] text-slate-500">
                                         <span x-text="'Rasio Backorder: ' + Number(supplierScores['{{ $sup?->id }}']?.backorder_rate ?? {{ $backorderRate }}).toFixed(1) + '%'">Rasio Backorder: {{ number_format($backorderRate, 1) }}%</span>
-                                        <span class="text-sky-700 font-semibold">Bobot 35%</span>
                                     </div>
                                 </div>
 
@@ -3441,7 +3906,6 @@
                                     </div>
                                     <div class="flex justify-between text-[11px] text-slate-500">
                                         <span>Kesesuaian Spesifikasi</span>
-                                        <span class="text-amber-700 font-semibold">Bobot 25%</span>
                                     </div>
                                 </div>
                             </div>
@@ -3696,7 +4160,7 @@
                     </div>
                 </div>
 
-                <!-- 5. Opsi Pemesanan Otomatis (Auto-Order Routine) -->
+                <!-- 5. Opsi Pemesanan Otomatis -->
                 <div class="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80 flex items-start gap-3">
                     <input 
                         type="checkbox" 
@@ -3707,21 +4171,59 @@
                         class="accent-[#ea580c] w-4 h-4 rounded cursor-pointer mt-0.5"
                     />
                     <label for="autoOrderCheck" class="cursor-pointer space-y-0.5">
-                        <span class="block text-slate-900 font-semibold text-xs">Aktifkan Pemesanan Otomatis (Auto-Order Routine)</span>
+                        <span class="block text-slate-900 font-semibold text-xs">Pemesanan Otomatis</span>
                         <span class="block text-slate-500 text-[11px] font-normal leading-relaxed">
-                            Sistem akan otomatis menerbitkan jadwal pesanan di subuh hari pengiriman tanpa perlu konfirmasi manual berulang kali.
+                            Terbitkan jadwal pesanan otomatis sesuai hari pengiriman tanpa konfirmasi manual berulang.
                         </span>
                     </label>
                 </div>
 
-                <!-- 6. Catatan Spesifikasi Mutu Dapur -->
+                <!-- 6. Ketentuan Mutu & Aturan Pasok Bahan Baku (Chips Preset) -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <label class="block text-slate-800 font-semibold text-xs">
+                            Ketentuan Mutu &amp; Aturan Pasok (SLA Dapur)
+                        </label>
+                        <span class="text-[10px] text-slate-400 font-medium">Pilih aturan penerimaan bahan</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <template x-for="item in availableQualityTerms" :key="item.id">
+                            <button 
+                                type="button"
+                                @click="toggleQualityTerm(item.label)"
+                                class="p-2.5 rounded-xl border text-left transition flex items-start gap-2.5 cursor-pointer"
+                                :class="selectedQualityTerms.includes(item.label) 
+                                    ? 'bg-orange-50/90 border-[#ea580c] text-orange-950 shadow-2xs' 
+                                    : 'bg-white border-slate-200/90 text-slate-700 hover:bg-slate-50 hover:border-slate-300'">
+                                <div class="mt-0.5 w-4 h-4 rounded-md flex items-center justify-center shrink-0 transition"
+                                     :class="selectedQualityTerms.includes(item.label) ? 'bg-[#ea580c] text-white' : 'border border-slate-300 bg-white'">
+                                    <template x-if="selectedQualityTerms.includes(item.label)">
+                                        <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    </template>
+                                </div>
+                                <div class="min-w-0">
+                                    <span class="text-xs font-bold block leading-tight" x-text="item.label"></span>
+                                    <span class="text-[10px] text-slate-500 block mt-0.5 leading-snug" x-text="item.desc"></span>
+                                </div>
+                            </button>
+                        </template>
+                    </div>
+
+                    <!-- Hidden Inputs for Form Submission -->
+                    <template x-for="t in selectedQualityTerms" :key="'term-input-' + t">
+                        <input type="hidden" name="terms[]" :value="t">
+                    </template>
+                </div>
+
+                <!-- 7. Catatan Spesifikasi Tambahan -->
                 <div>
-                    <label class="block text-slate-700 font-semibold mb-1.5">Catatan Spesifikasi Mutu &amp; Instruksi Dapur (Opsional)</label>
+                    <label class="block text-slate-700 font-semibold mb-1 text-xs">Catatan Spesifikasi Tambahan (Opsional)</label>
                     <textarea 
                         name="submission_details" 
                         rows="2" 
-                        placeholder="Contoh: Pemotongan ayam karkas dibagi 8 bagian, toleransi tiba sebelum jam 06.00 WIB, kemasan tertutup rapi."
-                        class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-900 font-medium placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition"
+                        placeholder="Contoh: Pemotongan ayam karkas dibagi 8 bagian, toleransi tiba sebelum jam 06.00 WIB, kemasan per 2 kg..."
+                        class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-900 font-medium text-xs placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition"
                     ></textarea>
                 </div>
 

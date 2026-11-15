@@ -115,4 +115,50 @@ class Partnership extends Model
     {
         return in_array(strtolower((string) $this->status), ['terminated', 'ended', 'completed', 'berakhir', 'dihentikan'], true);
     }
+
+    /**
+     * Mengambil daftar aturan/ketentuan mutu dari rincian pengajuan.
+     *
+     * @return array<int, string>
+     */
+    public function getQualityTermsAttribute(): array
+    {
+        if (empty($this->submission_details)) {
+            return [];
+        }
+
+        if (preg_match('/\[Ketentuan Mutu:\s*([^\]]+)\]/i', (string) $this->submission_details, $matches)) {
+            return array_values(array_filter(array_map('trim', explode('|', $matches[1]))));
+        }
+
+        if (str_starts_with(trim((string) $this->submission_details), '{')) {
+            $decoded = json_decode((string) $this->submission_details, true);
+            if (is_array($decoded) && isset($decoded['terms']) && is_array($decoded['terms'])) {
+                return array_values(array_filter(array_map('trim', $decoded['terms'])));
+            }
+        }
+
+        return [];
+    }
+
+    /**
+     * Mengambil catatan khusus yang telah dibersihkan dari tag ketentuan mutu.
+     */
+    public function getCleanNotesAttribute(): string
+    {
+        if (empty($this->submission_details)) {
+            return '';
+        }
+
+        if (str_starts_with(trim((string) $this->submission_details), '{')) {
+            $decoded = json_decode((string) $this->submission_details, true);
+            if (is_array($decoded) && isset($decoded['notes'])) {
+                return trim((string) $decoded['notes']);
+            }
+        }
+
+        $cleaned = preg_replace('/\[Ketentuan Mutu:\s*[^\]]+\]\s*/i', '', (string) $this->submission_details);
+
+        return trim((string) $cleaned);
+    }
 }

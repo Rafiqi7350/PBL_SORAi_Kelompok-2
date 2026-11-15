@@ -8,14 +8,11 @@
     {{-- Page Header --}}
     <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-5">
         <div class="space-y-1">
-            <span class="text-[11px] font-bold uppercase text-[#ea580c] tracking-[0.14em] block">
-                PERMINTAAN KEMITRAAN B2B
-            </span>
-            <h1 class="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight uppercase">
-                PENGAJUAN MASUK &amp; PERSETUJUAN
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                Pengajuan Masuk &amp; Persetujuan
             </h1>
-            <p class="text-xs sm:text-[13px] text-slate-500 max-w-2xl leading-relaxed">
-                Tinjau profil keandalan mitra UMKM, atur fasilitas tempo pembayaran (TOP) serta plafon kredit, dan kelola kemitraan yang sedang berjalan.
+            <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                Tinjau permohonan kemitraan UMKM, atur fasilitas tempo, dan persetujuan kontrak pasokan.
             </p>
         </div>
 
@@ -198,12 +195,45 @@
                                     </div>
                                 </div>
 
-                                @if($partnership->submission_details)
-                                    <div class="pt-2 border-t border-slate-200/70">
-                                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Catatan UMKM</p>
-                                        <p class="text-[11px] text-slate-600 font-medium leading-relaxed line-clamp-2">
-                                            {{ $partnership->submission_details }}
-                                        </p>
+                                @php
+                                    $qualityTerms = $partnership->quality_terms;
+                                    $cleanNotes = $partnership->clean_notes;
+                                @endphp
+
+                                @if(!empty($qualityTerms) || !empty($cleanNotes) || $partnership->submission_details)
+                                    <div class="pt-2.5 border-t border-slate-200/70 space-y-2">
+                                        @if(!empty($qualityTerms))
+                                            <div>
+                                                <p class="text-[10px] font-bold uppercase tracking-wider text-[#ea580c] flex items-center gap-1 mb-1.5">
+                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                                                    <span>Ketentuan Mutu &amp; Pengiriman Dapur</span>
+                                                </p>
+                                                <div class="flex flex-wrap gap-1.5">
+                                                    @foreach($qualityTerms as $term)
+                                                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/70">
+                                                            <svg class="w-3 h-3 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                                            <span>{{ $term }}</span>
+                                                        </span>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        @endif
+
+                                        @if(!empty($cleanNotes))
+                                            <div>
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Instruksi Tambahan Dapur</p>
+                                                <p class="text-[11px] text-slate-700 font-medium leading-relaxed">
+                                                    {{ $cleanNotes }}
+                                                </p>
+                                            </div>
+                                        @elseif(empty($qualityTerms) && $partnership->submission_details)
+                                            <div>
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-0.5">Catatan UMKM</p>
+                                                <p class="text-[11px] text-slate-700 font-medium leading-relaxed line-clamp-2">
+                                                    {{ $partnership->submission_details }}
+                                                </p>
+                                            </div>
+                                        @endif
                                     </div>
                                 @endif
                             </div>
