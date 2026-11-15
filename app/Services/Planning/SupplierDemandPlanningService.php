@@ -22,17 +22,21 @@ class SupplierDemandPlanningService
     /**
      * Hitung dan perbarui inventori, ambang batas pengaman (SS & ROP), serta proyeksi permintaan.
      */
-    public function generateForecastAndPlanning(SupplierProfile $supplier, string $horizon = '7_DAYS'): DemandForecastRun
+    public function generateForecastAndPlanning(SupplierProfile $supplier, string $horizon = '7_DAYS'): ?DemandForecastRun
     {
-        return DB::transaction(function () use ($supplier, $horizon) {
+        $commodities = $this->getSuppliedCommodities($supplier);
+
+        // Jika pemasok belum memasok komoditas apapun, jangan buat peramalan tiruan
+        if ($commodities->isEmpty()) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($supplier, $horizon, $commodities) {
             $daysCount = match ($horizon) {
                 '30_DAYS' => 30,
                 '90_DAYS' => 90,
                 default => 7,
             };
-
-            // 1. Ambil seluruh komoditas yang dipasok oleh supplier ini
-            $commodities = $this->getSuppliedCommodities($supplier);
 
             // 2. Buat run batch peramalan baru
             $forecastRun = DemandForecastRun::create([
@@ -77,8 +81,9 @@ class SupplierDemandPlanningService
 
         // C. Hitung histori variabilitas permintaan (standar deviasi harian)
         $historicalDailyStats = $this->calculateHistoricalDailyStats($supplier, $commodity);
-        $meanDailyDemand = max(10.0, $historicalDailyStats['mean'] + $scheduledCommitments->sum() / max(1, $scheduledCommitments->count()));
-        $stdDevDemand = max(3.0, $historicalDailyStats['std_dev']);
+        $scheduledCount = $scheduledCommitments->count();
+        $meanDailyDemand = (float) ($historicalDailyStats['mean'] + ($scheduledCount > 0 ? $scheduledCommitments->sum() / $scheduledCount : 0.0));
+        $stdDevDemand = (float) $historicalDailyStats['std_dev'];
 
         // D. Setup / Sinkronisasi Sumber Produsen Hulu (Material Source)
         $materialSource = SupplierMaterialSource::firstOrCreate(
@@ -103,7 +108,7 @@ class SupplierDemandPlanningService
         // SS = Z * sqrt(L * sigma_D^2 + D^2 * sigma_L^2) dengan Z = 1.645 (95% service level)
         $z = 1.645;
         $varianceComponent = ($leadTimeDays * pow($stdDevDemand, 2)) + (pow($meanDailyDemand, 2) * pow($leadTimeVariance, 2));
-        $safetyStock = round($z * sqrt(max(1.0, $varianceComponent)), 2);
+        $safetyStock = $varianceComponent > 0 ? round($z * sqrt($varianceComponent), 2) : 0.00;
         $reorderPoint = round(($meanDailyDemand * $leadTimeDays) + $safetyStock, 2);
 
         // F. Update / Buat Record Inventori Pemasok
@@ -113,12 +118,12 @@ class SupplierDemandPlanningService
                 'commodity_id' => $commodity->id,
             ],
             [
-                'current_stock' => round($reorderPoint * 1.15, 2), // Default awal sedikit di atas ROP
-                'reserved_stock' => round($meanDailyDemand * 0.5, 2),
+                'current_stock' => 0.00,
+                'reserved_stock' => 0.00,
                 'safety_stock' => $safetyStock,
                 'reorder_point' => $reorderPoint,
                 'unit' => $commodity->unit ?? 'kg',
-                'last_restocked_at' => now()->subDays(2),
+                'last_restocked_at' => null,
             ]
         );
 
@@ -189,8 +194,8 @@ class SupplierDemandPlanningService
     ): void {
         $currentStock = (float) $inventoryItem->current_stock;
 
-        // Pemicu: Jika stok saat ini menyentuh ROP atau di bawah Safety Stock
-        if ($currentStock <= $reorderPoint) {
+        // Pemicu: Hanya terbitkan jika ada permintaan aktif dan stok saat ini menyentuh ROP
+        if ($meanDailyDemand > 0 && $currentStock <= $reorderPoint) {
             $urgency = ($currentStock < $safetyStock)
                 ? SupplierPurchaseSuggestion::URGENCY_CRITICAL
                 : SupplierPurchaseSuggestion::URGENCY_WARNING;
@@ -295,7 +300,7 @@ class SupplierDemandPlanningService
     /**
      * Ambil daftar komoditas yang dipasok oleh supplier ini.
      */
-    protected function getSuppliedCommodities(SupplierProfile $supplier): Collection
+    public function getSuppliedCommodities(SupplierProfile $supplier): Collection
     {
         // Ambil komoditas dari produk supplier atau kontrak aktif
         $commodityIds = $supplier->products()->pluck('commodity_id')
@@ -308,7 +313,7 @@ class SupplierDemandPlanningService
             ->filter();
 
         if ($commodityIds->isEmpty()) {
-            return Commodity::limit(3)->get();
+            return collect();
         }
 
         return Commodity::whereIn('id', $commodityIds)->get();
@@ -352,7 +357,7 @@ class SupplierDemandPlanningService
             ->whereIn('supplier_confirmation_status', ['DISETUJUI', 'DISESUAIKAN', 'MENUNGGU_KONFIRMASI'])
             ->sum('estimated_quantity');
 
-        return (float) ($monthlyVolume > 0 ? round($monthlyVolume / 30.0, 2) : 25.0);
+        return (float) ($monthlyVolume > 0 ? round($monthlyVolume / 30.0, 2) : 0.0);
     }
 
     /**
@@ -369,8 +374,12 @@ class SupplierDemandPlanningService
             ->limit(30)
             ->pluck('total');
 
-        if ($dailySums->count() < 2) {
-            return ['mean' => 35.0, 'std_dev' => 8.5];
+        if ($dailySums->count() === 0) {
+            return ['mean' => 0.0, 'std_dev' => 0.0];
+        }
+
+        if ($dailySums->count() === 1) {
+            return ['mean' => (float) max(0.0, $dailySums->first() / 10000.0), 'std_dev' => 0.0];
         }
 
         $mean = $dailySums->avg();
@@ -381,8 +390,8 @@ class SupplierDemandPlanningService
         $stdDev = sqrt($variance / ($dailySums->count() - 1));
 
         return [
-            'mean' => (float) max(10.0, $mean / 10000.0), // Konversi approximate rupiah ke kg jika order total
-            'std_dev' => (float) max(3.0, $stdDev / 10000.0),
+            'mean' => (float) max(0.0, $mean / 10000.0),
+            'std_dev' => (float) max(0.0, $stdDev / 10000.0),
         ];
     }
 }

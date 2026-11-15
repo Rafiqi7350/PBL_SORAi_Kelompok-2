@@ -212,14 +212,11 @@ function supplierDemandPlanningPage() {
     {{-- Header Page --}}
     <div class="flex flex-col lg:flex-row lg:items-end justify-between gap-4 border-b border-slate-200/80 pb-5">
         <div class="space-y-1">
-            <span class="text-[11px] font-bold uppercase text-[#ea580c] tracking-[0.14em] block">
-                MODUL LOGISTIK &amp; COLLABORATIVE SUPPLY PLANNING
-            </span>
-            <h1 class="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight uppercase">
-                Perencanaan Persediaan &amp; Prediksi Permintaan
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                Perencanaan Kebutuhan &amp; Pasokan
             </h1>
-            <p class="text-xs sm:text-[13px] text-slate-500 max-w-2xl leading-relaxed">
-                Agregasi kebutuhan riil UMKM, batas cadangan pengaman (Safety Stock), sistem peringatan dini kehabisan stok, serta rekomendasi otomatis Purchase Order ke petani/produsen hulu.
+            <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                Agregasi kebutuhan bahan baku UMKM, batas cadangan stok, dan rekomendasi pasokan.
             </p>
         </div>
 
@@ -259,7 +256,6 @@ function supplierDemandPlanningPage() {
                 <h3 class="text-2xl font-bold text-[#ea580c] tracking-tight tabular-nums">
                     {{ number_format($totalProjectedDemand7Days, 1, ',', '.') }} <span class="text-xs font-semibold text-slate-500">kg/unit</span>
                 </h3>
-                <p class="text-[11px] text-slate-500 font-medium">Agregasi kebutuhan dapur seluruh UMKM</p>
             </div>
         </div>
 
@@ -277,7 +273,6 @@ function supplierDemandPlanningPage() {
                 <h3 class="text-2xl font-bold {{ $criticalInventoryCount > 0 ? 'text-rose-600' : ($warningInventoryCount > 0 ? 'text-amber-600' : 'text-emerald-600') }} tracking-tight tabular-nums">
                     {{ $criticalInventoryCount }} <span class="text-xs font-semibold text-slate-500">Kritis / {{ $warningInventoryCount }} Siaga</span>
                 </h3>
-                <p class="text-[11px] text-slate-500 font-medium">Bahan baku di bawah batas aman</p>
             </div>
         </div>
 
@@ -295,7 +290,6 @@ function supplierDemandPlanningPage() {
                 <h3 class="text-2xl font-bold text-sky-700 tracking-tight tabular-nums">
                     {{ $purchaseSuggestions->where('status', 'PENDING_REVIEW')->count() }} <span class="text-xs font-semibold text-slate-500">PO Tertunda</span>
                 </h3>
-                <p class="text-[11px] text-slate-500 font-medium">Siap diterbitkan ke produsen hulu</p>
             </div>
         </div>
 
@@ -311,9 +305,12 @@ function supplierDemandPlanningPage() {
             </div>
             <div class="space-y-1">
                 <h3 class="text-2xl font-bold text-violet-700 tracking-tight tabular-nums">
-                    {{ number_format(100 - (float) ($latestForecastRun?->model_accuracy_mape ?? 8.4), 1) }}%
+                    @if($latestForecastRun)
+                        {{ number_format(100 - (float) ($latestForecastRun->model_accuracy_mape ?? 8.4), 1) }}%
+                    @else
+                        0.0%
+                    @endif
                 </h3>
-                <p class="text-[11px] text-slate-500 font-medium">Model Hybrid: Kontrak + CSP + Historis</p>
             </div>
         </div>
     </div>
@@ -411,7 +408,7 @@ function supplierDemandPlanningPage() {
         @endphp
 
         <div class="grid grid-cols-1 gap-5">
-            @foreach($forecastByCommodity as $commId => $items)
+            @forelse($forecastByCommodity as $commId => $items)
                 @php
                     $comm = $items->first()?->commodity;
                     $totalCommodityProjected = $items->sum('baseline_demand');
@@ -470,7 +467,26 @@ function supplierDemandPlanningPage() {
                         </div>
                     </div>
                 </div>
-            @endforeach
+            @empty
+                <div class="bg-white rounded-2xl p-12 text-center border border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.04)] space-y-3">
+                    <div class="w-14 h-14 rounded-2xl bg-orange-50 text-[#ea580c] border border-orange-100 flex items-center justify-center mx-auto">
+                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/>
+                        </svg>
+                    </div>
+                    <div class="space-y-1 max-w-md mx-auto">
+                        <h4 class="font-bold text-base text-slate-900">Belum Ada Proyeksi Kebutuhan</h4>
+                        <p class="text-xs text-slate-500 leading-relaxed">
+                            Belum ada komoditas aktif atau pesanan terjadwal. Tambahkan komoditas pada katalog untuk mengaktifkan peramalan permintaan.
+                        </p>
+                    </div>
+                    <div class="pt-2">
+                        <a href="{{ route('supplier.katalog.index') }}" class="inline-flex items-center gap-2 bg-[#ea580c] hover:bg-[#c2410c] text-white font-semibold text-xs py-2.5 px-5 rounded-xl shadow-2xs transition">
+                            <span>Kelola Stok Komoditas</span>
+                        </a>
+                    </div>
+                </div>
+            @endforelse
         </div>
 
         {{-- Matriks Breakdown Kontribusi Demand per UMKM --}}
@@ -529,7 +545,7 @@ function supplierDemandPlanningPage() {
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            @foreach($inventoryItems as $inv)
+            @forelse($inventoryItems as $inv)
                 @php
                     $isCritical = $inv->ews_status === 'CRITICAL';
                     $isWarning = $inv->ews_status === 'WARNING';
@@ -588,7 +604,26 @@ function supplierDemandPlanningPage() {
                         <span class="font-medium text-slate-700">{{ $inv->last_restocked_at ? $inv->last_restocked_at->translatedFormat('d M Y') : 'Baru' }}</span>
                     </div>
                 </div>
-            @endforeach
+            @empty
+                <div class="col-span-full bg-white rounded-2xl p-12 text-center border border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.04)] space-y-3">
+                    <div class="w-14 h-14 rounded-2xl bg-orange-50 text-[#ea580c] border border-orange-100 flex items-center justify-center mx-auto">
+                        <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                        </svg>
+                    </div>
+                    <div class="space-y-1 max-w-md mx-auto">
+                        <h4 class="font-bold text-base text-slate-900">Belum Ada Inventori Bahan Baku</h4>
+                        <p class="text-xs text-slate-500 leading-relaxed">
+                            Belum ada stok komoditas fisik yang tercatat di gudang. Tambahkan komoditas pada katalog untuk mengaktifkan pemantauan batas stok pengaman (Safety Stock).
+                        </p>
+                    </div>
+                    <div class="pt-2">
+                        <a href="{{ route('supplier.katalog.index') }}" class="inline-flex items-center gap-2 bg-[#ea580c] hover:bg-[#c2410c] text-white font-semibold text-xs py-2.5 px-5 rounded-xl shadow-2xs transition">
+                            <span>Buka Katalog Stok</span>
+                        </a>
+                    </div>
+                </div>
+            @endforelse
         </div>
     </div>
 
@@ -709,7 +744,7 @@ function supplierDemandPlanningPage() {
             </div>
 
             {{-- Hasil Simulasi Realtime --}}
-            <template x-if="simulationResult">
+            <template x-if="simulationResult && simulationResult.commodity_breakdowns && simulationResult.commodity_breakdowns.length > 0">
                 <div class="space-y-5">
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div class="bg-orange-50/70 p-4 rounded-xl border border-orange-200/80">
@@ -751,6 +786,19 @@ function supplierDemandPlanningPage() {
                             </tbody>
                         </table>
                     </div>
+                </div>
+            </template>
+            <template x-if="!simulationResult || !simulationResult.commodity_breakdowns || simulationResult.commodity_breakdowns.length === 0">
+                <div class="bg-slate-50/70 rounded-2xl p-8 text-center border border-slate-200/80 space-y-2 mt-4">
+                    <div class="w-12 h-12 rounded-xl bg-orange-50 text-[#ea580c] border border-orange-100 flex items-center justify-center mx-auto mb-2">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                    </div>
+                    <p class="text-xs font-bold text-slate-700">Belum Ada Komoditas untuk Disimulasikan</p>
+                    <p class="text-[11px] text-slate-400 max-w-md mx-auto">
+                        Simulasi dinamik fluktuasi membutuhkan komoditas aktif pada inventori Anda. Tambahkan produk komoditas pada katalog terlebih dahulu.
+                    </p>
                 </div>
             </template>
         </div>

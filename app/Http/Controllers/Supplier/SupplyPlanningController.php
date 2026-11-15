@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Supplier;
 
 use App\Http\Controllers\Controller;
+use App\Models\DemandForecastItem;
 use App\Models\Partnership;
 use App\Models\SupplierInventoryItem;
 use App\Models\SupplierPurchaseSuggestion;
@@ -105,10 +106,28 @@ class SupplyPlanningController extends Controller
         // =========================================================================
         // DATA MODUL PERENCANAAN PERSEDIAAN & DEMAND FORECASTING PEMASOK
         // =========================================================================
-        $latestForecastRun = $supplier->forecastRuns()->latest('run_at')->first();
+        $hasProductsOrPartnerships = $supplier->products()->exists() ||
+            Partnership::where('supplier_id', $supplier->id)->exists();
 
-        // Inisialisasi otomatis jika belum ada kalkulasi peramalan
-        if (! $latestForecastRun) {
+        // Jika akun pemasok baru (belum memiliki produk atau kemitraan),
+        // bersihkan data mock/dummy sisa sebelumnya jika ada
+        if (! $hasProductsOrPartnerships) {
+            $supplier->inventoryItems()->delete();
+            $supplier->purchaseSuggestions()->delete();
+            $supplier->materialSources()->delete();
+            $runIds = $supplier->forecastRuns()->pluck('id');
+            if ($runIds->isNotEmpty()) {
+                DemandForecastItem::whereIn('forecast_run_id', $runIds)->delete();
+                $supplier->forecastRuns()->delete();
+            }
+        }
+
+        $latestForecastRun = $hasProductsOrPartnerships
+            ? $supplier->forecastRuns()->latest('run_at')->first()
+            : null;
+
+        // Inisialisasi otomatis hanya jika pemasok memiliki produk di katalog dan belum ada forecast
+        if ($hasProductsOrPartnerships && ! $latestForecastRun) {
             $latestForecastRun = $this->planningService->generateForecastAndPlanning($supplier, '7_DAYS');
         }
 
@@ -117,13 +136,17 @@ class SupplyPlanningController extends Controller
             : collect();
 
         // Inventori bahan baku dan status EWS
-        $inventoryItems = $supplier->inventoryItems()->with('commodity')->get();
+        $inventoryItems = $hasProductsOrPartnerships
+            ? $supplier->inventoryItems()->with('commodity')->get()
+            : collect();
 
         // Rekomendasi Pengadaan (Purchase Suggestions)
-        $purchaseSuggestions = $supplier->purchaseSuggestions()
-            ->with(['commodity', 'materialSource'])
-            ->latest()
-            ->get();
+        $purchaseSuggestions = $hasProductsOrPartnerships
+            ? $supplier->purchaseSuggestions()
+                ->with(['commodity', 'materialSource'])
+                ->latest()
+                ->get()
+            : collect();
 
         // Multi-tenant Breakdown Kebutuhan per UMKM (Privacy-Preserving)
         $umkmBreakdowns = Partnership::where('supplier_id', $supplier->id)
@@ -143,10 +166,19 @@ class SupplyPlanningController extends Controller
             });
 
         // Simulasi What-If default
-        $whatIfSimulationDefault = $this->planningService->simulateWhatIfScenario($supplier, 20.0, 2);
+        $whatIfSimulationDefault = $hasProductsOrPartnerships
+            ? $this->planningService->simulateWhatIfScenario($supplier, 20.0, 2)
+            : [
+                'scenario_name' => 'Simulasi Lonjakan Permintaan',
+                'demand_shock_pct' => 20.0,
+                'lead_time_delay_days' => 2,
+                'total_additional_buffer' => 0.0,
+                'total_additional_capital' => 0.0,
+                'commodity_breakdowns' => [],
+            ];
 
         // Ringkasan Total Kebutuhan Proyeksi
-        $totalProjectedDemand7Days = $forecastItems->sum('baseline_demand');
+        $totalProjectedDemand7Days = (float) $forecastItems->sum('baseline_demand');
         $criticalInventoryCount = $inventoryItems->filter(fn ($i) => $i->ews_status === 'CRITICAL')->count();
         $warningInventoryCount = $inventoryItems->filter(fn ($i) => $i->ews_status === 'WARNING')->count();
 
@@ -187,8 +219,37 @@ class SupplyPlanningController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Profil pemasok tidak ditemukan.'], 403);
         }
 
+        $suppliedCommodities = $this->planningService->getSuppliedCommodities($supplier);
+        if ($suppliedCommodities->isEmpty()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Belum ada produk komoditas pada katalog Anda untuk dikalkulasi.',
+                'data' => [
+                    'run_id' => null,
+                    'horizon' => '7_DAYS',
+                    'total_projected_volume' => 0.0,
+                    'items' => [],
+                    'inventory' => [],
+                ],
+            ]);
+        }
+
         $horizon = (string) $request->input('horizon', '7_DAYS');
         $run = $this->planningService->generateForecastAndPlanning($supplier, $horizon);
+
+        if (! $run) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Belum ada produk komoditas pada katalog Anda untuk dikalkulasi.',
+                'data' => [
+                    'run_id' => null,
+                    'horizon' => $horizon,
+                    'total_projected_volume' => 0.0,
+                    'items' => [],
+                    'inventory' => [],
+                ],
+            ]);
+        }
 
         $items = $run->items()->with('commodity')->orderBy('forecast_date')->get();
         $inventory = $supplier->inventoryItems()->with('commodity')->get()->map(function ($inv) {
@@ -229,9 +290,26 @@ class SupplyPlanningController extends Controller
             return response()->json(['status' => 'error', 'message' => 'Profil pemasok tidak ditemukan.'], 403);
         }
 
+        $hasProductsOrPartnerships = $supplier->products()->exists() ||
+            Partnership::where('supplier_id', $supplier->id)->exists();
+
         $demandShockPct = (float) $request->input('demand_shock_pct', 20.0);
         $leadTimeDelayDays = (int) $request->input('lead_time_delay_days', 2);
         $scenarioName = (string) $request->input('scenario_name', 'Simulasi Skenario Interaktif');
+
+        if (! $hasProductsOrPartnerships) {
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'scenario_name' => $scenarioName,
+                    'demand_shock_pct' => $demandShockPct,
+                    'lead_time_delay_days' => $leadTimeDelayDays,
+                    'total_additional_buffer' => 0.0,
+                    'total_additional_capital' => 0.0,
+                    'commodity_breakdowns' => [],
+                ],
+            ]);
+        }
 
         $result = $this->planningService->simulateWhatIfScenario(
             $supplier,

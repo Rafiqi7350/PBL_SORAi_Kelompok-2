@@ -6,16 +6,13 @@
 <div class="space-y-7">
 
     {{-- Header Page --}}
-    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-5">
-        <div class="space-y-1">
-            <span class="text-[11px] font-bold text-[#ea580c] uppercase tracking-[0.14em] block">
-                PANEL ANALISIS B2B PEMASOK
-            </span>
-            <h1 class="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight">
-                Dashboard Analisis Operasional &amp; Kemitraan
+    <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-4">
+        <div>
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                Dasbor Operasional &amp; Kemitraan
             </h1>
-            <p class="text-xs sm:text-[13px] text-slate-500 max-w-2xl leading-relaxed">
-                Monitoring terpadu pesanan masuk, ketersediaan stok bahan baku, logistik pengiriman subuh, dan performa kerja sama mitra UMKM.
+            <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                Ringkasan pesanan masuk, ketersediaan stok, dan performa kemitraan UMKM.
             </p>
         </div>
 
@@ -52,12 +49,6 @@
                 <p class="text-2xl font-bold text-[#ea580c] tracking-tight tabular-nums">
                     Rp {{ number_format($totalOmset, 0, ',', '.') }}
                 </p>
-                <p class="text-[11px] font-semibold text-emerald-700 inline-flex items-center gap-1 tabular-nums">
-                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-                    </svg>
-                    <span>+{{ $growthPercentage }}% dari bulan lalu</span>
-                </p>
             </div>
         </div>
 
@@ -77,11 +68,6 @@
                 <p class="text-2xl font-bold text-slate-900 tracking-tight tabular-nums">
                     {{ $activeOrdersCount }} <span class="text-sm font-semibold text-slate-500">Pesanan</span>
                 </p>
-                <a href="{{ route('supplier.pengiriman.index', ['tab' => 'pending']) }}"
-                   class="text-[11px] font-semibold text-amber-700 hover:text-amber-800 inline-flex items-center gap-1.5 tabular-nums transition-colors">
-                    <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                    <span>{{ $perluPenyesuaianCount }} Perlu Penyesuaian Stok</span>
-                </a>
             </div>
         </div>
 
@@ -101,9 +87,6 @@
                 <p class="text-2xl font-bold text-slate-900 tracking-tight tabular-nums">
                     {{ number_format($totalStokTerjual, 0, ',', '.') }} <span class="text-sm font-semibold text-slate-500">kg</span>
                 </p>
-                <p class="text-[11px] font-semibold text-slate-600 truncate">
-                    Utama: {{ $topCommodityName }}
-                </p>
             </div>
         </div>
 
@@ -111,7 +94,7 @@
         <div class="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-slate-300/80 transition flex flex-col justify-between gap-4">
             <div class="flex items-start justify-between gap-3">
                 <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                    Fulfillment Rate
+                    Tingkat Pemenuhan
                 </span>
                 <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
                     <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
@@ -121,13 +104,7 @@
             </div>
             <div class="space-y-1.5">
                 <p class="text-2xl font-bold text-emerald-700 tracking-tight tabular-nums">
-                    {{ $fulfillmentRate }}%
-                </p>
-                <p class="text-[11px] font-semibold text-emerald-700 inline-flex items-center gap-1">
-                    <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/>
-                    </svg>
-                    <span>Kualitas Sesuai Kontrak</span>
+                    {{ number_format($fulfillmentRate, 1) }}%
                 </p>
             </div>
         </div>
@@ -159,49 +136,65 @@
         </div>
 
         @php
-            $maxChartVal = max(500, ...array_column($monthsTrend, 'target'), ...array_column($monthsTrend, 'realisasi'));
+            $totalRealisasiAll = array_sum(array_column($monthsTrend, 'realisasi'));
+            $totalTargetAll = array_sum(array_column($monthsTrend, 'target'));
+            $hasAnyChartData = ($totalRealisasiAll + $totalTargetAll) > 0;
+            $maxChartVal = max(100, ...array_column($monthsTrend, 'target'), ...array_column($monthsTrend, 'realisasi'));
         @endphp
-        <div class="pt-4">
-            <div class="relative h-52 sm:h-60 flex items-end justify-between gap-3 sm:gap-6 px-2 sm:px-6">
-                {{-- Subtle Horizontal Reference Gridlines --}}
-                <div class="pointer-events-none absolute inset-x-0 inset-y-0 flex flex-col justify-between">
-                    <div class="border-b border-dashed border-slate-200/70 w-full flex justify-end"><span class="text-[10px] font-medium text-slate-400 tabular-nums -mt-2 pr-1">{{ number_format($maxChartVal, 0, ',', '.') }} kg</span></div>
-                    <div class="border-b border-dashed border-slate-200/70 w-full flex justify-end"><span class="text-[10px] font-medium text-slate-400 tabular-nums -mt-2 pr-1">{{ number_format($maxChartVal * 0.66, 0, ',', '.') }} kg</span></div>
-                    <div class="border-b border-dashed border-slate-200/70 w-full flex justify-end"><span class="text-[10px] font-medium text-slate-400 tabular-nums -mt-2 pr-1">{{ number_format($maxChartVal * 0.33, 0, ',', '.') }} kg</span></div>
-                    <div class="border-b border-slate-200 w-full"></div>
-                </div>
 
-                @foreach($monthsTrend as $bar)
-                    <div class="relative z-10 flex-1 flex flex-col items-center h-full justify-end">
-                        <div class="w-full flex items-end justify-center gap-1.5 sm:gap-2.5 h-full">
-                            {{-- Target --}}
-                            <div style="height: {{ max(2, ($bar['target'] / $maxChartVal) * 100) }}%"
-                                 class="w-1/2 max-w-[44px] bg-amber-300/90 hover:bg-amber-400 rounded-t-lg relative group transition-all">
-                                <span class="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-20 shadow-lg pointer-events-none tabular-nums">
-                                    Target: {{ number_format($bar['target'], 0, ',', '.') }} kg
-                                </span>
-                            </div>
-                            {{-- Realisasi --}}
-                            <div style="height: {{ max(2, ($bar['realisasi'] / $maxChartVal) * 100) }}%"
-                                 class="w-1/2 max-w-[44px] bg-[#ea580c] hover:bg-[#c2410c] rounded-t-lg relative group transition-all">
-                                <span class="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-20 shadow-lg pointer-events-none tabular-nums">
-                                    Realisasi: {{ number_format($bar['realisasi'], 0, ',', '.') }} kg
-                                </span>
+        @if(! $hasAnyChartData)
+            <div class="py-14 text-center space-y-3">
+                <div class="w-12 h-12 rounded-2xl bg-orange-50 border border-orange-200/70 text-[#ea580c] flex items-center justify-center mx-auto">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                </div>
+                <div class="space-y-1">
+                    <p class="font-bold text-slate-800 text-sm">Belum Ada Riwayat Target &amp; Realisasi Penjualan</p>
+                    <p class="text-xs text-slate-500 max-w-sm mx-auto">Grafik perbandingan pasokan akan otomatis tampil begitu Anda mulai menyetujui kemitraan pasokan bahan baku dengan mitra UMKM.</p>
+                </div>
+            </div>
+        @else
+            <div class="pt-4">
+                <div class="relative h-52 sm:h-60 flex items-end justify-between gap-3 sm:gap-6 px-2 sm:px-6">
+                    {{-- Subtle Horizontal Reference Gridlines --}}
+                    <div class="pointer-events-none absolute inset-x-0 inset-y-0 flex flex-col justify-between">
+                        <div class="border-b border-dashed border-slate-200/70 w-full flex justify-end"><span class="text-[10px] font-medium text-slate-400 tabular-nums -mt-2 pr-1">{{ number_format($maxChartVal, 0, ',', '.') }} kg</span></div>
+                        <div class="border-b border-dashed border-slate-200/70 w-full flex justify-end"><span class="text-[10px] font-medium text-slate-400 tabular-nums -mt-2 pr-1">{{ number_format($maxChartVal * 0.66, 0, ',', '.') }} kg</span></div>
+                        <div class="border-b border-dashed border-slate-200/70 w-full flex justify-end"><span class="text-[10px] font-medium text-slate-400 tabular-nums -mt-2 pr-1">{{ number_format($maxChartVal * 0.33, 0, ',', '.') }} kg</span></div>
+                        <div class="border-b border-slate-200 w-full"></div>
+                    </div>
+
+                    @foreach($monthsTrend as $bar)
+                        <div class="relative z-10 flex-1 flex flex-col items-center h-full justify-end">
+                            <div class="w-full flex items-end justify-center gap-1.5 sm:gap-2.5 h-full">
+                                {{-- Target --}}
+                                <div style="height: {{ $bar['target'] > 0 ? max(4, ($bar['target'] / $maxChartVal) * 100) : 0 }}%"
+                                     class="w-1/2 max-w-[44px] bg-amber-300/90 hover:bg-amber-400 rounded-t-lg relative group transition-all">
+                                    <span class="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-20 shadow-lg pointer-events-none tabular-nums">
+                                        Target: {{ number_format($bar['target'], 0, ',', '.') }} kg
+                                    </span>
+                                </div>
+                                {{-- Realisasi --}}
+                                <div style="height: {{ $bar['realisasi'] > 0 ? max(4, ($bar['realisasi'] / $maxChartVal) * 100) : 0 }}%"
+                                     class="w-1/2 max-w-[44px] bg-[#ea580c] hover:bg-[#c2410c] rounded-t-lg relative group transition-all">
+                                    <span class="absolute -top-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition whitespace-nowrap z-20 shadow-lg pointer-events-none tabular-nums">
+                                        Realisasi: {{ number_format($bar['realisasi'], 0, ',', '.') }} kg
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                @endforeach
-            </div>
+                    @endforeach
+                </div>
 
-            {{-- Label Bulan --}}
-            <div class="flex justify-between items-center px-2 sm:px-6 pt-3">
-                @foreach($monthsTrend as $bar)
-                    <div class="flex-1 text-center text-xs font-semibold {{ str_contains($bar['month'], 'Aktif') ? 'text-[#ea580c]' : 'text-slate-600' }}">
-                        {{ $bar['month'] }}
-                    </div>
-                @endforeach
+                {{-- Label Bulan --}}
+                <div class="flex justify-between items-center px-2 sm:px-6 pt-3">
+                    @foreach($monthsTrend as $bar)
+                        <div class="flex-1 text-center text-xs font-semibold {{ str_contains($bar['month'], 'Aktif') ? 'text-[#ea580c]' : 'text-slate-600' }}">
+                            {{ $bar['month'] }}
+                        </div>
+                    @endforeach
+                </div>
             </div>
-        </div>
+        @endif
 
     </div>
 

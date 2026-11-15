@@ -5,9 +5,12 @@ namespace App\Http\Controllers\Supplier;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\Partnership;
+use App\Models\Payment;
+use App\Models\SupplierProduct;
 use App\Models\SupplierProfile;
-use App\Models\User;
+use App\Models\SupplyPlan;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -41,7 +44,7 @@ class SupplierDashboardController extends Controller
         $totalOrdersCount = 0;
         $completedOrdersCount = 0;
         $totalStokTerjual = 0.0;
-        $topCommodityName = 'Daging Ayam Broiler';
+        $topCommodityName = '-';
 
         if ($supplier && ! empty($supplierPartnershipIds)) {
             $prevStart = (clone $activeCarbon)->subMonth()->startOfMonth()->toDateString();
@@ -82,7 +85,7 @@ class SupplierDashboardController extends Controller
 
             $growthPercentage = $omsetPrevMonth > 0
                 ? round((($totalOmset - $omsetPrevMonth) / $omsetPrevMonth) * 100, 1)
-                : ($totalOmset > 0 ? 18.5 : 0.0);
+                : 0.0;
 
             // KONSOLIDASI QUERY 2: Total stok terjual bulan ini & Komoditas terlaris via 1 JOIN query
             $topItemAgg = DB::table('order_items as oi')
@@ -100,14 +103,14 @@ class SupplierDashboardController extends Controller
                 ->first();
 
             if ($topItemAgg) {
-                $topCommodityName = $topItemAgg->commodity_name ?? 'Daging Ayam Broiler';
+                $topCommodityName = $topItemAgg->commodity_name ?? '-';
                 $totalStokTerjual = (float) ($topItemAgg->current_month_qty ?? 0);
             }
         }
 
         $fulfillmentRate = ($totalOrdersCount > 0)
             ? round(($completedOrdersCount / $totalOrdersCount) * 100, 1)
-            : 100.0;
+            : 0.0;
 
         $monthsTrend = $this->buildMonthlySalesTrend($supplier, $activeCarbon);
         $transactions = $this->getConsolidatedRecentTransactions($supplier);
@@ -240,12 +243,7 @@ class SupplierDashboardController extends Controller
             return $user->supplierProfile;
         }
 
-        $dummySupplierUser = User::where('role', 'supplier')->first();
-        if ($dummySupplierUser && $dummySupplierUser->supplierProfile) {
-            return $dummySupplierUser->supplierProfile;
-        }
-
-        return SupplierProfile::first();
+        return null;
     }
 
     /**
@@ -253,15 +251,9 @@ class SupplierDashboardController extends Controller
      *
      * @return array<int, array<string, mixed>>
      */
-    /**
-     * Susun tren penjualan mulai dari bulan September dan seterusnya (Kg/Bulan) via 1 query agregasi PostgreSQL.
-     *
-     * @return array<int, array<string, mixed>>
-     */
     private function buildMonthlySalesTrend(?SupplierProfile $supplier, Carbon $activeCarbon): array
     {
         $months = [];
-        $benchmarkTargets = [350, 400, 420, 450, 480, 500];
 
         // Mulai dari September tahun periode berjalan
         $startYear = $activeCarbon->month < 9 ? $activeCarbon->year - 1 : $activeCarbon->year;
@@ -270,10 +262,13 @@ class SupplierDashboardController extends Controller
 
         // 1 Query agregasi cepat ke database (kompatibel PostgreSQL & SQLite)
         $salesByMonth = [];
+        $targetByMonth = [];
+
         if ($supplier) {
             $isSqlite = DB::connection()->getDriverName() === 'sqlite';
             $dateExpr = $isSqlite ? "strftime('%Y-%m', o.order_date)" : "TO_CHAR(o.order_date, 'YYYY-MM')";
 
+            // Realisasi dari order_items yang valid
             $salesByMonth = DB::table('order_items as oi')
                 ->join('orders as o', 'oi.order_id', '=', 'o.id')
                 ->join('partnerships as p', 'o.partnership_id', '=', 'p.id')
@@ -282,6 +277,16 @@ class SupplierDashboardController extends Controller
                 ->selectRaw("{$dateExpr} as ym, SUM(oi.quantity) as monthly_qty")
                 ->groupBy(DB::raw($dateExpr))
                 ->pluck('monthly_qty', 'ym')
+                ->all();
+
+            // Target dari supply_plans resmi kemitraan jika ada
+            $targetByMonth = DB::table('supply_plans as sp')
+                ->join('partnerships as p', 'sp.partnership_id', '=', 'p.id')
+                ->where('p.supplier_id', $supplier->id)
+                ->whereBetween('sp.period_month_year', [$startMonth->format('Y-m'), $endMonth->format('Y-m')])
+                ->selectRaw('sp.period_month_year as ym, SUM(sp.estimated_quantity) as target_qty')
+                ->groupBy('sp.period_month_year')
+                ->pluck('target_qty', 'ym')
                 ->all();
         }
 
@@ -292,7 +297,7 @@ class SupplierDashboardController extends Controller
             $key = $monthDate->format('Y-m');
 
             $finalRealisasi = (int) ($salesByMonth[$key] ?? 0);
-            $finalTarget = $benchmarkTargets[$i % count($benchmarkTargets)];
+            $finalTarget = (int) ($targetByMonth[$key] ?? 0);
 
             $months[] = [
                 'month' => $isActive ? $shortName.' (Aktif)' : $shortName,
@@ -369,5 +374,53 @@ class SupplierDashboardController extends Controller
         }
 
         return $transactions;
+    }
+
+    /**
+     * Check if supplier data has updates for live-sync polling.
+     */
+    public function checkUpdates(Request $request): JsonResponse
+    {
+        $supplier = $this->getActiveSupplierProfile();
+        if (! $supplier) {
+            return response()->json(['updated' => false, 'fingerprint' => '']);
+        }
+
+        $allPartnerships = Partnership::where('supplier_id', $supplier->id)->get();
+        $partnershipIds = $allPartnerships->pluck('id')->all();
+
+        $latestOrderUpdate = ! empty($partnershipIds)
+            ? Order::whereIn('partnership_id', $partnershipIds)->max('updated_at')
+            : null;
+        $latestPaymentUpdate = ! empty($partnershipIds)
+            ? Payment::whereHas('order', fn ($q) => $q->whereIn('partnership_id', $partnershipIds))->max('updated_at')
+            : null;
+        $latestSupplyPlanUpdate = ! empty($partnershipIds)
+            ? SupplyPlan::whereIn('partnership_id', $partnershipIds)->max('updated_at')
+            : null;
+        $latestPartnershipUpdate = $allPartnerships->max('updated_at');
+        $latestProductUpdate = SupplierProduct::where('supplier_id', $supplier->id)->max('updated_at');
+
+        $ordersCount = ! empty($partnershipIds)
+            ? Order::whereIn('partnership_id', $partnershipIds)->count()
+            : 0;
+        $partnershipsCount = $allPartnerships->count();
+        $productsCount = SupplierProduct::where('supplier_id', $supplier->id)->count();
+
+        $stateFingerprint = md5(implode('|', [
+            $latestOrderUpdate,
+            $latestPaymentUpdate,
+            $latestSupplyPlanUpdate,
+            $latestPartnershipUpdate,
+            $latestProductUpdate,
+            $ordersCount,
+            $partnershipsCount,
+            $productsCount,
+        ]));
+
+        return response()->json([
+            'updated' => true,
+            'fingerprint' => $stateFingerprint,
+        ]);
     }
 }

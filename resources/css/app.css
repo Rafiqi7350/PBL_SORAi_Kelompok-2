@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @import "../../node_modules/preline/variants.css";
 @source "../../node_modules/preline/dist/*.js";
 
@@ -92,4 +94,401 @@
     font-family: var(--font-display, 'Space Grotesk', sans-serif);
     letter-spacing: -0.03em;
     line-height: 1.05;
+}
+
+/* ========================================================
+   SORAI EYE-COMFORT LIGHT THEME (Warm, Natural, Gentle on Eyes)
+   Specially tuned for long reading sessions and older eyes
+   ======================================================== */
+html:not(.dark) body {
+    background-color: #f1f4f8 !important; /* Soft warm soothing canvas, avoids blinding white glare */
+    color: #1e293b !important;
+}
+
+/* Distinct card boundaries so page is NOT a flat blinding sheet of white */
+html:not(.dark) .bg-white {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.05), 0 1px 2px -1px rgba(15, 23, 42, 0.03) !important;
+}
+
+html:not(.dark) .bg-slate-50,
+html:not(.dark) .bg-gray-50 {
+    background-color: #f1f4f8 !important;
+}
+
+/* Inset boxes and inputs inside cards in Light Mode */
+html:not(.dark) .bg-white div[class*="bg-slate-50"],
+html:not(.dark) .bg-white div[class*="bg-slate-100"],
+html:not(.dark) .bg-white input[class*="bg-slate-50"],
+html:not(.dark) .bg-white textarea[class*="bg-slate-50"] {
+    background-color: #f8fafc !important;
+    border-color: #e2e8f0 !important;
+    color: #1e293b !important;
+}
+
+/* Header in Light Mode */
+html:not(.dark) header {
+    background-color: rgba(255, 255, 255, 0.96) !important;
+    border-color: #e2e8f0 !important;
+}
+
+/* Typography Enhancements for Older Eyes in Light Mode (High Readability, No Washout) */
+html:not(.dark) .text-slate-900,
+html:not(.dark) .text-gray-900 {
+    color: #0f172a !important; /* Crisp, high-contrast dark slate */
+}
+
+html:not(.dark) .text-slate-800,
+html:not(.dark) .text-gray-800 {
+    color: #1e293b !important;
+}
+
+html:not(.dark) .text-slate-700,
+html:not(.dark) .text-gray-700 {
+    color: #334155 !important;
+}
+
+/* Darken low-contrast secondary text so older eyes don't have to squint */
+html:not(.dark) .text-slate-500,
+html:not(.dark) .text-gray-500 {
+    color: #475569 !important;
+}
+
+html:not(.dark) .text-slate-400,
+html:not(.dark) .text-gray-400 {
+    color: #64748b !important;
+}
+
+/* Soften glaring highlighter orange in light mode to warm terracotta */
+html:not(.dark) .bg-\[\#ea580c\] {
+    background-color: #d95818 !important;
+}
+
+html:not(.dark) .hover\:bg-\[\#c2410c\]:hover {
+    background-color: #b94510 !important;
+}
+
+html:not(.dark) .text-\[\#ea580c\] {
+    color: #c2410c !important;
+}
+
+
+/* ========================================================
+   SORAI NATURAL EYE-COMFORT DARK THEME (.dark on <html>)
+   Deep Slate-Zinc Palette, Soft Translucent Badges, No Glare
+   ======================================================== */
+html.dark {
+    color-scheme: dark;
+}
+
+html.dark body {
+    background-color: #0f172a !important; /* Deep soothing slate-900, warm and relaxed on the retina */
+    color: #e2e8f0 !important;
+}
+
+/* Surface Cards & Backgrounds */
+html.dark .bg-slate-50,
+html.dark .bg-slate-50\/50,
+html.dark .bg-slate-50\/60,
+html.dark .bg-slate-50\/70,
+html.dark .bg-slate-50\/80,
+html.dark .bg-slate-50\/90,
+html.dark [class*="bg-slate-50/"],
+html.dark [class*="bg-slate-50\\/"],
+html.dark .bg-gray-50,
+html.dark [class*="bg-gray-50/"],
+html.dark [class*="bg-gray-50\\/"] {
+    background-color: #141d2e !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    color: #e2e8f0 !important;
+}
+
+/* Card Surface */
+html.dark .bg-white {
+    background-color: #1e293b !important; /* Slate-800 card surface */
+    color: #e2e8f0 !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Inset Displays, Read-Only Preview Boxes, & Inset Containers */
+html.dark div[class*="bg-slate-50"],
+html.dark div[class*="bg-slate-100"] {
+    background-color: #141d2e !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+    color: #e2e8f0 !important;
+}
+
+/* Secondary Action Buttons & Badges inside cards in Dark Mode */
+html.dark button.bg-white,
+html.dark a.bg-white {
+    background-color: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    color: #cbd5e1 !important;
+}
+
+html.dark button.bg-white:hover,
+html.dark a.bg-white:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    border-color: rgba(234, 88, 12, 0.4) !important;
+    color: #fdba74 !important;
+}
+
+html.dark span.bg-white {
+    background-color: rgba(255, 255, 255, 0.06) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    color: #94a3b8 !important;
+}
+
+/* Inset / Nested / Sub-containers */
+html.dark .bg-slate-100,
+html.dark .bg-slate-100\/50,
+html.dark .bg-slate-100\/60,
+html.dark .bg-slate-100\/70,
+html.dark .bg-slate-100\/75,
+html.dark .bg-slate-100\/80,
+html.dark .bg-slate-100\/90,
+html.dark [class*="bg-slate-100/"],
+html.dark [class*="bg-slate-100\\/"],
+html.dark .bg-gray-100,
+html.dark [class*="bg-gray-100/"],
+html.dark [class*="bg-gray-100\\/"] {
+    background-color: #141d2e !important;
+    border-color: rgba(255, 255, 255, 0.06) !important;
+    color: #94a3b8 !important;
+}
+
+html.dark .bg-slate-200,
+html.dark .bg-gray-200 {
+    background-color: #273549 !important;
+    color: #cbd5e1 !important;
+}
+
+/* Header & Navigation */
+html.dark header {
+    background-color: rgba(22, 30, 48, 0.96) !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark header .border-slate-100,
+html.dark header .border-slate-200\/80,
+html.dark header .border-slate-200 {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Header pill "Portal Dapur UMKM" */
+html.dark header .bg-slate-100\/90,
+html.dark header .bg-slate-100 {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    color: #94a3b8 !important;
+}
+
+/* Borders & Dividers in Dark Mode */
+html.dark .border-slate-200,
+html.dark .border-slate-200\/70,
+html.dark .border-slate-200\/80,
+html.dark .border-slate-200\/90,
+html.dark .border-slate-100,
+html.dark .border-gray-200,
+html.dark .border-gray-100 {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Typography in Dark Mode (Soft, non-glaring) */
+html.dark .text-slate-950,
+html.dark .text-slate-900,
+html.dark .text-slate-800,
+html.dark .text-gray-950,
+html.dark .text-gray-900,
+html.dark .text-gray-800 {
+    color: #f1f5f9 !important; /* Soft slate-100, not piercing raw #ffffff */
+}
+
+html.dark .text-slate-700,
+html.dark .text-slate-600,
+html.dark .text-gray-700,
+html.dark .text-gray-600 {
+    color: #cbd5e1 !important;
+}
+
+html.dark .text-slate-500,
+html.dark .text-gray-500 {
+    color: #94a3b8 !important;
+}
+
+html.dark .text-slate-400,
+html.dark .text-gray-400 {
+    color: #64748b !important;
+}
+
+/* Active navigation tab highlight in Dark Mode */
+html.dark header nav button .text-slate-950 {
+    color: #fdba74 !important;
+}
+
+/* Form Controls & Inputs */
+html.dark input,
+html.dark select,
+html.dark textarea {
+    background-color: #141d2e !important;
+    color: #f1f5f9 !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+    color: #64748b !important;
+}
+
+/* ========================================================
+   CRITICAL FIX: ELIMINATE ALL "TERANG-TERANG" PILLS & BADGES IN DARK MODE
+   Convert all pastel-50 / light backgrounds to soft translucent dark badges
+   ======================================================== */
+/* Emerald / Green badges (e.g. SLA Tracking Aktif, OTD) */
+html.dark .bg-emerald-50,
+html.dark .bg-emerald-100,
+html.dark .bg-green-50,
+html.dark .bg-green-100 {
+    background-color: rgba(16, 185, 129, 0.14) !important;
+    color: #6ee7b7 !important;
+    border-color: rgba(16, 185, 129, 0.28) !important;
+}
+
+/* Sky / Blue badges (e.g. Pemenuhan Kuota, Bobot 35%) */
+html.dark .bg-sky-50,
+html.dark .bg-sky-100,
+html.dark .bg-blue-50,
+html.dark .bg-blue-100,
+html.dark .bg-cyan-50,
+html.dark .bg-cyan-100 {
+    background-color: rgba(14, 165, 233, 0.14) !important;
+    color: #7dd3fc !important;
+    border-color: rgba(14, 165, 233, 0.28) !important;
+}
+
+/* Amber / Yellow badges (e.g. Skor Bintang 0.0, Warning) */
+html.dark .bg-amber-50,
+html.dark .bg-amber-100,
+html.dark .bg-yellow-50,
+html.dark .bg-yellow-100 {
+    background-color: rgba(245, 158, 11, 0.14) !important;
+    color: #fcd34d !important;
+    border-color: rgba(245, 158, 11, 0.28) !important;
+}
+
+/* Purple / Violet badges (e.g. Mitra Terkontrak Aktif) */
+html.dark .bg-purple-50,
+html.dark .bg-purple-100,
+html.dark .bg-violet-50,
+html.dark .bg-violet-100,
+html.dark .bg-indigo-50,
+html.dark .bg-indigo-100 {
+    background-color: rgba(168, 85, 247, 0.14) !important;
+    color: #d8b4fe !important;
+    border-color: rgba(168, 85, 247, 0.28) !important;
+}
+
+/* Rose / Red badges (e.g. Ditolak, Terlambat) */
+html.dark .bg-rose-50,
+html.dark .bg-rose-100,
+html.dark .bg-red-50,
+html.dark .bg-red-100 {
+    background-color: rgba(244, 63, 94, 0.14) !important;
+    color: #fda4af !important;
+    border-color: rgba(244, 63, 94, 0.28) !important;
+}
+
+/* Orange badges (e.g. Menunggu, Diproses) */
+html.dark .bg-orange-50,
+html.dark .bg-orange-50\/70,
+html.dark .bg-orange-50\/80,
+html.dark .bg-orange-50\/90,
+html.dark .bg-orange-100 {
+    background-color: rgba(234, 88, 12, 0.14) !important;
+    color: #fdba74 !important;
+    border-color: rgba(234, 88, 12, 0.28) !important;
+}
+
+/* Softened Metric Numbers in Dark Mode (No neon eye strain) */
+html.dark .text-\[\#ea580c\],
+html.dark .text-orange-600,
+html.dark .text-orange-700,
+html.dark .text-orange-800 {
+    color: #fb923c !important; /* Warm peach-orange, eye-friendly */
+}
+
+html.dark .text-emerald-600,
+html.dark .text-emerald-700 {
+    color: #34d399 !important; /* Soft gentle mint */
+}
+
+html.dark .text-sky-600,
+html.dark .text-sky-700 {
+    color: #38bdf8 !important; /* Soft calm sky */
+}
+
+html.dark .text-purple-600,
+html.dark .text-purple-700 {
+    color: #c084fc !important; /* Soft lavender */
+}
+
+html.dark .text-amber-600,
+html.dark .text-amber-700 {
+    color: #fbbf24 !important; /* Soft gold */
+}
+
+html.dark .text-rose-600,
+html.dark .text-rose-700 {
+    color: #fb7185 !important; /* Soft coral */
+}
+
+/* Buttons in Dark Mode */
+html.dark .bg-\[\#ea580c\] {
+    background-color: #d95818 !important; /* Balanced warm terracotta */
+}
+
+html.dark .hover\:bg-\[\#c2410c\]:hover {
+    background-color: #b94510 !important;
+}
+
+/* Neutralize glaring white ring on profile/status */
+html.dark .ring-white {
+    --tw-ring-color: #1e293b !important;
+}
+
+/* Dropdown Menu & Modals in Dark Mode */
+html.dark [role="menu"],
+html.dark .modal-content,
+html.dark [role="dialog"] > div {
+    background-color: #1e293b !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Hover effects in dark mode */
+html.dark .hover\:bg-slate-100\/75:hover,
+html.dark .hover\:bg-slate-100:hover,
+html.dark .hover\:bg-slate-50:hover,
+html.dark .hover\:bg-gray-50:hover,
+html.dark .hover\:bg-gray-100:hover {
+    background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Tables in Dark Mode */
+html.dark table thead tr,
+html.dark table thead th,
+html.dark tr[class*="bg-slate-50"] {
+    background-color: #141d2e !important;
+    color: #94a3b8 !important;
+    border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+html.dark table tbody tr {
+    border-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+html.dark table tbody tr:hover,
+html.dark tr[class*="hover:bg-slate-50"]:hover {
+    background-color: rgba(255, 255, 255, 0.04) !important;
 }

@@ -8,14 +8,11 @@
     {{-- Header Section --}}
     <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-5">
         <div class="space-y-1">
-            <span class="text-[11px] font-bold uppercase text-[#ea580c] tracking-[0.14em] block">
-                MONITORING KEUANGAN &amp; PEMBAYARAN B2B
-            </span>
-            <h1 class="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight uppercase">
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
                 Riwayat Transaksi Pemasok
             </h1>
-            <p class="text-xs sm:text-[13px] text-slate-500 max-w-2xl leading-relaxed">
-                Histori penerimaan dana, pelacakan tagihan invoice pasokan, dan status penyelesaian pembayaran mitra UMKM.
+            <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                Histori penerimaan dana, pelacakan faktur invoice, dan status penyelesaian pembayaran.
             </p>
         </div>
 
@@ -43,9 +40,6 @@
                 <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight tabular-nums">
                     {{ $totalUangDidapatFormatted }}
                 </h2>
-                <p class="text-xs text-slate-500 leading-relaxed pt-1">
-                    Total pembayaran dari <strong class="text-slate-700 tabular-nums">{{ $countLunas }} transaksi</strong> yang telah berstatus lunas (settlement / paid).
-                </p>
             </div>
             <div class="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 shrink-0 border border-emerald-100">
                 <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
@@ -63,9 +57,6 @@
                 <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight tabular-nums">
                     {{ $totalBelumDibayarFormatted }}
                 </h2>
-                <p class="text-xs text-slate-500 leading-relaxed pt-1">
-                    Tagihan terbuka dari <strong class="text-slate-700 tabular-nums">{{ $countBelumDibayar }} invoice</strong> yang masih menunggu pembayaran mitra UMKM.
-                </p>
             </div>
             <div class="w-12 h-12 rounded-xl bg-amber-50 flex items-center justify-center text-amber-600 shrink-0 border border-amber-100">
                 <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
@@ -709,45 +700,48 @@
             },
 
             triggerPrint(docTitle, contentHtml) {
-                const printFrame = document.createElement('iframe');
-                printFrame.style.position = 'fixed';
-                printFrame.style.right = '0';
-                printFrame.style.bottom = '0';
-                printFrame.style.width = '0';
-                printFrame.style.height = '0';
-                printFrame.style.border = '0';
-                printFrame.style.opacity = '0';
-                document.body.appendChild(printFrame);
+                // Gunakan pop-up window yang handal dan didukung penuh seluruh browser modern
+                const printWindow = window.open('', '_blank', 'width=900,height=900,menubar=no,toolbar=no,location=no,status=no');
+                
+                if (printWindow) {
+                    const topToolbar = '<div class="no-print-bar" style="background:#f8fafc;border:1px solid #e2e8f0;padding:12px 20px;margin-bottom:24px;border-radius:12px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 3px rgba(0,0,0,0.05);font-family:sans-serif;">'
+                        + '<div style="font-size:13px;color:#334155;font-weight:700;">Pratinjau Dokumen Cetak / Simpan PDF &bull; ' + docTitle + '</div>'
+                        + '<div style="display:flex;gap:8px;">'
+                        + '<button type="button" onclick="window.print()" style="background:#ea580c;color:#fff;border:none;padding:9px 20px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;">🖨️ Cetak / Simpan PDF</button>'
+                        + '<button type="button" onclick="window.close()" style="background:#fff;color:#475569;border:1px solid #cbd5e1;padding:9px 18px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;">Tutup</button>'
+                        + '</div></div>';
 
-                const frameDoc = printFrame.contentWindow.document;
-                frameDoc.open();
-                frameDoc.write('<!DOCTYPE html><html lang="id"><head>');
-                frameDoc.write('<meta charset="utf-8">');
-                frameDoc.write('<title>' + docTitle + '</title>');
-                frameDoc.write('<link rel="preconnect" href="https://fonts.googleapis.com">');
-                frameDoc.write('<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>');
-                frameDoc.write('<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">');
-                frameDoc.write('<style>');
-                frameDoc.write('@page { size: A4 portrait; margin: 12mm 10mm; }');
-                frameDoc.write('* { box-sizing: border-box; font-family: "Montserrat", "Segoe UI", Arial, sans-serif; }');
-                frameDoc.write('body { margin: 0; padding: 0; background: #ffffff !important; color: #0f172a !important; font-family: "Montserrat", "Segoe UI", Arial, sans-serif; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }');
-                frameDoc.write('</' + 'style>');
-                frameDoc.write('</' + 'head>');
-                frameDoc.write('<body>');
-                frameDoc.write(contentHtml);
-                frameDoc.write('</' + 'body>');
-                frameDoc.write('</' + 'html>');
-                frameDoc.close();
+                    const printStyle = '<' + 'style>'
+                        + '@page { size: A4 portrait; margin: 12mm 10mm; }'
+                        + '* { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }'
+                        + 'body { margin: 0; padding: 24px; background: #ffffff !important; color: #0f172a !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }'
+                        + '@media print { .no-print-bar { display: none !important; } body { padding: 0 !important; } }'
+                        + '<' + '/style>';
 
-                printFrame.contentWindow.focus();
-                setTimeout(() => {
-                    printFrame.contentWindow.print();
+                    const fullDoc = '<' + '!DOCTYPE html><' + 'html lang="id"><' + 'head>'
+                        + '<' + 'meta charset="utf-8">'
+                        + '<' + 'meta name="viewport" content="width=device-width, initial-scale=1.0">'
+                        + '<' + 'title>' + docTitle + '<' + '/title>'
+                        + printStyle
+                        + '<' + '/head><' + 'body>'
+                        + topToolbar
+                        + contentHtml
+                        + '<' + '/body><' + '/html>';
+
+                    printWindow.document.open();
+                    printWindow.document.write(fullDoc);
+                    printWindow.document.close();
+                    printWindow.focus();
+
+                    // Pemicu otomatis dialog cetak browser
                     setTimeout(() => {
-                        if (document.body.contains(printFrame)) {
-                            document.body.removeChild(printFrame);
-                        }
-                    }, 1500);
-                }, 400);
+                        try {
+                            printWindow.print();
+                        } catch (e) {}
+                    }, 400);
+                } else {
+                    alert('Mohon izinkan pop-up pada browser Anda untuk mencetak atau menyimpan dokumen.');
+                }
             }
         };
     }

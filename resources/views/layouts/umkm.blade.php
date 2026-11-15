@@ -10,6 +10,20 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
+    <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon.png') }}">
+    <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
+
+    <script>
+        try {
+            if (localStorage.getItem('sorai_theme') === 'dark' || (!('sorai_theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        } catch (e) {}
+    </script>
+
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
@@ -43,7 +57,35 @@
           mobileNavOpen: false,
           profileMenuOpen: false,
           mobileProfileMenuOpen: false,
-          activeTab: @if(request()->routeIs('umkm.katalog.index')) (new URLSearchParams(window.location.search).get('tab') || 'katalog') @else '' @endif,
+          isDarkMode: document.documentElement.classList.contains('dark'),
+          toggleTheme() {
+              this.isDarkMode = !this.isDarkMode;
+              document.documentElement.classList.toggle('dark', this.isDarkMode);
+              try { localStorage.setItem('sorai_theme', this.isDarkMode ? 'dark' : 'light'); } catch (e) {}
+          },
+          activeTab: @if(request()->routeIs('umkm.katalog.index')) (new URLSearchParams(window.location.search).get('tab') || sessionStorage.getItem('sorai_umkm_active_tab') || 'katalog') @else '' @endif,
+          init() {
+              @if(request()->routeIs('umkm.katalog.index'))
+                  var self = this;
+                  this.$watch('activeTab', function(val) {
+                      if (!val) return;
+                      try {
+                          sessionStorage.setItem('sorai_umkm_active_tab', val);
+                          var url = new URL(window.location.href);
+                          url.searchParams.set('tab', val);
+                          if (val === 'pemesanan') {
+                              var savedSub = sessionStorage.getItem('sorai_umkm_order_subtab');
+                              if (savedSub && !url.searchParams.get('subtab')) {
+                                  url.searchParams.set('subtab', savedSub);
+                              }
+                          } else {
+                              url.searchParams.delete('subtab');
+                          }
+                          window.history.replaceState({}, '', url.toString());
+                      } catch (e) {}
+                  });
+              @endif
+          },
           setTab(t) {
               @if(!request()->routeIs('umkm.katalog.index'))
                   window.location.href = '{{ route('umkm.katalog.index') }}?tab=' + encodeURIComponent(t);
@@ -52,9 +94,18 @@
               this.activeTab = t;
               this.mobileNavOpen = false;
               this.mobileProfileMenuOpen = false;
-              const url = new URL(window.location);
-              url.searchParams.set('tab', t);
-              window.history.replaceState({}, '', url);
+              try {
+                  sessionStorage.setItem('sorai_umkm_active_tab', t);
+                  var url = new URL(window.location.href);
+                  url.searchParams.set('tab', t);
+                  if (t === 'pemesanan') {
+                      var savedSub = sessionStorage.getItem('sorai_umkm_order_subtab');
+                      if (savedSub) url.searchParams.set('subtab', savedSub);
+                  } else {
+                      url.searchParams.delete('subtab');
+                  }
+                  window.history.replaceState({}, '', url.toString());
+              } catch (e) {}
           }
       }">
 
@@ -159,6 +210,25 @@
                                 <span>Kelola Akun</span>
                             </a>
 
+                            {{-- Mode Gelap / Mode Terang Toggle --}}
+                            <button type="button"
+                                    @click="toggleTheme()"
+                                    role="menuitem"
+                                    class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer text-left">
+                                <div class="flex items-center gap-2.5">
+                                    <svg x-show="!isDarkMode" class="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                                    </svg>
+                                    <svg x-show="isDarkMode" x-cloak class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                                    </svg>
+                                    <span x-text="isDarkMode ? 'Mode Terang' : 'Mode Gelap'"></span>
+                                </div>
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold"
+                                      :class="isDarkMode ? 'bg-amber-400/20 text-amber-300' : 'bg-slate-100 text-slate-600'"
+                                      x-text="isDarkMode ? 'Aktif' : 'Mati'"></span>
+                            </button>
+
                             <div class="my-1 border-t border-slate-100"></div>
 
                             <button type="button"
@@ -220,7 +290,7 @@
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                 </svg>
-                                <span>Supply Planning</span>
+                                <span>Perencanaan Pasokan</span>
                             </span>
                             <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
                                   :class="activeTab === 'supply-planning' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
@@ -252,7 +322,7 @@
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                                 </svg>
-                                <span>Dashboard Analisis</span>
+                                <span>Analisis Pengadaan</span>
                             </span>
                             <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
                                   :class="activeTab === 'dashboard' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
@@ -268,7 +338,7 @@
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
-                                <span>Monitoring &amp; SLA</span>
+                                <span>Pemantauan &amp; SLA</span>
                             </span>
                             <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
                                   :class="activeTab === 'monitoring' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
@@ -331,6 +401,23 @@
                     </a>
 
                     <button type="button"
+                            @click="toggleTheme()"
+                            class="w-full py-2 px-3 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center justify-between transition-colors cursor-pointer text-left">
+                        <div class="flex items-center gap-2.5">
+                            <svg x-show="!isDarkMode" class="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                            </svg>
+                            <svg x-show="isDarkMode" x-cloak class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                            </svg>
+                            <span x-text="isDarkMode ? 'Mode Terang' : 'Mode Gelap'"></span>
+                        </div>
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold"
+                              :class="isDarkMode ? 'bg-amber-400/20 text-amber-300' : 'bg-slate-100 text-slate-600'"
+                              x-text="isDarkMode ? 'Aktif' : 'Mati'"></span>
+                    </button>
+
+                    <button type="button"
                             @click="mobileNavOpen = false; mobileProfileMenuOpen = false; $dispatch('open-logout-modal')"
                             class="w-full py-2 px-3 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors cursor-pointer text-left">
                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -359,7 +446,7 @@
                     <svg class="w-4 h-4 shrink-0" :class="activeTab === 'supply-planning' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>
-                    <span>Supply Planning</span>
+                    <span>Perencanaan Pasokan</span>
                 </button>
 
                 <button type="button"
@@ -379,7 +466,7 @@
                     <svg class="w-4 h-4 shrink-0" :class="activeTab === 'dashboard' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                     </svg>
-                    <span>Dashboard Analisis</span>
+                    <span>Analisis Pengadaan</span>
                 </button>
 
                 <button type="button"
@@ -389,7 +476,7 @@
                     <svg class="w-4 h-4 shrink-0" :class="activeTab === 'monitoring' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    <span>Monitoring &amp; SLA</span>
+                    <span>Pemantauan &amp; SLA</span>
                 </button>
             </nav>
         </div>

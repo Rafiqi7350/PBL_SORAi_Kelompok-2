@@ -6,13 +6,8 @@
     {{-- Page Header --}}
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div class="space-y-1">
-            <div class="flex flex-wrap items-center gap-2">
-                <p class="text-[11px] font-bold uppercase tracking-widest text-[#ea580c]">Standarisasi Master Data</p>
-                <span class="text-slate-300 text-xs">•</span>
-                <span class="text-[11px] font-medium text-slate-500">Acuan Bapanas / Siskaperbapo</span>
-            </div>
-            <h1 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Master Data Komoditas Bahan Baku</h1>
-            <p class="text-xs sm:text-sm text-slate-500 max-w-2xl">Kelola daftar komoditas standar, kategori acuan, satuan baku, dan patokan harga eceran tertinggi (HET) pemerintah.</p>
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Master Komoditas Bahan Baku</h1>
+            <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Kelola daftar komoditas acuan, satuan baku, dan batas harga standar pangan.</p>
         </div>
         <div class="shrink-0">
             <a href="{{ route('admin.commodities.create') }}"

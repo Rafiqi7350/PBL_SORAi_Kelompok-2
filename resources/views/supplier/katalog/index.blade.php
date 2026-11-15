@@ -8,23 +8,15 @@
     {{-- Header Section --}}
     <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-5">
         <div class="space-y-1">
-            <span class="text-[11px] font-bold uppercase text-[#ea580c] tracking-[0.14em] block">
-                INVENTARIS BAHAN BAKU
-            </span>
-            <h1 class="text-2xl sm:text-[26px] font-bold text-slate-900 tracking-tight uppercase">
-                KELOLA STOK KOMODITAS
+            <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                Kelola Stok Komoditas
             </h1>
-            <p class="text-xs sm:text-[13px] text-slate-500 max-w-2xl leading-relaxed">
-                Atur daftar bahan baku grosir, harga jual per satuan, kapasitas suplai mingguan, serta status ketersediaan stok untuk mitra UMKM.
+            <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                Atur daftar bahan baku, harga satuan, dan ketersediaan stok untuk mitra UMKM.
             </p>
         </div>
 
         <div class="flex items-center gap-3 shrink-0">
-            <span class="hidden sm:inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-semibold bg-white text-slate-700 border border-slate-200 shadow-2xs tabular-nums">
-                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span>{{ method_exists($products, 'total') ? $products->total() : $products->count() }} Komoditas</span>
-            </span>
-
             <a href="{{ route('supplier.katalog.create') }}"
                data-cy="btn-tambah-komoditas"
                class="inline-flex items-center gap-2 bg-[#ea580c] hover:bg-[#c2410c] text-white font-semibold text-xs py-2.5 px-5 rounded-xl shadow-2xs transition">

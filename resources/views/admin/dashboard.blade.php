@@ -4,11 +4,25 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>SORAI — Control Panel Administrator Systems</title>
+    <title>SORAI — Panel Kontrol Administrator</title>
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon.png') }}">
+    <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
+
+    <script>
+        try {
+            if (localStorage.getItem('sorai_theme') === 'dark' || (!('sorai_theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        } catch (e) {}
+    </script>
 
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
@@ -57,6 +71,12 @@
 <body class="min-h-screen bg-slate-50 text-slate-900 antialiased selection:bg-orange-100 selection:text-orange-900"
       x-data="{
           mobileNavOpen: false,
+          isDarkMode: document.documentElement.classList.contains('dark'),
+          toggleTheme() {
+              this.isDarkMode = !this.isDarkMode;
+              document.documentElement.classList.toggle('dark', this.isDarkMode);
+              try { localStorage.setItem('sorai_theme', this.isDarkMode ? 'dark' : 'light'); } catch (e) {}
+          },
           sidebarHidden: (() => { try { return window.localStorage.getItem('sorai_admin_sidebar_hidden') === 'true'; } catch (e) { return false; } })(),
           adminTab: '{{ request()->query('tab', ($errors->any() ? 'master' : $currentTab)) }}',
           chartFilter: 'minggu',
@@ -81,11 +101,11 @@
           },
           get activeTabLabel() {
               return {
-                  'dashboard': 'Dashboard Admin',
+                  'dashboard': 'Dasbor Admin',
                   'users': 'Manajemen Pengguna',
                   'master': 'Ringkasan Master Data',
-                  'monitoring': 'Monitoring Sistem'
-              }[this.adminTab] || 'Dashboard Admin';
+                  'monitoring': 'Pemantauan Sistem'
+              }[this.adminTab] || 'Dasbor Admin';
           },
           clearNotif() { this.notification = ''; this.errorNotification = ''; },
           init() {
@@ -129,7 +149,7 @@
                 </div>
                 <div class="min-w-0">
                     <h1 class="font-extrabold text-lg tracking-tight text-white leading-none">SORAI</h1>
-                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest block mt-1">Admin Control Hub</span>
+                    <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest block mt-1">Pusat Kendali Admin</span>
                 </div>
             </a>
 
@@ -171,7 +191,7 @@
                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/>
                         </svg>
-                        <span class="truncate">Dashboard Admin</span>
+                        <span class="truncate">Dasbor Admin</span>
                     </button>
 
                     <button type="button"
@@ -249,7 +269,7 @@
                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                         </svg>
-                        <span class="truncate">Monitoring Sistem</span>
+                        <span class="truncate">Pemantauan Sistem</span>
                     </button>
                 </nav>
             </div>
@@ -303,7 +323,7 @@
                 </button>
                 <div class="flex items-center gap-2 min-w-0">
                     <span class="w-7 h-7 rounded-lg bg-[#ea580c] text-white text-xs font-extrabold flex items-center justify-center shrink-0">S</span>
-                    <span class="text-sm font-bold text-slate-900 truncate" x-text="activeTabLabel">Dashboard Admin</span>
+                    <span class="text-sm font-bold text-slate-900 truncate" x-text="activeTabLabel">Dasbor Admin</span>
                 </div>
             </div>
             <span class="text-[11px] font-semibold text-slate-500 truncate max-w-[140px]">Super Admin</span>
@@ -339,12 +359,12 @@
                     <a href="{{ route('admin.dashboard') }}"
                        @click.prevent="setAdminTab('dashboard')"
                        class="font-medium text-slate-400 hover:text-slate-700 transition-colors shrink-0">
-                        Control Hub Admin
+                        Pusat Kendali Admin
                     </a>
                     <svg class="w-3.5 h-3.5 text-slate-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                     </svg>
-                    <span class="font-semibold text-slate-800 truncate" x-text="activeTabLabel">Dashboard Admin</span>
+                    <span class="font-semibold text-slate-800 truncate" x-text="activeTabLabel">Dasbor Admin</span>
                 </div>
             </div>
 
@@ -353,6 +373,21 @@
                     {{ now()->locale('id')->translatedFormat('l, d M Y') }}
                 </span>
                 <span class="h-4 w-px bg-slate-200"></span>
+
+                {{-- Mode Gelap / Mode Terang Toggle --}}
+                <button type="button"
+                        @click="toggleTheme()"
+                        class="inline-flex items-center justify-center w-8 h-8 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition cursor-pointer"
+                        :title="isDarkMode ? 'Beralih ke Mode Terang' : 'Beralih ke Mode Gelap'"
+                        aria-label="Toggle Mode Tampilan">
+                    <svg x-show="!isDarkMode" class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                    </svg>
+                    <svg x-show="isDarkMode" x-cloak class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                </button>
+
                 <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-700">
                     <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
                     <span>Super Admin</span>
@@ -449,10 +484,11 @@
 
                 {{-- Page Header --}}
                 <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-                    <div class="space-y-1">
-                        <p class="text-[11px] font-bold uppercase tracking-widest text-[#ea580c]">Control Panel Sistem</p>
-                        <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Dashboard Overview</h2>
-                        <p class="text-xs sm:text-sm text-slate-500">Ringkasan mitra terdaftar, moderasi verifikasi, dan aktivitas sistem SORAI hari ini.</p>
+                    <div>
+                        <h2 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Dasbor Admin</h2>
+                        <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">
+                            Ringkasan pengguna terdaftar, status verifikasi mitra, dan aktivitas sistem SORAI.
+                        </p>
                     </div>
                     <div class="inline-flex items-center gap-2.5 bg-white border border-slate-200/80 rounded-xl px-3.5 py-2 shadow-2xs self-start sm:self-auto tabular-nums">
                         <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
@@ -851,9 +887,8 @@
             <div x-show="adminTab === 'users'" x-cloak class="space-y-6">
                 <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                     <div class="space-y-1">
-                        <p class="text-[11px] font-bold uppercase tracking-widest text-[#ea580c]">Verifikasi &amp; Moderasi Akun</p>
-                        <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Manajemen Pengguna Sistem</h2>
-                        <p class="text-xs sm:text-sm text-slate-500">Kelola persetujuan registrasi mitra UMKM maupun pemasok dan kontrol akses akun aktif.</p>
+                        <h2 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Manajemen Pengguna Sistem</h2>
+                        <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Kelola persetujuan registrasi mitra UMKM, pemasok, dan kontrol akses akun.</p>
                     </div>
                     @if($pendingUsersCount > 0)
                         <span class="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-800 text-xs font-semibold tabular-nums self-start sm:self-auto">
@@ -1032,9 +1067,8 @@
             <div x-show="adminTab === 'master'" x-cloak class="space-y-6">
                 <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                     <div class="space-y-1">
-                        <p class="text-[11px] font-bold uppercase tracking-widest text-[#ea580c]">Standarisasi Data Sistem</p>
-                        <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Master Data Komoditas &amp; Satuan</h2>
-                        <p class="text-xs sm:text-sm text-slate-500">Kelola kategori acuan, satuan baku, serta akses katalog master komoditas B2B.</p>
+                        <h2 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Master Data Komoditas &amp; Satuan</h2>
+                        <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Kelola kategori acuan, satuan baku, serta katalog master komoditas bahan baku.</p>
                     </div>
                     <a href="{{ route('admin.commodities.index') }}"
                        class="inline-flex items-center gap-2 bg-[#161922] hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-xs font-semibold transition shadow-xs self-start sm:self-auto">
@@ -1165,9 +1199,8 @@
             <div x-show="adminTab === 'monitoring'" x-cloak class="space-y-6">
                 <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                     <div class="space-y-1">
-                        <p class="text-[11px] font-bold uppercase tracking-widest text-[#ea580c]">Audit &amp; System Logs</p>
-                        <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Monitoring Sistem &amp; Aktivitas Akun</h2>
-                        <p class="text-xs sm:text-sm text-slate-500">Jejak audit pendaftaran dan status verifikasi pengguna terkini di platform SORAI.</p>
+                        <h2 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">Monitoring Sistem &amp; Aktivitas Akun</h2>
+                        <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Jejak audit pendaftaran dan status verifikasi pengguna terkini di platform SORAI.</p>
                     </div>
                     <span class="inline-flex items-center gap-2 bg-emerald-50 text-emerald-700 text-xs font-semibold px-3.5 py-2 rounded-xl border border-emerald-200/80 self-start sm:self-auto">
                         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -1381,5 +1414,138 @@
     @include('partials.action-confirm-modal')
     @include('partials.logout-modal', ['logoutRoute' => route('admin.logout')])
 
+    {{-- Live-Sync & Auto-Reload Notification Component --}}
+    <div id="admin-live-sync"
+         x-data="adminLiveSync()"
+         x-init="init()"
+         class="relative z-50">
+        <div x-cloak
+             x-show="notificationMsg"
+             x-transition:enter="transition ease-out duration-300 transform"
+             x-transition:enter-start="opacity-0 -translate-y-2 scale-95"
+             x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+             x-transition:leave="transition ease-in duration-200 transform"
+             x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+             x-transition:leave-end="opacity-0 -translate-y-2 scale-95"
+             class="fixed top-5 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 px-4 py-2.5 bg-slate-900/95 text-white border border-slate-700/80 rounded-2xl shadow-xl text-xs font-medium backdrop-blur-md max-w-md w-[92vw] sm:w-auto">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+            <span x-text="notificationMsg" class="flex-1 leading-snug"></span>
+            <button type="button" @click="notificationMsg = ''" class="text-white/60 hover:text-white p-1 rounded-lg transition shrink-0" aria-label="Tutup notifikasi">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function adminLiveSync() {
+            return {
+                notificationMsg: '',
+                lastFingerprint: '',
+                isSyncing: false,
+                hasPendingSync: false,
+                pollTimer: null,
+
+                isAnyModalOrInputActive: function() {
+                    var activeTag = document.activeElement ? document.activeElement.tagName : '';
+                    var isTyping = ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeTag) && 
+                        !['button', 'submit', 'checkbox', 'radio'].includes(document.activeElement.type);
+
+                    if (isTyping) return true;
+
+                    var dirtyInputs = document.querySelectorAll('form:not([method="GET"]):not([method="get"]) input, form:not([method="GET"]):not([method="get"]) textarea');
+                    for (var j = 0; j < dirtyInputs.length; j++) {
+                        var inp = dirtyInputs[j];
+                        if (inp.type !== 'hidden' && inp.type !== 'submit' && inp.value !== inp.defaultValue) {
+                            return true;
+                        }
+                    }
+
+                    var modals = document.querySelectorAll('.fixed.inset-0.z-50, [role="dialog"]');
+                    for (var i = 0; i < modals.length; i++) {
+                        var el = modals[i];
+                        if (el.offsetParent !== null && window.getComputedStyle(el).display !== 'none') {
+                            return true;
+                        }
+                    }
+
+                    return false;
+                },
+
+                init: function() {
+                    var self = this;
+                    this.checkForUpdates(true);
+
+                    this.pollTimer = setInterval(function() {
+                        self.checkForUpdates(false);
+                    }, 8000);
+
+                    setInterval(function() {
+                        if (self.hasPendingSync && !self.isAnyModalOrInputActive()) {
+                            self.hasPendingSync = false;
+                            self.performSafeReload();
+                        }
+                    }, 2000);
+                },
+
+                checkForUpdates: function(isInitial) {
+                    var self = this;
+                    if (self.isSyncing) return;
+
+                    fetch('{{ route("admin.check-updates") }}', {
+                        headers: {
+                            'Accept': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(function(res) {
+                        if (!res.ok) throw new Error('Network error');
+                        return res.json();
+                    })
+                    .then(function(data) {
+                        if (data && data.fingerprint) {
+                            if (!self.lastFingerprint || isInitial) {
+                                self.lastFingerprint = data.fingerprint;
+                                return;
+                            }
+
+                            if (data.fingerprint !== self.lastFingerprint) {
+                                self.lastFingerprint = data.fingerprint;
+                                self.handleNewDataDetected();
+                            }
+                        }
+                    })
+                    .catch(function() {});
+                },
+
+                handleNewDataDetected: function() {
+                    if (this.isAnyModalOrInputActive()) {
+                        this.hasPendingSync = true;
+                        this.notify('Pembaruan data sistem terdeteksi. Data akan diperbarui saat Anda selesai.');
+                        return;
+                    }
+
+                    this.notify('Data baru terdeteksi! Memperbarui tampilan...');
+                    var self = this;
+                    setTimeout(function() {
+                        self.performSafeReload();
+                    }, 800);
+                },
+
+                performSafeReload: function() {
+                    window.location.reload();
+                },
+
+                notify: function(msg) {
+                    var self = this;
+                    this.notificationMsg = msg;
+                    setTimeout(function() {
+                        if (self.notificationMsg === msg) self.notificationMsg = '';
+                    }, 3500);
+                }
+            };
+        }
+    </script>
 </body>
 </html>

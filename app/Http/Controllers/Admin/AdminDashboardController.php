@@ -7,7 +7,9 @@ use App\Models\Commodity;
 use App\Models\CommodityCategory;
 use App\Models\CommodityUnit;
 use App\Models\Order;
+use App\Models\Partnership;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -390,5 +392,51 @@ class AdminDashboardController extends Controller
 
         return redirect()->route('admin.dashboard', ['tab' => 'users'])
             ->with('success', "✓ Status akun {$user->email} berhasil diperbarui menjadi {$displayStatus}.");
+    }
+
+    /**
+     * Check if system data has updates for admin live-sync polling.
+     */
+    public function checkUpdates(Request $request): JsonResponse
+    {
+        $latestUserUpdate = User::max('updated_at');
+        $usersCount = User::count();
+        $pendingUsersCount = User::whereRaw("LOWER(COALESCE(status, '')) IN ('pending', 'pending_verifikasi')")->count();
+
+        $latestCommodityUpdate = Commodity::max('updated_at');
+        $commoditiesCount = Commodity::count();
+
+        $latestCategoryUpdate = CommodityCategory::max('updated_at');
+        $categoriesCount = CommodityCategory::count();
+
+        $latestUnitUpdate = CommodityUnit::max('updated_at');
+        $unitsCount = CommodityUnit::count();
+
+        $latestOrderUpdate = Order::max('updated_at');
+        $ordersCount = Order::count();
+
+        $latestPartnershipUpdate = Partnership::max('updated_at');
+        $partnershipsCount = Partnership::count();
+
+        $stateFingerprint = md5(implode('|', [
+            $latestUserUpdate,
+            $usersCount,
+            $pendingUsersCount,
+            $latestCommodityUpdate,
+            $commoditiesCount,
+            $latestCategoryUpdate,
+            $categoriesCount,
+            $latestUnitUpdate,
+            $unitsCount,
+            $latestOrderUpdate,
+            $ordersCount,
+            $latestPartnershipUpdate,
+            $partnershipsCount,
+        ]));
+
+        return response()->json([
+            'updated' => true,
+            'fingerprint' => $stateFingerprint,
+        ]);
     }
 }
