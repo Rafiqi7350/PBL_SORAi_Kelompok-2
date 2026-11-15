@@ -60,6 +60,8 @@ Route::prefix('admin')->name('admin.')->group(function () {
 /* UMKM Routes */
 Route::prefix('umkm')->name('umkm.')->middleware(EnsureUserIsUmkm::class)->group(function () {
     Route::get('/katalog', [KatalogController::class, 'index'])->name('katalog.index');
+    Route::get('/check-updates', [KatalogController::class, 'checkUpdates'])->name('check-updates');
+    Route::get('/dashboard/analytics', [KatalogController::class, 'dashboardAnalytics'])->name('dashboard.analytics');
     Route::post('/katalog/ajukan-kemitraan', [KatalogController::class, 'ajukanKemitraan'])->name('katalog.ajukan');
 
     Route::post('/supply-planning', [CollaborativeSupplyPlanningController::class, 'store'])->name('supply-planning.store');
@@ -96,6 +98,7 @@ Route::get('/akun/foto/{user}', [ProfilePhotoController::class, 'show'])->middle
 Route::prefix('supplier')->name('supplier.')->middleware(EnsureUserIsSupplier::class)->group(function () {
     Route::get('/', fn () => redirect()->route('supplier.dashboard'));
     Route::get('/dashboard', [SupplierDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/check-updates', [SupplierDashboardController::class, 'checkUpdates'])->name('check-updates');
 
     Route::get('/katalog', [KatalogSupplierController::class, 'index'])->name('katalog.index');
     Route::get('/katalog/create', [KatalogSupplierController::class, 'create'])->name('katalog.create');
@@ -148,6 +151,7 @@ Route::prefix('supplier')->name('supplier.')->middleware(EnsureUserIsSupplier::c
 /* Admin Protected Routes (Master Data Komoditas, Kategori, Satuan Baku, User Moderasi) */
 Route::prefix('admin')->name('admin.')->middleware(EnsureUserIsAdmin::class)->group(function () {
     Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
+    Route::get('/check-updates', [AdminDashboardController::class, 'checkUpdates'])->name('check-updates');
     Route::patch('/users/{id}/status', [AdminDashboardController::class, 'updateUserStatus'])->name('users.update-status');
     Route::resource('commodities', CommodityController::class);
     Route::resource('categories', CommodityCategoryController::class)->except(['create', 'edit']);
