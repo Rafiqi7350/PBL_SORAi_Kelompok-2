@@ -63,12 +63,17 @@ Route::prefix('umkm')->name('umkm.')->middleware(EnsureUserIsUmkm::class)->group
     Route::get('/check-updates', [KatalogController::class, 'checkUpdates'])->name('check-updates');
     Route::get('/dashboard/analytics', [KatalogController::class, 'dashboardAnalytics'])->name('dashboard.analytics');
     Route::post('/katalog/ajukan-kemitraan', [KatalogController::class, 'ajukanKemitraan'])->name('katalog.ajukan');
+    Route::put('/katalog/permintaan/{partnership}', [KatalogController::class, 'updatePermintaan'])->name('katalog.permintaan.update');
+    Route::delete('/katalog/permintaan/{partnership}', [KatalogController::class, 'batalPermintaan'])->name('katalog.permintaan.destroy');
+    Route::post('/katalog/permintaan/{partnership}/batal', [KatalogController::class, 'batalPermintaan'])->name('katalog.permintaan.batal');
 
     Route::post('/supply-planning', [CollaborativeSupplyPlanningController::class, 'store'])->name('supply-planning.store');
     Route::delete('/supply-planning/{id}', [CollaborativeSupplyPlanningController::class, 'destroy'])->name('supply-planning.destroy');
 
     Route::get('/pemesanan', [PemesananController::class, 'index'])->name('pemesanan.index');
     Route::post('/pemesanan/terbitkan', [PemesananController::class, 'terbitkan'])->name('pemesanan.terbitkan');
+    Route::post('/pemesanan/{order}/batal', [PemesananController::class, 'batalPesanan'])->name('pemesanan.batal');
+    Route::delete('/pemesanan/{order}', [PemesananController::class, 'batalPesanan'])->name('pemesanan.destroy');
     Route::get('/pemesanan/{order}/konfirmasi', [PemesananController::class, 'showKonfirmasi'])->name('pemesanan.konfirmasi.show');
     Route::post('/pemesanan/{order}/konfirmasi', [PemesananController::class, 'konfirmasi'])->name('pemesanan.konfirmasi');
     Route::post('/pemesanan/{order}/konfirmasi-backorder', [PemesananController::class, 'konfirmasiBackorder'])->name('pemesanan.konfirmasi-backorder');

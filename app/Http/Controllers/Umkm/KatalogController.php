@@ -14,6 +14,7 @@ use App\Models\SupplierPerformanceScore;
 use App\Models\SupplierProduct;
 use App\Models\SupplierProfile;
 use App\Models\SupplyPlan;
+use App\Models\UmkmProfile;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -244,12 +245,56 @@ class KatalogController extends Controller
 
         // Eliminasi query redundan: ekstrak langsung dari memory $allPartnerships
         $appliedProductIds = $allPartnerships
-            ->reject(fn ($p) => in_array(strtolower((string) $p->status), ['rejected', 'ditolak']))
+            ->reject(fn ($p) => in_array(strtolower((string) $p->status), ['rejected', 'ditolak', 'cancelled', 'dibatalkan']))
             ->flatMap(fn ($p) => $p->deliverySchedules->pluck('supplier_product_id'))
             ->filter()
             ->unique()
             ->values()
             ->toArray();
+
+        // Format daftar riwayat pengajuan kemitraan/permintaan UMKM dengan batasan edit < 30 menit
+        $partnershipRequests = ($allPartnerships->isNotEmpty())
+            ? $allPartnerships->map(function ($p) {
+                $schedule = $p->deliverySchedules->first();
+                $product = $schedule?->supplierProduct;
+                $commodity = $product?->commodity;
+                $diffMinutes = $p->created_at ? abs(now()->diffInMinutes($p->created_at)) : 999;
+                $diffSeconds = $p->created_at ? max(0, (int) (1800 - abs(now()->diffInSeconds($p->created_at)))) : 0;
+                $isPending = in_array(strtolower((string) $p->status), ['pending', 'menunggu', 'dalam_review']);
+                $canEdit = $isPending && $diffMinutes < 30;
+                $remainingMinutes = ceil($diffSeconds / 60);
+
+                return [
+                    'id' => $p->id,
+                    'contract_code' => $p->contract_code,
+                    'supplier_id' => $p->supplier_id,
+                    'supplier_name' => $p->supplier?->company_name ?? 'Pemasok Mitra',
+                    'supplier_product_id' => $schedule?->supplier_product_id,
+                    'commodity_name' => $commodity?->name ?? 'Komoditas Pasokan',
+                    'commodity_image' => $commodity?->image_url ?? $product?->image_url,
+                    'price' => (float) ($product?->price ?? 0),
+                    'status' => $p->status,
+                    'volume_per_delivery' => (float) ($schedule?->volume_per_delivery ?? 0),
+                    'total_contract_volume' => (float) ($schedule?->total_contract_volume ?? 0),
+                    'unit' => $schedule?->unit ?? 'kg',
+                    'frequency_type' => $schedule?->frequency_type ?? '-',
+                    'delivery_days' => (array) ($schedule?->delivery_days ?? []),
+                    'delivery_time' => $schedule?->delivery_time ? substr((string) $schedule->delivery_time, 0, 5) : '05:30',
+                    'start_date' => $schedule?->start_date?->format('Y-m-d'),
+                    'start_date_formatted' => $schedule?->start_date?->translatedFormat('d M Y') ?? '-',
+                    'is_auto_order_active' => (bool) ($schedule?->is_auto_order_active ?? true),
+                    'quality_terms' => $p->quality_terms,
+                    'clean_notes' => $p->clean_notes,
+                    'submission_details' => $p->submission_details,
+                    'created_at' => $p->created_at?->translatedFormat('d M Y, H:i') ?? '-',
+                    'created_at_human' => $p->created_at?->diffForHumans() ?? '-',
+                    'can_edit' => $canEdit,
+                    'diff_minutes' => $diffMinutes,
+                    'remaining_minutes' => $remainingMinutes,
+                    'remaining_seconds' => $diffSeconds,
+                ];
+            })
+            : collect();
 
         // Hitung jumlah pesanan yang perlu divalidasi penerimaannya (Batch 1) oleh UMKM (hanya yang sudah diberangkatkan)
         $pendingValidationCount = ($umkm && $partnershipIds->isNotEmpty())
@@ -443,19 +488,13 @@ class KatalogController extends Controller
             $persentasePenghematan = round((($totalPengeluaranBulanLalu - $totalPengeluaranBulanIni) / $totalPengeluaranBulanLalu) * 100, 1);
         }
 
-        // 2. Total Barang Diterima Bulan Ini (Komoditas Bahan Baku Dapur: Daging & Bumbu)
+        // 2. Total Barang Diterima Bulan Ini
         $totalDiterimaKg = ($umkm && $partnershipIds->isNotEmpty())
             ? (float) OrderItem::whereHas('order', function ($oq) use ($partnershipIds, $startOfMonth, $endOfMonth) {
                 $oq->whereIn('partnership_id', $partnershipIds)
                     ->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
             })
-            ->whereHas('supplierProduct.commodity', function ($cq) use ($likeOp) {
-                $cq->where('name', $likeOp, '%ayam%')
-                    ->orWhere('name', $likeOp, '%bumbu%')
-                    ->orWhere('category', $likeOp, '%daging%')
-                    ->orWhere('category', $likeOp, '%bumbu%');
-            })
-            ->sum('quantity_delivered')
+                ->sum('quantity_delivered')
             : 0.0;
 
         // 3. Skor Rata-Rata On-Time Delivery Bulan Ini
@@ -490,20 +529,20 @@ class KatalogController extends Controller
             ? OrderItem::whereHas('order', function ($oq) use ($partnershipIds) {
                 $oq->whereIn('partnership_id', $partnershipIds);
             })
-            ->selectRaw("{$monthFormatSql} as month_key, SUM(quantity_delivered) as delivered_vol")
-            ->groupBy(DB::raw($monthFormatSql))
-            ->pluck('delivered_vol', 'month_key')
-            ->toArray()
+                ->selectRaw("{$monthFormatSql} as month_key, SUM(quantity_delivered) as delivered_vol")
+                ->groupBy(DB::raw($monthFormatSql))
+                ->pluck('delivered_vol', 'month_key')
+                ->toArray()
             : [];
 
         $monthlyCost = ($umkm && $partnershipIds->isNotEmpty())
             ? OrderItem::whereHas('order', function ($oq) use ($partnershipIds) {
                 $oq->whereIn('partnership_id', $partnershipIds);
             })
-            ->selectRaw("{$monthFormatSql} as month_key, SUM(subtotal) as cost_total")
-            ->groupBy(DB::raw($monthFormatSql))
-            ->pluck('cost_total', 'month_key')
-            ->toArray()
+                ->selectRaw("{$monthFormatSql} as month_key, SUM(subtotal) as cost_total")
+                ->groupBy(DB::raw($monthFormatSql))
+                ->pluck('cost_total', 'month_key')
+                ->toArray()
             : [];
 
         $trendsData = [];
@@ -531,41 +570,41 @@ class KatalogController extends Controller
                 'payments',
                 'review',
             ])
-            ->whereIn('partnership_id', $partnershipIds)
-            ->latest('created_at')
-            ->limit(10)
-            ->get()
-            ->map(function ($ord) {
-                $firstItem = $ord->items->first();
-                $commodityName = $firstItem?->supplierProduct?->commodity?->name ?? 'Komoditas Pasokan';
-                $unit = $firstItem?->supplierProduct?->unit ?? $firstItem?->supplierProduct?->commodity?->unit ?? 'kg';
-                $deliveredQty = (float) $ord->items->sum('quantity_delivered');
-                $orderedQty = (float) $ord->items->sum('quantity');
-                $qtyDisplay = $deliveredQty > 0 ? $deliveredQty : $orderedQty;
+                ->whereIn('partnership_id', $partnershipIds)
+                ->latest('created_at')
+                ->limit(10)
+                ->get()
+                ->map(function ($ord) {
+                    $firstItem = $ord->items->first();
+                    $commodityName = $firstItem?->supplierProduct?->commodity?->name ?? 'Komoditas Pasokan';
+                    $unit = $firstItem?->supplierProduct?->unit ?? $firstItem?->supplierProduct?->commodity?->unit ?? 'kg';
+                    $deliveredQty = (float) $ord->items->sum('quantity_delivered');
+                    $orderedQty = (float) $ord->items->sum('quantity');
+                    $qtyDisplay = $deliveredQty > 0 ? $deliveredQty : $orderedQty;
 
-                $latestPayment = $ord->payments->last() ?? $ord->payment;
-                $paymentStatus = strtoupper($latestPayment?->payment_status ?? ($ord->order_status === 'completed' ? 'PAID' : 'UNPAID'));
+                    $latestPayment = $ord->payments->last() ?? $ord->payment;
+                    $paymentStatus = strtoupper($latestPayment?->payment_status ?? ($ord->order_status === 'completed' ? 'PAID' : 'UNPAID'));
 
-                return [
-                    'id' => 'TRX-'.strtoupper(substr((string) $ord->id, 0, 8)),
-                    'db_id' => $ord->id,
-                    'invoiceNumber' => 'INV-'.strtoupper(substr((string) $ord->id, 0, 8)),
-                    'supplierName' => $ord->partnership?->supplier?->company_name ?? 'Mitra Pemasok',
-                    'supplierPhone' => $ord->partnership?->supplier?->phone ?? '-',
-                    'supplierAddress' => $ord->partnership?->supplier?->warehouse_address ?? 'Malang Raya & Jawa Timur',
-                    'commodity' => $commodityName,
-                    'approvedQty' => $qtyDisplay,
-                    'unit' => $unit,
-                    'total' => (float) $ord->total_amount,
-                    'date' => $ord->created_at?->format('d/m/Y') ?? '-',
-                    'paymentStatus' => $paymentStatus,
-                    'paidAt' => $latestPayment?->paid_at?->format('d/m/Y H:i') ?? ($paymentStatus === 'PAID' ? ($ord->created_at?->format('d/m/Y H:i') ?? '-') : null),
-                    'orderStatus' => $ord->order_status ?? 'completed',
-                    'rating' => $ord->review?->rating ?? null,
-                    'review' => $ord->review?->review ?? '',
-                ];
-            })
-            ->values()
+                    return [
+                        'id' => 'TRX-'.strtoupper(substr((string) $ord->id, 0, 8)),
+                        'db_id' => $ord->id,
+                        'invoiceNumber' => 'INV-'.strtoupper(substr((string) $ord->id, 0, 8)),
+                        'supplierName' => $ord->partnership?->supplier?->company_name ?? 'Mitra Pemasok',
+                        'supplierPhone' => $ord->partnership?->supplier?->phone ?? '-',
+                        'supplierAddress' => $ord->partnership?->supplier?->warehouse_address ?? 'Malang Raya & Jawa Timur',
+                        'commodity' => $commodityName,
+                        'approvedQty' => $qtyDisplay,
+                        'unit' => $unit,
+                        'total' => (float) $ord->total_amount,
+                        'date' => $ord->created_at?->format('d/m/Y') ?? '-',
+                        'paymentStatus' => $paymentStatus,
+                        'paidAt' => $latestPayment?->paid_at?->format('d/m/Y H:i') ?? ($paymentStatus === 'PAID' ? ($ord->created_at?->format('d/m/Y H:i') ?? '-') : null),
+                        'orderStatus' => $ord->order_status ?? 'completed',
+                        'rating' => $ord->review?->rating ?? null,
+                        'review' => $ord->review?->review ?? '',
+                    ];
+                })
+                ->values()
             : collect();
 
         // Ambil data performa mitra pemasok untuk Tab Monitoring & Evaluasi Kemitraan (Hanya kemitraan aktif)
@@ -645,6 +684,7 @@ class KatalogController extends Controller
             'realisasiPasokanBulanIni',
             'dashboardOrders',
             'stateFingerprint',
+            'partnershipRequests',
         ));
     }
 
@@ -687,7 +727,7 @@ class KatalogController extends Controller
     {
         $umkm = Auth::user()?->umkmProfile;
         if (! $umkm && $request->has('umkm_id')) {
-            $umkm = \App\Models\UmkmProfile::find($request->input('umkm_id'));
+            $umkm = UmkmProfile::find($request->input('umkm_id'));
         }
 
         $allPartnerships = $umkm ? Partnership::where('umkm_id', $umkm->id)->get() : collect();
@@ -703,7 +743,7 @@ class KatalogController extends Controller
                 ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
                 ->where(function ($q) {
                     $q->whereHas('payments', fn ($pq) => $pq->whereIn(DB::raw("UPPER(COALESCE(payment_status, ''))"), ['PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS', 'LUNAS']))
-                      ->orWhereIn('order_status', ['completed', 'BARANG_DITERIMA', 'completed_partial']);
+                        ->orWhereIn('order_status', ['completed', 'BARANG_DITERIMA', 'completed_partial']);
                 })->sum('total_amount')
             : 0.0;
 
@@ -712,7 +752,7 @@ class KatalogController extends Controller
                 ->whereBetween('created_at', [$startOfLastMonth, $endOfLastMonth])
                 ->where(function ($q) {
                     $q->whereHas('payments', fn ($pq) => $pq->whereIn(DB::raw("UPPER(COALESCE(payment_status, ''))"), ['PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS', 'LUNAS']))
-                      ->orWhereIn('order_status', ['completed', 'BARANG_DITERIMA', 'completed_partial']);
+                        ->orWhereIn('order_status', ['completed', 'BARANG_DITERIMA', 'completed_partial']);
                 })->sum('total_amount')
             : 0.0;
 
@@ -735,8 +775,6 @@ class KatalogController extends Controller
         $deliveredKg = ($umkm && $partnershipIds->isNotEmpty())
             ? (float) OrderItem::whereHas('order', function ($oq) use ($partnershipIds, $startOfMonth, $endOfMonth) {
                 $oq->whereIn('partnership_id', $partnershipIds)->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
-            })->whereHas('supplierProduct.commodity', function ($cq) use ($likeOp) {
-                $cq->where('name', $likeOp, '%ayam%')->orWhere('name', $likeOp, '%bumbu%')->orWhere('category', $likeOp, '%daging%')->orWhere('category', $likeOp, '%bumbu%');
             })->sum('quantity_delivered')
             : 0.0;
 
@@ -889,6 +927,154 @@ class KatalogController extends Controller
             'special_instructions' => $finalSubmissionDetails,
         ]);
 
-        return redirect()->route('umkm.katalog.index')->with('success', 'Pengajuan kemitraan pasokan & jadwal rutin berhasil dikirim ke pemasok!');
+        return redirect()->route('umkm.katalog.index', ['tab' => 'riwayat-permintaan'])
+            ->with('success', 'Pengajuan kemitraan pasokan & jadwal rutin berhasil dikirim! Anda dapat mengubah rincian data ini dalam waktu < 30 menit ke depan.');
+    }
+
+    /**
+     * Memperbarui data pengajuan permintaan kemitraan selama batas waktu (< 30 menit).
+     */
+    public function updatePermintaan(Request $request, Partnership $partnership)
+    {
+        $umkm = Auth::user()?->umkmProfile;
+        if (! $umkm && ! Auth::check()) {
+            $dummyUmkmUser = User::where('role', 'umkm')->first();
+            $umkm = $dummyUmkmUser?->umkmProfile;
+        }
+
+        if (! $umkm || $partnership->umkm_id !== $umkm->id) {
+            abort(403, 'Akses ditolak.');
+        }
+
+        $isPending = in_array(strtolower((string) $partnership->status), ['pending', 'menunggu', 'dalam_review']);
+        if (! $isPending) {
+            return redirect()->back()->with('error', 'Permintaan ini sudah diproses dan tidak dapat diubah.');
+        }
+
+        $diffMinutes = $partnership->created_at ? abs(now()->diffInMinutes($partnership->created_at)) : 999;
+        if ($diffMinutes >= 30) {
+            return redirect()->back()->with('error', 'Batas waktu 30 menit untuk mengubah data permintaan telah berakhir. Data telah dikunci.');
+        }
+
+        $request->validate([
+            'volume_per_delivery' => 'required|numeric|min:0.1',
+            'frequency_type' => 'nullable|string',
+            'delivery_days' => 'nullable|array',
+            'delivery_time' => 'nullable|string',
+            'start_date' => 'nullable|date',
+            'is_auto_order_active' => 'nullable|boolean',
+            'submission_details' => 'nullable|string',
+            'terms' => 'nullable|array',
+            'terms.*' => 'nullable|string',
+        ]);
+
+        $volumePerDelivery = (float) $request->input('volume_per_delivery');
+        $frequencyType = $request->input('frequency_type', '2x Seminggu (Senin & Kamis)');
+
+        $deliveryDays = $request->input('delivery_days', []);
+        if (empty($deliveryDays)) {
+            if (str_contains($frequencyType, 'Senin & Kamis')) {
+                $deliveryDays = ['Senin', 'Kamis'];
+            } elseif (str_contains($frequencyType, 'Senin, Rabu, Jumat') || str_contains($frequencyType, '3x Seminggu')) {
+                $deliveryDays = ['Senin', 'Rabu', 'Jumat'];
+            } elseif (str_contains($frequencyType, 'Setiap Hari')) {
+                $deliveryDays = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+            } elseif (str_contains($frequencyType, '1x Seminggu')) {
+                $deliveryDays = ['Senin'];
+            } else {
+                $deliveryDays = ['Senin', 'Kamis'];
+            }
+        }
+
+        $daysPerWeek = count($deliveryDays) ?: 2;
+        $totalContractVolume = $volumePerDelivery * $daysPerWeek * 4;
+        $deliveryTime = $request->input('delivery_time', '05:30:00');
+        if (strlen($deliveryTime) === 5) {
+            $deliveryTime .= ':00';
+        }
+
+        $frequencyTypeToSave = ($frequencyType === 'Kustom')
+            ? $daysPerWeek.'x Seminggu ('.implode(', ', $deliveryDays).')'
+            : $frequencyType;
+
+        $selectedTerms = $request->input('terms', []);
+        $termsList = is_array($selectedTerms)
+            ? array_values(array_filter(array_map('trim', $selectedTerms)))
+            : [];
+
+        $customNote = trim((string) $request->input('submission_details', ''));
+
+        if (! empty($termsList)) {
+            $termsFormatted = '[Ketentuan Mutu: '.implode(' | ', $termsList).']';
+            $finalSubmissionDetails = $customNote !== '' ? ($termsFormatted.' '.$customNote) : $termsFormatted;
+        } else {
+            $finalSubmissionDetails = $customNote !== '' ? $customNote : null;
+        }
+
+        $partnership->update([
+            'submission_details' => $finalSubmissionDetails,
+        ]);
+
+        $schedule = $partnership->deliverySchedules()->first();
+        if ($schedule) {
+            $schedule->update([
+                'volume_per_delivery' => $volumePerDelivery,
+                'total_contract_volume' => $totalContractVolume,
+                'frequency_type' => $frequencyTypeToSave,
+                'delivery_days' => $deliveryDays,
+                'delivery_time' => $deliveryTime,
+                'start_date' => $request->input('start_date', $schedule->start_date),
+                'is_auto_order_active' => $request->boolean('is_auto_order_active', true),
+                'special_instructions' => $finalSubmissionDetails,
+            ]);
+        }
+
+        return redirect()->route('umkm.katalog.index', ['tab' => 'riwayat-permintaan'])
+            ->with('success', 'Data pengajuan permintaan berhasil diperbarui! Batas waktu edit aktif hingga 30 menit sejak pengajuan.');
+    }
+
+    public function batalPermintaan(Request $request, Partnership $partnership)
+    {
+        $umkm = Auth::user()?->umkmProfile;
+        if (! $umkm && ! Auth::check()) {
+            $dummyUmkmUser = User::where('role', 'umkm')->first();
+            $umkm = $dummyUmkmUser?->umkmProfile;
+        }
+
+        if (! $umkm || $partnership->umkm_id !== $umkm->id) {
+            abort(403, 'Akses ditolak.');
+        }
+
+        $isPending = in_array(strtolower((string) $partnership->status), ['pending', 'menunggu', 'dalam_review']);
+        if (! $isPending) {
+            return redirect()->back()->with('error', 'Pengajuan ini telah diproses dan tidak dapat dibatalkan.');
+        }
+
+        $diffMinutes = $partnership->created_at ? abs(now()->diffInMinutes($partnership->created_at)) : 999;
+        if ($diffMinutes >= 30) {
+            return redirect()->back()->with('error', 'Batas waktu 30 menit untuk membatalkan pengajuan telah berakhir. Data telah dikunci untuk pemasok.');
+        }
+
+        $commodityName = $partnership->deliverySchedules->first()?->supplierProduct?->commodity?->name ?? 'Bahan Baku';
+
+        DB::transaction(function () use ($partnership) {
+            $partnership->update([
+                'status' => 'cancelled',
+            ]);
+
+            $partnership->deliverySchedules()->update([
+                'is_auto_order_active' => false,
+            ]);
+        });
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Pengajuan kemitraan pasokan untuk '.$commodityName.' berhasil dibatalkan.',
+            ]);
+        }
+
+        return redirect()->route('umkm.katalog.index', ['tab' => 'riwayat-permintaan'])
+            ->with('success', 'Pengajuan kemitraan pasokan untuk '.$commodityName.' berhasil dibatalkan.');
     }
 }

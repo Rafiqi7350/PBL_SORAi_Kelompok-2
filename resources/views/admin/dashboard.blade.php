@@ -144,9 +144,7 @@
             <a href="{{ route('admin.dashboard') }}"
                @click.prevent="setAdminTab('dashboard')"
                class="flex items-center gap-3 min-w-0">
-                <div class="bg-[#ea580c] text-white rounded-xl w-9 h-9 flex items-center justify-center font-extrabold text-base shadow-sm shrink-0">
-                    S
-                </div>
+                <img src="{{ asset('images/logo.png') }}" alt="Logo SORAI" class="w-9 h-9 object-contain shrink-0">
                 <div class="min-w-0">
                     <h1 class="font-extrabold text-lg tracking-tight text-white leading-none">SORAI</h1>
                     <span class="text-[10px] font-semibold text-slate-400 uppercase tracking-widest block mt-1">Pusat Kendali Admin</span>
@@ -322,7 +320,7 @@
                     </svg>
                 </button>
                 <div class="flex items-center gap-2 min-w-0">
-                    <span class="w-7 h-7 rounded-lg bg-[#ea580c] text-white text-xs font-extrabold flex items-center justify-center shrink-0">S</span>
+                    <img src="{{ asset('images/logo.png') }}" alt="Logo SORAI" class="w-7 h-7 object-contain shrink-0">
                     <span class="text-sm font-bold text-slate-900 truncate" x-text="activeTabLabel">Dasbor Admin</span>
                 </div>
             </div>
@@ -351,7 +349,7 @@
                    href="{{ route('admin.dashboard') }}"
                    @click.prevent="setAdminTab('dashboard')"
                    class="inline-flex items-center gap-2 pr-2 border-r border-slate-200 shrink-0">
-                    <span class="w-6 h-6 rounded-md bg-[#ea580c] text-white text-[11px] font-extrabold flex items-center justify-center">S</span>
+                    <img src="{{ asset('images/logo.png') }}" alt="Logo SORAI" class="w-6 h-6 object-contain shrink-0">
                     <span class="font-bold text-slate-900 tracking-tight">SORAI</span>
                 </a>
 
