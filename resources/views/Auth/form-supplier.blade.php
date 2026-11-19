@@ -131,6 +131,13 @@
 
         <div class="w-full bg-white rounded-[2rem] p-8 sm:p-12 shadow-[0_10px_35px_rgba(0,0,0,0.06)] space-y-6">
 
+            <!-- Brand Logo -->
+            <div class="flex justify-center -mb-2">
+                <a href="{{ url('/') }}" class="inline-block transition-transform hover:scale-105 duration-200">
+                    <img src="{{ asset('images/logo.png') }}" alt="Logo SORAI" class="w-14 h-14 object-contain mx-auto">
+                </a>
+            </div>
+
             <!-- Title & Subtitle -->
             <div class="text-center space-y-2">
                 <span class="text-xs font-bold text-orange-600 uppercase font-mono tracking-wider block">

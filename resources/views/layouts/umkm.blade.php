@@ -127,9 +127,7 @@
                 <a href="{{ route('umkm.katalog.index') }}"
                    @click.prevent="setTab('katalog')"
                    class="flex items-center gap-3 min-w-0 group">
-                    <div class="w-8 h-8 rounded-lg bg-[#ea580c] text-white flex items-center justify-center font-extrabold text-sm shadow-xs group-hover:bg-[#c2410c] transition-colors shrink-0">
-                        S
-                    </div>
+                    <img src="{{ asset('images/logo.png') }}" alt="Logo SORAI" class="w-8 h-8 object-contain shrink-0 group-hover:scale-105 transition-transform duration-200">
                     <div class="flex items-center gap-2.5 min-w-0">
                         <span class="font-extrabold text-[17px] text-slate-900 tracking-tight leading-none">SORAI</span>
                         <span class="hidden sm:inline-block text-slate-200 font-light text-lg leading-none select-none">/</span>
@@ -210,6 +208,17 @@
                                 <span>Kelola Akun</span>
                             </a>
 
+                            {{-- Panduan Portal UMKM --}}
+                            <button type="button"
+                                    @click="profileMenuOpen = false; $dispatch('open-umkm-guide')"
+                                    role="menuitem"
+                                    class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer text-left">
+                                <svg class="w-4 h-4 shrink-0 text-[#ea580c]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>Panduan &amp; Alur Portal</span>
+                            </button>
+
                             {{-- Mode Gelap / Mode Terang Toggle --}}
                             <button type="button"
                                     @click="toggleTheme()"
@@ -281,6 +290,22 @@
                         </button>
 
                         <button type="button"
+                                @click="setTab('riwayat-permintaan')"
+                                class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
+                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
+                                  :class="activeTab === 'riwayat-permintaan' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
+                                <svg class="w-4 h-4 shrink-0 transition-colors"
+                                     :class="activeTab === 'riwayat-permintaan' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
+                                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                                </svg>
+                                <span>Riwayat Permintaan</span>
+                            </span>
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
+                                  :class="activeTab === 'riwayat-permintaan' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
+                        </button>
+
+                        <button type="button"
                                 @click="setTab('supply-planning')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
                             <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
@@ -338,7 +363,7 @@
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
-                                <span>Pemantauan &amp; SLA</span>
+                                <span>Pemantauan Mutu &amp; SLA</span>
                             </span>
                             <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
                                   :class="activeTab === 'monitoring' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
@@ -440,6 +465,16 @@
                 </button>
 
                 <button type="button"
+                        @click="setTab('riwayat-permintaan')"
+                        :class="activeTab === 'riwayat-permintaan' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent hover:bg-slate-50 font-medium'"
+                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left">
+                    <svg class="w-4 h-4 shrink-0" :class="activeTab === 'riwayat-permintaan' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                    </svg>
+                    <span>Riwayat Permintaan</span>
+                </button>
+
+                <button type="button"
                         @click="setTab('supply-planning')"
                         :class="activeTab === 'supply-planning' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent hover:bg-slate-50 font-medium'"
                         class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left">
@@ -478,6 +513,18 @@
                     </svg>
                     <span>Pemantauan &amp; SLA</span>
                 </button>
+
+                <div class="pt-2 mt-2 border-t border-slate-100">
+                    <button type="button"
+                            @click="mobileNavOpen = false; $dispatch('open-umkm-guide')"
+                            class="w-full px-3.5 py-2.5 rounded-xl border border-orange-200/70 bg-gradient-to-r from-orange-50 to-amber-50 text-[#c2410c] text-xs font-semibold flex items-center gap-2.5 transition cursor-pointer text-left shadow-xs">
+                        <span class="w-5 h-5 rounded-lg bg-gradient-to-tr from-[#ea580c] to-amber-500 text-white flex items-center justify-center text-[11px] font-bold shadow-xs">?</span>
+                        <div class="flex-1">
+                            <span class="block text-xs font-bold text-[#c2410c]">Panduan &amp; Alur Portal</span>
+                            <span class="block text-[10px] text-slate-500 font-normal">Alur bisnis &amp; fungsi setiap tab</span>
+                        </div>
+                    </button>
+                </div>
             </nav>
         </div>
     </header>
@@ -507,6 +554,9 @@
         @include('partials.flash-notification')
         @yield('content')
     </main>
+
+    {{-- Modal Panduan Interaktif Portal UMKM --}}
+    @include('partials.umkm-guide-modal')
 
     {{-- Modal Logout --}}
     @include('partials.logout-modal')

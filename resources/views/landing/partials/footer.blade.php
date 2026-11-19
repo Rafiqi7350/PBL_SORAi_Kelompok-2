@@ -4,9 +4,7 @@
             
             <div class="lg:col-span-5 space-y-4">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-orange-600 text-white flex items-center justify-center font-extrabold text-xl shadow-xs">
-                        S
-                    </div>
+                    <img src="{{ asset('images/logo.png') }}" alt="Logo SORAI" class="w-10 h-10 object-contain shrink-0">
                     <div>
                         <span class="font-extrabold text-slate-900 text-xl tracking-tight uppercase block leading-none">SORAi</span>
                         <span class="text-[10px] font-mono text-orange-600 font-bold tracking-widest uppercase">PORTAL DAPUR & PEMASOK</span>

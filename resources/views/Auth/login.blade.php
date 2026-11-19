@@ -6,6 +6,7 @@
     <title>Masuk ke SORAI</title>
 
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon.png') }}">
     <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
 
     <!-- Google Fonts -->
@@ -44,6 +45,13 @@
         </div>
 
         <div class="w-full bg-white rounded-[2rem] p-8 sm:p-10 shadow-[0_10px_35px_rgba(0,0,0,0.06)]">
+
+            <!-- Brand Logo -->
+            <div class="flex justify-center mb-3">
+                <a href="{{ url('/') }}" class="inline-block transition-transform hover:scale-105 duration-200">
+                    <img src="{{ asset('images/logo.png') }}" alt="Logo SORAI" class="w-16 h-16 object-contain mx-auto">
+                </a>
+            </div>
 
             <!-- Title -->
             <h2 class="text-2xl font-bold text-gray-900 text-center mb-6 tracking-tight">
