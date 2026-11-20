@@ -28,39 +28,60 @@
             showReviewModal: false,
             isSubmittingReview: false,
             notificationMsg: '',
-            // Auto-Reload / Live-Sync State
-            lastFingerprint: '{{ $stateFingerprint ?? "" }}',
-            isSyncing: false,
-            hasPendingSync: false,
-            pollTimer: null,
-            liveSyncActive: true,
+            catalogSearch: '{{ addslashes($search ?? '') }}',
+            visibleProductCount: {{ method_exists($products, 'total') ? $products->total() : $products->count() }},
+            _searchUrlTimer: null,
 
-            isAnyModalOpen: function() {
-                var isTyping = Boolean(
-                    document.activeElement &&
-                    ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName) &&
-                    document.activeElement.type !== 'button' &&
-                    document.activeElement.type !== 'submit'
-                );
+            filterCatalog: function() {
+                var query = (this.catalogSearch || '').toLowerCase().trim();
+                var cards = document.querySelectorAll('.catalog-product-card');
+                if (!cards || cards.length === 0) return;
 
-                return Boolean(
-                    isTyping ||
-                    this.selectedCommodity ||
-                    this.showAjukanConfirmModal ||
-                    this.editingPermintaan ||
-                    this.cancellingPermintaan ||
-                    this.cancellingOrder ||
-                    this.confirmingOrderId ||
-                    this.confirmingBackorderId ||
-                    this.rejectingBackorderId ||
-                    this.approvingBackorderOrder ||
-                    this.previewAutoOrder ||
-                    this.payingOrder ||
-                    this.payingInvoice ||
-                    this.showReviewModal ||
-                    this.ratingInputOrder ||
-                    (this.selectedSupplierPerformance && !this.selectedSupplierPerformance.isClosed)
-                );
+                var words = query ? query.split(/\s+/) : [];
+                var count = 0;
+
+                cards.forEach(function(card) {
+                    var text = (card.getAttribute('data-searchable') || '').toLowerCase();
+                    var match = true;
+
+                    if (words.length > 0) {
+                        for (var i = 0; i < words.length; i++) {
+                            if (!text.includes(words[i])) {
+                                match = false;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (match) {
+                        card.style.display = '';
+                        count++;
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+
+                this.visibleProductCount = count;
+
+                // Sync URL query secara debounced tanpa reload halaman
+                clearTimeout(this._searchUrlTimer);
+                this._searchUrlTimer = setTimeout(function() {
+                    try {
+                        var url = new URL(window.location.href);
+                        if (query) {
+                            url.searchParams.set('search', query);
+                        } else {
+                            url.searchParams.delete('search');
+                        }
+                        url.searchParams.set('tab', 'katalog');
+                        window.history.replaceState({}, '', url.toString());
+                    } catch (e) {}
+                }, 300);
+            },
+
+            clearSearch: function() {
+                this.catalogSearch = '';
+                this.filterCatalog();
             },
 
             init: function() {
@@ -87,14 +108,6 @@
 
                 // Hitung mundur live timer sisa waktu edit 30 menit
                 setInterval(function() {
-                    if (self.hasPendingSync && !self.isAnyModalOpen()) {
-                        self.hasPendingSync = false;
-                        self.performSafeReload();
-                    }
-                }, 2000);
-
-                // Hitung mundur live timer sisa waktu edit 30 menit
-                setInterval(function() {
                     if (self.partnershipRequests && self.partnershipRequests.length > 0) {
                         self.partnershipRequests.forEach(function(item) {
                             if (item.remaining_seconds > 0) {
@@ -105,62 +118,6 @@
                                 }
                             }
                         });
-                    }
-                }, 1000);
-            },
-
-            performSafeReload: function() {
-                var self = this;
-                try {
-                    var targetUrl = new URL(window.location.href);
-                    // Ambil tab aktif dari URL atau sessionStorage atau 'katalog'
-                    var currentTab = (new URLSearchParams(window.location.search)).get('tab') 
-                        || sessionStorage.getItem('sorai_umkm_active_tab') 
-                        || 'katalog';
-                    
-                    targetUrl.searchParams.set('tab', currentTab);
-
-                    if (currentTab === 'pemesanan') {
-                        var currentSubTab = self.orderSubTab 
-                            || (new URLSearchParams(window.location.search)).get('subtab')
-                            || sessionStorage.getItem('sorai_umkm_order_subtab') 
-                            || 'auto-order';
-                        targetUrl.searchParams.set('subtab', currentSubTab);
-                    } else {
-                        targetUrl.searchParams.delete('subtab');
-                    }
-
-                    window.location.href = targetUrl.toString();
-                } catch (e) {
-                    window.location.reload();
-                }
-            },
-
-            checkForUpdates: function() {
-                var self = this;
-                if (!self.liveSyncActive || self.isSyncing) return;
-
-                fetch('{{ route("umkm.check-updates") }}', {
-                    headers: {
-                        'Accept': 'application/json',
-                        'X-Requested-With': 'XMLHttpRequest'
-                    }
-                })
-                .then(function(res) {
-                    if (!res.ok) throw new Error('Network error');
-                    return res.json();
-                })
-                .then(function(data) {
-                    if (data && data.fingerprint) {
-                        if (!self.lastFingerprint) {
-                            self.lastFingerprint = data.fingerprint;
-                            return;
-                        }
-
-                        if (data.fingerprint !== self.lastFingerprint) {
-                            self.lastFingerprint = data.fingerprint;
-                            self.handleNewDataDetected();
-                        }
                     }
                 }, 1000);
             },
@@ -1477,7 +1434,6 @@
     <!-- TAB: RIWAYAT PENGAJUAN PERMINTAAN (< 30 MENIT EDIT)       -->
     <!-- ========================================================= -->
     <div {{ $serverActiveTab === 'riwayat-permintaan' ? '' : 'x-cloak style=display:none;' }} x-show="activeTab === 'riwayat-permintaan'" class="space-y-6">
-    <div x-cloak x-show="activeTab === 'riwayat-permintaan'" class="space-y-6">
 
         <!-- HEADER SECTION -->
         <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-4">
@@ -1497,22 +1453,6 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     <span>Ajukan Pasokan Baru</span>
                 </button>
-            </div>
-        </div>
-
-        <!-- INFO BANNER PERATURAN 30 MENIT -->
-        <div class="p-4 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex items-start gap-3.5 text-xs text-amber-950">
-            <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-            </div>
-            <div class="space-y-0.5 leading-relaxed">
-                <p class="font-bold text-amber-900">Ketentuan Perubahan Data Pengajuan (&lt; 30 Menit)</p>
-                <p class="text-[11px] text-amber-800">
-                    Sistem memberikan fleksibilitas bagi dapur Anda untuk merevisi volume, jadwal tiba, atau spesifikasi mutu selama <strong>30 menit pertama</strong>. Setelah melewati 30 menit atau disetujui oleh pemasok, data pengajuan otomatis terkunci permanen untuk kepastian operasional armada pemasok.
-                </p>
-            </div>
-        </div>
-
             </div>
         </div>
 
@@ -1712,7 +1652,6 @@
     <!-- TAB 1: KATALOG BAHAN BAKU                                -->
     <!-- ========================================================= -->
     <div {{ $serverActiveTab === 'katalog' ? '' : 'x-cloak style=display:none;' }} x-show="activeTab === 'katalog'" class="space-y-6">
-    <div x-show="activeTab === 'katalog'" class="space-y-6">
 
         <!-- 1. HERO BANNER: PASOKAN BAHAN BAKU SEGAR LANGSUNG DARI PETANI LOKAL -->
         <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#f59e0b] text-white p-6 sm:p-8 lg:p-8 shadow-xl border border-orange-400/30">
@@ -1758,31 +1697,32 @@
                     </div>
 
                     <!-- Action Buttons -->
-                    <div class="flex flex-wrap items-center gap-2.5 pt-2">
+                    <div class="flex flex-wrap items-center gap-3 pt-2">
                         <button type="button"
                                 @click="document.getElementById('katalog-search-bar')?.scrollIntoView({ behavior: 'smooth' })"
-                                class="px-5 py-2.5 rounded-xl bg-white hover:bg-amber-50 text-[#ea580c] text-xs font-black transition shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 group/btn cursor-pointer">
-                        <a href="#katalog-search-bar"
-                           class="px-5 py-2.5 rounded-xl bg-white hover:bg-amber-50 text-[#ea580c] text-xs font-black transition shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 group/btn cursor-pointer">
+                                class="px-5 py-2.5 rounded-xl bg-white hover:bg-orange-50 text-[#ea580c] text-xs font-bold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 group/btn cursor-pointer">
                             <span>Lihat Semua Bahan Baku</span>
-                            <svg class="w-3.5 h-3.5 group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
+                            <svg class="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
                             </svg>
                         </button>
-                        </a>
 
                         <button type="button" 
                                 @click="$dispatch('open-umkm-guide')" 
-                                class="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/25 backdrop-blur-md text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs">
-                            <span class="w-4 h-4 rounded-full bg-white text-[#ea580c] flex items-center justify-center text-[10px] font-black">?</span>
+                                class="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 text-white border border-white/25 backdrop-blur-md text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs">
+                            <span class="w-4 h-4 rounded-full bg-white/90 text-[#ea580c] flex items-center justify-center text-[10px] font-black">?</span>
                             <span>Cara Kerja Pasokan Dapur</span>
                         </button>
 
                         <template x-if="partnershipRequests.length > 0">
                             <button type="button" 
                                     @click="setTab('riwayat-permintaan')" 
-                                    class="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-amber-950 text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer shadow-xs">
-                                <span>Riwayat Permintaan (<span x-text="partnershipRequests.length"></span>)</span>
+                                    class="px-4 py-2.5 rounded-xl bg-orange-950/40 hover:bg-orange-950/60 text-white border border-white/20 backdrop-blur-md text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs">
+                                <svg class="w-3.5 h-3.5 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                                </svg>
+                                <span>Riwayat Permintaan</span>
+                                <span class="px-1.5 py-0.5 rounded-full bg-amber-400 text-amber-950 text-[10px] font-bold" x-text="partnershipRequests.length"></span>
                             </button>
                         </template>
                     </div>
@@ -1851,7 +1791,7 @@
         </div>
 
         <!-- Hidden anchor & Accessibility Title -->
-        <div id="katalog-search-bar" class="sr-only">Katalog Bahan Baku</div>
+        <div id="katalog-search-bar" class="sr-only scroll-mt-28">Katalog Bahan Baku</div>
 
         <!-- 2. QUICK CATEGORY FILTER PILLS (CHIPS DENGAN CLEAN SVG ICONS) -->
         <div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
@@ -2022,7 +1962,6 @@
         <div class="flex items-center justify-between text-xs text-slate-500 px-1">
             <div>
                 Menampilkan <strong class="text-slate-900 font-bold" x-text="visibleProductCount">{{ method_exists($products, 'total') ? $products->total() : $products->count() }}</strong> pilihan bahan baku segar
-                Menampilkan <strong class="text-slate-900 font-bold">{{ method_exists($products, 'total') ? $products->total() : $products->count() }}</strong> pilihan bahan baku segar
                 @if($category && $category !== 'Semua Kategori')
                     pada kategori <span class="text-[#ea580c] font-bold">{{ $category }}</span>
                 @endif
@@ -2083,7 +2022,6 @@
                 @foreach($products as $product)
                     <div class="catalog-product-card bg-white rounded-3xl overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-lg hover:border-orange-200 transition-all duration-300 border border-slate-200/80 group"
                          data-searchable="{{ strtolower(e(($product->commodity?->name ?? '') . ' ' . ($product->commodity?->category ?? '') . ' ' . ($product->supplier?->company_name ?? '') . ' ' . ($product->supplier?->delivery_area ?? '') . ' ' . ($product->quality_grade ?? '') . ' ' . ($product->description ?? ''))) }}">
-                    <div class="bg-white rounded-3xl overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-lg hover:border-orange-200 transition-all duration-300 border border-slate-200/80 group">
                         
                         <!-- Gambar Komoditas & Badges -->
                         <div class="relative h-48 w-full bg-slate-100 overflow-hidden flex items-center justify-center">
@@ -2319,30 +2257,8 @@
                 @endforeach
             </div>
 
-2            <!-- 6. PAGINASI KATALOG -->
+            <!-- 6. PAGINASI KATALOG -->
             <div x-show="visibleProductCount > 0 && (!catalogSearch || catalogSearch.trim() === '')" class="mt-8 flex justify-center">
-            <!-- 6. TIPS & JAMINAN KEAMANAN DAPUR UMKM -->
-            <div class="bg-gradient-to-r from-orange-50/80 via-amber-50/50 to-white rounded-3xl p-5 sm:p-6 border border-orange-200/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs mt-4">
-                <div class="flex items-start gap-3.5">
-                    <div class="w-10 h-10 rounded-2xl bg-orange-100 text-[#ea580c] flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <h4 class="font-bold text-slate-900 text-sm">Jaminan Proteksi Rekening Bersama (Escrow SORAI)</h4>
-                        <p class="text-xs text-slate-600 mt-0.5 leading-relaxed max-w-2xl">
-                            Setiap pembayaran faktur yang Anda lakukan aman terlindungi di rekening bersama SORAI. Dana baru dicairkan kepada pemasok setelah Anda memeriksa dan memvalidasi langsung penerimaan bahan baku segar di dapur Anda.
-                        </p>
-                    </div>
-                </div>
-                <button type="button" @click="$dispatch('open-umkm-guide')" class="px-4 py-2.5 bg-white hover:bg-orange-50 text-[#ea580c] border border-orange-200 font-bold text-xs rounded-xl transition shrink-0 cursor-pointer shadow-2xs">
-                    Pelajari Alur Lengkap
-                </button>
-            </div>
-
-            <!-- 7. PAGINASI KATALOG -->
-            <div class="mt-8 flex justify-center">
                 {{ $products->links() }}
             </div>
         @endif
