@@ -112,13 +112,15 @@ class SupplyPlanningController extends Controller
         // Jika akun pemasok baru (belum memiliki produk atau kemitraan),
         // bersihkan data mock/dummy sisa sebelumnya jika ada
         if (! $hasProductsOrPartnerships) {
-            $supplier->inventoryItems()->delete();
-            $supplier->purchaseSuggestions()->delete();
-            $supplier->materialSources()->delete();
-            $runIds = $supplier->forecastRuns()->pluck('id');
-            if ($runIds->isNotEmpty()) {
-                DemandForecastItem::whereIn('forecast_run_id', $runIds)->delete();
-                $supplier->forecastRuns()->delete();
+            if ($supplier->inventoryItems()->exists() || $supplier->purchaseSuggestions()->exists()) {
+                $supplier->inventoryItems()->delete();
+                $supplier->purchaseSuggestions()->delete();
+                $supplier->materialSources()->delete();
+                $runIds = $supplier->forecastRuns()->pluck('id');
+                if ($runIds->isNotEmpty()) {
+                    DemandForecastItem::whereIn('forecast_run_id', $runIds)->delete();
+                    $supplier->forecastRuns()->delete();
+                }
             }
         }
 

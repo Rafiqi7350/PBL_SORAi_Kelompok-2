@@ -19,6 +19,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class KatalogController extends Controller
@@ -90,8 +91,10 @@ class KatalogController extends Controller
 
         $products = $query->paginate(12)->withQueryString();
 
-        // Get unique categories for the filter
-        $categories = Commodity::select('category')->distinct()->pluck('category');
+        // Get unique categories for the filter (cached to avoid redundant queries to remote DB)
+        $categories = Cache::remember('catalog_categories', 3600, function () {
+            return Commodity::select('category')->distinct()->pluck('category');
+        });
 
         // Ambil profil UMKM user yang sedang login atau fallback untuk demo UMKM
         $umkm = Auth::user()?->umkmProfile;
@@ -234,14 +237,20 @@ class KatalogController extends Controller
         // Gabungkan dengan supply plans dari schedule (jika belum ada di supply_plans)
         $supplyPlans = ! empty($formattedSupplyPlans) ? $formattedSupplyPlans : $supplyPlans;
 
-        // Ambil daftar supplier aktif untuk dropdown form Collaborative Supply Planning
-        $availableSuppliers = SupplierProfile::whereHas('user', function ($q) {
-            $q->where('status', 'active');
-        })->orderBy('company_name')->get();
+        // Ambil daftar supplier aktif untuk dropdown form Collaborative Supply Planning (cached)
+        $availableSuppliers = Cache::remember('catalog_available_suppliers', 600, function () {
+            return SupplierProfile::whereHas('user', function ($q) {
+                $q->where('status', 'active');
+            })->orderBy('company_name')->get();
+        });
 
-        // Ambil master komoditas & satuan untuk opsi pilihan kebutuhan UMKM
-        $availableCommodities = Commodity::orderBy('name')->get();
-        $availableUnits = CommodityUnit::orderBy('name')->get();
+        // Ambil master komoditas & satuan untuk opsi pilihan kebutuhan UMKM (cached)
+        $availableCommodities = Cache::remember('catalog_available_commodities', 3600, function () {
+            return Commodity::orderBy('name')->get();
+        });
+        $availableUnits = Cache::remember('catalog_available_units', 3600, function () {
+            return CommodityUnit::orderBy('name')->get();
+        });
 
         // Eliminasi query redundan: ekstrak langsung dari memory $allPartnerships
         $appliedProductIds = $allPartnerships
@@ -296,44 +305,29 @@ class KatalogController extends Controller
             })
             : collect();
 
-        // Hitung jumlah pesanan yang perlu divalidasi penerimaannya (Batch 1) oleh UMKM (hanya yang sudah diberangkatkan)
-        $pendingValidationCount = ($umkm && $partnershipIds->isNotEmpty())
+        // Hitung jumlah validasi & backorder dalam 1 query agregat terkonsolidasi (menghemat 3 round-trip ke DB)
+        $actionCounts = ($umkm && $partnershipIds->isNotEmpty())
             ? Order::whereIn('partnership_id', $partnershipIds)
-                ->whereIn('order_status', ['MENUNGGU_KONFIRMASI_BARANG', 'DIKIRIM', 'shipped', 'partially_shipped'])
-                ->whereHas('shipmentConfirmations', function ($sq) {
-                    $sq->where('shipment_batch', 1)->whereNotNull('shipped_at')->whereNull('received_at');
-                })->count()
-            : 0;
+                ->selectRaw("
+                    COUNT(CASE WHEN order_status IN ('MENUNGGU_KONFIRMASI_BARANG', 'DIKIRIM', 'shipped', 'partially_shipped') AND EXISTS (
+                        SELECT 1 FROM shipment_confirmations sc WHERE sc.order_id = orders.id AND sc.shipment_batch = 1 AND sc.shipped_at IS NOT NULL AND sc.received_at IS NULL
+                    ) THEN 1 END) as pending_validation,
+                    COUNT(CASE WHEN order_status = '".Order::STATUS_WAITING_BACKORDER_APPROVAL."' OR EXISTS (
+                        SELECT 1 FROM shipment_confirmations sc WHERE sc.order_id = orders.id AND sc.backorder_action = 'create_backorder' AND sc.backorder_approval_status = 'pending'
+                    ) THEN 1 END) as pending_backorder_approval,
+                    COUNT(CASE WHEN order_status IN ('".Order::STATUS_BACKORDER_PENDING."', '".Order::STATUS_WAITING_BACKORDER_APPROVAL."') OR (
+                        order_status IN ('shipped', 'partially_shipped') AND EXISTS (
+                            SELECT 1 FROM shipment_confirmations sc WHERE sc.order_id = orders.id AND sc.backorder_action = 'create_backorder' AND sc.backorder_approval_status != 'rejected'
+                        ) AND NOT EXISTS (
+                            SELECT 1 FROM shipment_confirmations sc WHERE sc.order_id = orders.id AND sc.shipment_batch = 2 AND sc.received_at IS NOT NULL
+                        )
+                    ) THEN 1 END) as pending_backorder
+                ")->first()
+            : null;
 
-        // Hitung jumlah pesanan yang menunggu persetujuan backorder dari UMKM
-        $pendingBackorderApprovalCount = ($umkm && $partnershipIds->isNotEmpty())
-            ? Order::whereIn('partnership_id', $partnershipIds)
-                ->where(function ($q) {
-                    $q->where('order_status', Order::STATUS_WAITING_BACKORDER_APPROVAL)
-                        ->orWhereHas('shipmentConfirmations', function ($sq) {
-                            $sq->where('backorder_action', 'create_backorder')
-                                ->where('backorder_approval_status', 'pending');
-                        });
-                })->count()
-            : 0;
-
-        // Hitung total pesanan backorder aktif (menunggu persetujuan + menunggu kirim sisa)
-        $pendingBackorderCount = ($umkm && $partnershipIds->isNotEmpty())
-            ? Order::whereIn('partnership_id', $partnershipIds)
-                ->where(function ($q) {
-                    $q->whereIn('order_status', [Order::STATUS_BACKORDER_PENDING, Order::STATUS_WAITING_BACKORDER_APPROVAL])
-                        ->orWhere(function ($oq) {
-                            $oq->whereIn('order_status', ['shipped', 'partially_shipped'])
-                                ->whereHas('shipmentConfirmations', function ($sq) {
-                                    $sq->where('backorder_action', 'create_backorder')
-                                        ->where('backorder_approval_status', '!=', 'rejected');
-                                })
-                                ->whereDoesntHave('shipmentConfirmations', function ($sq) {
-                                    $sq->where('shipment_batch', 2)->whereNotNull('received_at');
-                                });
-                        });
-                })->count()
-            : 0;
+        $pendingValidationCount = (int) ($actionCounts->pending_validation ?? 0);
+        $pendingBackorderApprovalCount = (int) ($actionCounts->pending_backorder_approval ?? 0);
+        $pendingBackorderCount = (int) ($actionCounts->pending_backorder ?? 0);
 
         // Ambil daftar pesanan backorder untuk UMKM ini (dengan pagination)
         $backorderOrders = ($umkm && $partnershipIds->isNotEmpty()) ? Order::with([
@@ -413,25 +407,6 @@ class KatalogController extends Controller
             ->latest('created_at')
             ->get() : collect();
 
-        // Hitung statistik pesanan dalam 1 query agregasi terkonsolidasi (Pesanan Aktif, Selesai, Dibatalkan)
-        if ($umkm && $partnershipIds->isNotEmpty()) {
-            $orderCounts = Order::whereIn('partnership_id', $partnershipIds)
-                ->selectRaw("
-                    COUNT(CASE WHEN order_status IN ('pending', 'confirmed', 'MENUNGGU_KONFIRMASI_BARANG', 'DIKIRIM', 'shipped', 'partially_shipped', '".Order::STATUS_WAITING_BACKORDER_APPROVAL."', '".Order::STATUS_BACKORDER_PENDING."') THEN 1 END) as active_count,
-                    COUNT(CASE WHEN order_status IN ('completed', 'BARANG_DITERIMA', '".Order::STATUS_COMPLETED_PARTIAL."') THEN 1 END) as completed_count,
-                    COUNT(CASE WHEN order_status = '".Order::STATUS_CANCELLED."' THEN 1 END) as cancelled_count
-                ")
-                ->first();
-
-            $activeOrdersCount = (int) ($orderCounts->active_count ?? 0);
-            $completedOrdersCount = (int) ($orderCounts->completed_count ?? 0);
-            $cancelledOrdersCount = (int) ($orderCounts->cancelled_count ?? 0);
-        } else {
-            $activeOrdersCount = 0;
-            $completedOrdersCount = 0;
-            $cancelledOrdersCount = 0;
-        }
-
         // Hitung total kontrak kemitraan aktif dan pending untuk UMKM ini secara riil (0 jika akun baru)
         $realActiveContractsCount = $allPartnerships->filter(fn ($p) => in_array(strtolower((string) $p->status), ['active', 'approved', 'accepted', 'disetujui']))->count();
         $realPendingContractsCount = $allPartnerships->filter(fn ($p) => in_array(strtolower((string) $p->status), ['pending', 'menunggu', 'dalam_review']))->count();
@@ -460,28 +435,30 @@ class KatalogController extends Controller
         $startOfLastMonth = now()->subMonth()->startOfMonth();
         $endOfLastMonth = now()->subMonth()->endOfMonth();
 
-        // 1. Total Pengeluaran Bulan Ini & Bulan Lalu (Hanya pesanan lunas)
-        $totalPengeluaranBulanIni = ($umkm && $partnershipIds->isNotEmpty())
-            ? (float) Order::whereIn('partnership_id', $partnershipIds)
-                ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-                ->where(function ($q) {
-                    $q->whereHas('payments', function ($pq) {
-                        $pq->whereIn(DB::raw("UPPER(COALESCE(payment_status, ''))"), ['PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS', 'LUNAS']);
-                    })->orWhereIn('order_status', ['completed', 'BARANG_DITERIMA', 'completed_partial']);
-                })
-                ->sum('total_amount')
-            : 0.0;
+        // Konsolidasi Query 1: Hitung statistik pesanan & pengeluaran (Bulan ini & Lalu) dalam 1 query agregat murni
+        if ($umkm && $partnershipIds->isNotEmpty()) {
+            $orderCounts = Order::whereIn('partnership_id', $partnershipIds)
+                ->selectRaw("
+                    COUNT(CASE WHEN order_status IN ('pending', 'confirmed', 'MENUNGGU_KONFIRMASI_BARANG', 'DIKIRIM', 'shipped', 'partially_shipped', '".Order::STATUS_WAITING_BACKORDER_APPROVAL."', '".Order::STATUS_BACKORDER_PENDING."') THEN 1 END) as active_count,
+                    COUNT(CASE WHEN order_status IN ('completed', 'BARANG_DITERIMA', '".Order::STATUS_COMPLETED_PARTIAL."') THEN 1 END) as completed_count,
+                    COUNT(CASE WHEN order_status = '".Order::STATUS_CANCELLED."' THEN 1 END) as cancelled_count,
+                    COALESCE(SUM(CASE WHEN created_at >= ? AND created_at <= ? AND (order_status IN ('completed', 'BARANG_DITERIMA', '".Order::STATUS_COMPLETED_PARTIAL."') OR EXISTS (SELECT 1 FROM payments p WHERE p.order_id = orders.id AND UPPER(p.payment_status) IN ('PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS', 'LUNAS'))) THEN total_amount ELSE 0 END), 0) as spend_this_month,
+                    COALESCE(SUM(CASE WHEN created_at >= ? AND created_at <= ? AND (order_status IN ('completed', 'BARANG_DITERIMA', '".Order::STATUS_COMPLETED_PARTIAL."') OR EXISTS (SELECT 1 FROM payments p WHERE p.order_id = orders.id AND UPPER(p.payment_status) IN ('PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS', 'LUNAS'))) THEN total_amount ELSE 0 END), 0) as spend_last_month
+                ", [$startOfMonth, $endOfMonth, $startOfLastMonth, $endOfLastMonth])
+                ->first();
 
-        $totalPengeluaranBulanLalu = ($umkm && $partnershipIds->isNotEmpty())
-            ? (float) Order::whereIn('partnership_id', $partnershipIds)
-                ->whereBetween('created_at', [$startOfLastMonth, $endOfLastMonth])
-                ->where(function ($q) {
-                    $q->whereHas('payments', function ($pq) {
-                        $pq->whereIn(DB::raw("UPPER(COALESCE(payment_status, ''))"), ['PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS', 'LUNAS']);
-                    })->orWhereIn('order_status', ['completed', 'BARANG_DITERIMA', 'completed_partial']);
-                })
-                ->sum('total_amount')
-            : 0.0;
+            $activeOrdersCount = (int) ($orderCounts->active_count ?? 0);
+            $completedOrdersCount = (int) ($orderCounts->completed_count ?? 0);
+            $cancelledOrdersCount = (int) ($orderCounts->cancelled_count ?? 0);
+            $totalPengeluaranBulanIni = (float) ($orderCounts->spend_this_month ?? 0.0);
+            $totalPengeluaranBulanLalu = (float) ($orderCounts->spend_last_month ?? 0.0);
+        } else {
+            $activeOrdersCount = 0;
+            $completedOrdersCount = 0;
+            $cancelledOrdersCount = 0;
+            $totalPengeluaranBulanIni = 0.0;
+            $totalPengeluaranBulanLalu = 0.0;
+        }
 
         $persentasePenghematan = 0.0;
         if ($totalPengeluaranBulanLalu > 0) {
@@ -525,10 +502,18 @@ class KatalogController extends Controller
             ? "strftime('%Y-%m', created_at)"
             : "TO_CHAR(created_at, 'YYYY-MM')";
 
-        $monthlyRealization = ($umkm && $partnershipIds->isNotEmpty())
+        // Konsolidasi Query 2: Realisasi volume & Total biaya bulanan dalam 1 query JOIN ringkas
+        $monthlyAgg = ($umkm && $partnershipIds->isNotEmpty())
             ? OrderItem::whereHas('order', function ($oq) use ($partnershipIds) {
                 $oq->whereIn('partnership_id', $partnershipIds);
             })
+                ->selectRaw("{$monthFormatSql} as month_key, SUM(quantity_delivered) as delivered_vol, SUM(subtotal) as cost_total")
+                ->groupBy(DB::raw($monthFormatSql))
+                ->get()
+            : collect();
+
+        $monthlyRealization = $monthlyAgg->pluck('delivered_vol', 'month_key')->toArray();
+        $monthlyCost = $monthlyAgg->pluck('cost_total', 'month_key')->toArray();
                 ->selectRaw("{$monthFormatSql} as month_key, SUM(quantity_delivered) as delivered_vol")
                 ->groupBy(DB::raw($monthFormatSql))
                 ->pluck('delivered_vol', 'month_key')
@@ -626,22 +611,8 @@ class KatalogController extends Controller
             })
             ->values();
 
-        // Fingerprint untuk Auto-Reload / Live-Sync jika ada perubahan data
-        $latestOrderUpdate = ($umkm && $partnershipIds->isNotEmpty()) ? Order::whereIn('partnership_id', $partnershipIds)->max('updated_at') : null;
-        $latestPaymentUpdate = ($umkm && $partnershipIds->isNotEmpty()) ? Payment::whereHas('order', fn ($q) => $q->whereIn('partnership_id', $partnershipIds))->max('updated_at') : null;
-        $latestSupplyPlanUpdate = ($umkm && $partnershipIds->isNotEmpty()) ? SupplyPlan::whereIn('partnership_id', $partnershipIds)->max('updated_at') : null;
-        $latestPartnershipUpdate = $allPartnerships->max('updated_at');
-        $ordersCount = ($umkm && $partnershipIds->isNotEmpty()) ? Order::whereIn('partnership_id', $partnershipIds)->count() : 0;
-        $partnershipsCount = $allPartnerships->count();
-
-        $stateFingerprint = md5(implode('|', [
-            $latestOrderUpdate,
-            $latestPaymentUpdate,
-            $latestSupplyPlanUpdate,
-            $latestPartnershipUpdate,
-            $ordersCount,
-            $partnershipsCount,
-        ]));
+        // State fingerprint disederhanakan tanpa beban query remote tambahan
+        $stateFingerprint = '';
 
         return view('umkm.katalog.index', compact(
             'products',

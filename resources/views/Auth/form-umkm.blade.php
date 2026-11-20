@@ -111,6 +111,13 @@
         }
     </script>
 </head>
+<body class="min-h-screen bg-[#f8fafc] text-slate-900 font-sans flex flex-col justify-between antialiased selection:bg-[#ea580c] selection:text-white"
+      x-data="registerUmkmForm()"
+      :class="{ 'overflow-hidden': showConfirmModal }"
+      @keydown.escape.window="showConfirmModal = false">
+
+    <!-- Main Content: Registration Card with Refined Margin & Padding -->
+    <main class="w-full max-w-xl mx-auto px-4 py-8 sm:py-12 my-auto flex-grow flex flex-col justify-center animate-page-enter">
 <body class="min-h-screen bg-[#f8fafc] text-slate-900 font-sans flex flex-col justify-between antialiased selection:bg-[#ea580c] selection:text-white">
 
     <!-- Main Content: Registration Card with Refined Margin & Padding -->
@@ -450,6 +457,96 @@
     <footer class="w-full py-5 text-center text-xs text-slate-400 font-medium">
         &copy; {{ date('Y') }} SORAI — Portal Kemitraan UMKM &amp; Pemasok Bahan Baku Lokal.
     </footer>
+
+    <!-- ========================================================= -->
+    <!-- POP UP VERIFIKASI ULANG: APAKAH DATA ANDA SUDAH BENAR?     -->
+    <!-- ========================================================= -->
+    <div x-cloak 
+         x-show="showConfirmModal" 
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+        
+        <div @click.away="showConfirmModal = false" 
+             x-show="showConfirmModal"
+             x-transition:enter="transition ease-out duration-200"
+             x-transition:enter-start="opacity-0 scale-95 translate-y-2"
+             x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+             x-transition:leave="transition ease-in duration-150"
+             x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+             x-transition:leave-end="opacity-0 scale-95 translate-y-2"
+             class="bg-white max-w-lg w-full rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-5">
+
+            <!-- Header Modal -->
+            <div class="text-center space-y-2">
+                <div class="w-12 h-12 mx-auto rounded-2xl bg-orange-100 text-[#ea580c] flex items-center justify-center shadow-xs">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900 tracking-tight">
+                    Apakah Data Anda Sudah Benar?
+                </h3>
+                <p class="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                    Pastikan seluruh data pendaftaran usaha kuliner Anda sudah akurat sebelum dikirim ke tim verifikator SORAI.
+                </p>
+            </div>
+
+            <!-- Ringkasan Data Pendaftaran -->
+            <div class="bg-slate-50 rounded-2xl border border-slate-200/80 p-4 space-y-2.5 text-xs">
+                <div class="flex items-start justify-between gap-3 pb-2 border-b border-slate-200/70">
+                    <span class="text-slate-500 font-medium shrink-0">Email Akun:</span>
+                    <span class="font-bold text-slate-900 text-right font-mono break-all" x-text="form.email"></span>
+                </div>
+
+                <div class="flex items-start justify-between gap-3 pb-2 border-b border-slate-200/70">
+                    <span class="text-slate-500 font-medium shrink-0">Nama Usaha Kuliner:</span>
+                    <span class="font-bold text-slate-900 text-right" x-text="form.business_name"></span>
+                </div>
+
+                <div class="flex items-start justify-between gap-3 pb-2 border-b border-slate-200/70">
+                    <span class="text-slate-500 font-medium shrink-0">Nama Pemilik / PIC:</span>
+                    <span class="font-bold text-slate-900 text-right" x-text="form.owner_name"></span>
+                </div>
+
+                <div class="flex items-start justify-between gap-3 pb-2 border-b border-slate-200/70">
+                    <span class="text-slate-500 font-medium shrink-0">WhatsApp Operasional:</span>
+                    <span class="font-bold text-slate-900 text-right font-mono" x-text="form.phone"></span>
+                </div>
+
+                <div class="flex items-start justify-between gap-3 pt-0.5">
+                    <span class="text-slate-500 font-medium shrink-0">Alamat Dapur:</span>
+                    <span class="font-semibold text-slate-800 text-right text-[11px] leading-relaxed max-w-[260px]" x-text="form.address"></span>
+                </div>
+            </div>
+
+            <div class="bg-orange-50/70 border border-orange-200/80 rounded-xl p-3 flex items-start gap-2.5 text-[11px] text-orange-900">
+                <svg class="w-4 h-4 text-[#ea580c] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span>Setelah dikirim, akun Anda akan diverifikasi oleh admin dalam 15–30 menit. Anda dapat memantau status secara langsung.</span>
+            </div>
+
+            <!-- Tombol Aksi Modal -->
+            <div class="grid grid-cols-2 gap-3 pt-1">
+                <button type="button"
+                        @click="showConfirmModal = false"
+                        class="w-full bg-slate-100 hover:bg-slate-200 active:scale-[0.99] text-slate-700 font-bold text-xs py-3 rounded-full transition cursor-pointer">
+                    Periksa Kembali
+                </button>
+
+                <button type="button"
+                        @click="submitFinalForm()"
+                        class="w-full bg-[#ea580c] hover:bg-[#c2410c] active:scale-[0.99] text-white font-bold text-xs py-3 rounded-full shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5">
+                    <span>Ya, Kirim Pendaftaran</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                </button>
+            </div>
+
+        </div>
+    </div>
 
 </body>
 </html>

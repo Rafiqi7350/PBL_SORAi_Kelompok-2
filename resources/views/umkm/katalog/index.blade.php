@@ -1,6 +1,10 @@
 @extends('layouts.umkm')
 
 @section('content')
+@php
+    $serverActiveTab = request('tab') ?: 'katalog';
+    $serverSubTab = request('subtab') ?: 'auto-order';
+@endphp
 <script>
     function umkmCatalogPage() {
         return {
@@ -62,6 +66,13 @@
             init: function() {
                 var self = this;
 
+                // Jalankan filter katalog awal jika ada parameter search dari URL
+                if (this.catalogSearch && this.catalogSearch.trim() !== '') {
+                    this.$nextTick(function() {
+                        self.filterCatalog();
+                    });
+                }
+
                 // Pantau orderSubTab secara reaktif: simpan ke sessionStorage & URL replaceState
                 this.$watch('orderSubTab', function(val) {
                     if (!val) return;
@@ -74,12 +85,7 @@
                     } catch (e) {}
                 });
 
-                // Polling setiap 8 detik untuk memeriksa data baru dari pemasok/sistem
-                this.pollTimer = setInterval(function() {
-                    self.checkForUpdates();
-                }, 8000);
-
-                // Jika ada update tertunda karena modal terbuka, reload segera setelah modal ditutup
+                // Hitung mundur live timer sisa waktu edit 30 menit
                 setInterval(function() {
                     if (self.hasPendingSync && !self.isAnyModalOpen()) {
                         self.hasPendingSync = false;
@@ -156,22 +162,7 @@
                             self.handleNewDataDetected();
                         }
                     }
-                })
-                .catch(function() {
-                    // Silent fail agar tidak mengganggu interaksi UI
-                });
-            },
-
-            handleNewDataDetected: function() {
-                var self = this;
-                if (this.isAnyModalOpen()) {
-                    this.hasPendingSync = true;
-                    return;
-                }
-
-                setTimeout(function() {
-                    self.performSafeReload();
-                }, 700);
+                }, 1000);
             },
             pendingValidationCount: {{ $pendingValidationCount ?? 0 }},
             pendingBackorderCount: {{ $pendingBackorderCount ?? 0 }},
@@ -1485,6 +1476,7 @@
     <!-- ========================================================= -->
     <!-- TAB: RIWAYAT PENGAJUAN PERMINTAAN (< 30 MENIT EDIT)       -->
     <!-- ========================================================= -->
+    <div {{ $serverActiveTab === 'riwayat-permintaan' ? '' : 'x-cloak style=display:none;' }} x-show="activeTab === 'riwayat-permintaan'" class="space-y-6">
     <div x-cloak x-show="activeTab === 'riwayat-permintaan'" class="space-y-6">
 
         <!-- HEADER SECTION -->
@@ -1505,6 +1497,22 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     <span>Ajukan Pasokan Baru</span>
                 </button>
+            </div>
+        </div>
+
+        <!-- INFO BANNER PERATURAN 30 MENIT -->
+        <div class="p-4 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex items-start gap-3.5 text-xs text-amber-950">
+            <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div class="space-y-0.5 leading-relaxed">
+                <p class="font-bold text-amber-900">Ketentuan Perubahan Data Pengajuan (&lt; 30 Menit)</p>
+                <p class="text-[11px] text-amber-800">
+                    Sistem memberikan fleksibilitas bagi dapur Anda untuk merevisi volume, jadwal tiba, atau spesifikasi mutu selama <strong>30 menit pertama</strong>. Setelah melewati 30 menit atau disetujui oleh pemasok, data pengajuan otomatis terkunci permanen untuk kepastian operasional armada pemasok.
+                </p>
+            </div>
+        </div>
+
             </div>
         </div>
 
@@ -1703,6 +1711,7 @@
     <!-- ========================================================= -->
     <!-- TAB 1: KATALOG BAHAN BAKU                                -->
     <!-- ========================================================= -->
+    <div {{ $serverActiveTab === 'katalog' ? '' : 'x-cloak style=display:none;' }} x-show="activeTab === 'katalog'" class="space-y-6">
     <div x-show="activeTab === 'katalog'" class="space-y-6">
 
         <!-- 1. HERO BANNER: PASOKAN BAHAN BAKU SEGAR LANGSUNG DARI PETANI LOKAL -->
@@ -1750,12 +1759,16 @@
 
                     <!-- Action Buttons -->
                     <div class="flex flex-wrap items-center gap-2.5 pt-2">
+                        <button type="button"
+                                @click="document.getElementById('katalog-search-bar')?.scrollIntoView({ behavior: 'smooth' })"
+                                class="px-5 py-2.5 rounded-xl bg-white hover:bg-amber-50 text-[#ea580c] text-xs font-black transition shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 group/btn cursor-pointer">
                         <a href="#katalog-search-bar"
                            class="px-5 py-2.5 rounded-xl bg-white hover:bg-amber-50 text-[#ea580c] text-xs font-black transition shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 group/btn cursor-pointer">
                             <span>Lihat Semua Bahan Baku</span>
                             <svg class="w-3.5 h-3.5 group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
                             </svg>
+                        </button>
                         </a>
 
                         <button type="button" 
@@ -1885,6 +1898,7 @@
 
         <!-- 3. CONTAINER SEARCH & ADVANCED FILTERS -->
         <div class="bg-white p-5 sm:p-6 rounded-3xl shadow-xs border border-slate-200/80 space-y-4">
+            <form method="GET" action="{{ route('umkm.katalog.index') }}" @submit.prevent="filterCatalog()" class="space-y-4">
             <form method="GET" action="{{ route('umkm.katalog.index') }}" class="space-y-4">
                 <input type="hidden" name="tab" value="katalog">
                 @if($category && $category !== 'Semua Kategori')
@@ -1900,13 +1914,32 @@
                     <input 
                         type="text" 
                         name="search"
+                        x-model="catalogSearch"
+                        @input="filterCatalog()"
+                        placeholder="Cari nama bahan baku (misal: Daging Ayam, Bawang Merah, Cabai) atau nama pemasok..."
+                        class="w-full pl-10 pr-24 py-3 text-xs sm:text-sm font-medium bg-slate-50 border border-slate-200/90 rounded-2xl text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition"
                         value="{{ $search }}"
                         placeholder="Cari nama bahan baku (misal: Daging Ayam, Bawang Merah, Cabai) atau nama pemasok..."
                         class="w-full pl-10 pr-10 py-3 text-xs sm:text-sm font-medium bg-slate-50 border border-slate-200/90 rounded-2xl text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition"
                         @input.debounce.700ms="$event.target.form.submit()"
                         {{ request()->has('search') ? 'autofocus' : '' }}
-                        onfocus="var val = this.value; this.value = ''; this.value = val;"
                     />
+                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center gap-1">
+                        <button type="button"
+                                x-show="catalogSearch && catalogSearch.length > 0"
+                                @click="clearSearch()"
+                                class="p-1.5 text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                                title="Hapus pencarian">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </button>
+                        <button type="button"
+                                @click="filterCatalog()"
+                                class="px-3.5 py-1.5 bg-slate-900 hover:bg-[#ea580c] text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer shadow-2xs">
+                            Cari
+                        </button>
+                    </div>
                     @if($search)
                         <a href="{{ route('umkm.katalog.index', array_merge(request()->except(['search', 'page']), ['tab' => 'katalog'])) }}"
                            class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-700 transition"
@@ -1975,6 +2008,10 @@
                             <a href="{{ route('umkm.katalog.index', ['tab' => 'katalog']) }}" class="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline whitespace-nowrap px-2">
                                 Reset
                             </a>
+                        @else
+                            <button type="button" x-show="catalogSearch && catalogSearch.length > 0" @click="clearSearch()" class="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline whitespace-nowrap px-2 cursor-pointer">
+                                Reset
+                            </button>
                         @endif
                     </div>
                 </div>
@@ -1984,6 +2021,7 @@
         <!-- 4. HASIL PENCARIAN & STATISTIK KOMODITAS -->
         <div class="flex items-center justify-between text-xs text-slate-500 px-1">
             <div>
+                Menampilkan <strong class="text-slate-900 font-bold" x-text="visibleProductCount">{{ method_exists($products, 'total') ? $products->total() : $products->count() }}</strong> pilihan bahan baku segar
                 Menampilkan <strong class="text-slate-900 font-bold">{{ method_exists($products, 'total') ? $products->total() : $products->count() }}</strong> pilihan bahan baku segar
                 @if($category && $category !== 'Semua Kategori')
                     pada kategori <span class="text-[#ea580c] font-bold">{{ $category }}</span>
@@ -2019,8 +2057,32 @@
                 </div>
             </div>
         @else
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full pt-1">
+            <!-- Empty state untuk pencarian live di client jika tidak ada komoditas cocok -->
+            <div x-cloak x-show="visibleProductCount === 0" class="bg-white rounded-3xl p-12 text-center shadow-xs border border-slate-200/80 space-y-4">
+                <div class="w-16 h-16 mx-auto rounded-3xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#ea580c]">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+                <div class="space-y-1">
+                    <h3 class="text-lg font-bold text-slate-900">Tidak Ada Komoditas Bahan Baku Ditemukan</h3>
+                    <p class="text-xs text-slate-500 font-medium max-w-md mx-auto leading-relaxed">
+                        Tidak ada bahan baku yang cocok dengan kata kunci "<span class="font-bold text-slate-800" x-text="catalogSearch"></span>". Silakan sesuaikan kata kunci atau bersihkan pencarian.
+                    </p>
+                </div>
+                <div>
+                    <button type="button" @click="clearSearch()" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#ea580c] hover:bg-[#c2410c] text-white text-xs font-bold transition shadow-xs cursor-pointer">
+                        <span>Tampilkan Semua Komoditas</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Grid Kartu Bahan Baku -->
+            <div x-show="visibleProductCount > 0" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 w-full pt-1">
                 @foreach($products as $product)
+                    <div class="catalog-product-card bg-white rounded-3xl overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-lg hover:border-orange-200 transition-all duration-300 border border-slate-200/80 group"
+                         data-searchable="{{ strtolower(e(($product->commodity?->name ?? '') . ' ' . ($product->commodity?->category ?? '') . ' ' . ($product->supplier?->company_name ?? '') . ' ' . ($product->supplier?->delivery_area ?? '') . ' ' . ($product->quality_grade ?? '') . ' ' . ($product->description ?? ''))) }}">
                     <div class="bg-white rounded-3xl overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-lg hover:border-orange-200 transition-all duration-300 border border-slate-200/80 group">
                         
                         <!-- Gambar Komoditas & Badges -->
@@ -2257,6 +2319,8 @@
                 @endforeach
             </div>
 
+2            <!-- 6. PAGINASI KATALOG -->
+            <div x-show="visibleProductCount > 0 && (!catalogSearch || catalogSearch.trim() === '')" class="mt-8 flex justify-center">
             <!-- 6. TIPS & JAMINAN KEAMANAN DAPUR UMKM -->
             <div class="bg-gradient-to-r from-orange-50/80 via-amber-50/50 to-white rounded-3xl p-5 sm:p-6 border border-orange-200/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs mt-4">
                 <div class="flex items-start gap-3.5">
@@ -2288,7 +2352,7 @@
     <!-- ========================================================= -->
     <!-- TAB: COLLABORATIVE SUPPLY PLANNING (PROYEKSI PASOKAN)      -->
     <!-- ========================================================= -->
-    <div x-cloak x-show="activeTab === 'supply-planning'" class="space-y-6">
+    <div {{ $serverActiveTab === 'supply-planning' ? '' : 'x-cloak style=display:none;' }} x-show="activeTab === 'supply-planning'" class="space-y-6">
 
         <!-- 1. ARCHITECTURAL HEADER -->
         <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-4">
@@ -2671,7 +2735,7 @@
     <!-- ========================================================= -->
     <!-- TAB: PESANAN & PENGIRIMAN (5 SUB-TABS)                     -->
     <!-- ========================================================= -->
-    <div x-cloak x-show="activeTab === 'pemesanan'" class="space-y-6">
+    <div {{ $serverActiveTab === 'pemesanan' ? '' : 'x-cloak style=display:none;' }} x-show="activeTab === 'pemesanan'" class="space-y-6">
 
         <!-- HEADER TITLE -->
         <div class="border-b border-slate-200/80 pb-4">
@@ -2839,7 +2903,7 @@
         </div>
 
         <!-- SUB-TAB 1: PEMESANAN OTOMATIS -->
-        <div x-show="orderSubTab === 'auto-order'" class="bg-white rounded-2xl border border-slate-200/80 overflow-hidden p-6 space-y-5 shadow-xs">
+        <div {{ $serverSubTab === 'auto-order' ? '' : 'x-cloak style=display:none;' }} x-show="orderSubTab === 'auto-order'" class="bg-white rounded-2xl border border-slate-200/80 overflow-hidden p-6 space-y-5 shadow-xs">
             <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-slate-100 pb-4">
                 <div>
                     <span class="text-[10px] font-bold text-[#ea580c] uppercase tracking-wider">Kontrak Terikat Aktif</span>
@@ -2950,7 +3014,7 @@
         </div>
 
         <!-- SUB-TAB 2: KONFIRMASI PENERIMAAN BARANG (TERHUBUNG DATABASE) -->
-        <div x-show="orderSubTab === 'confirm'" class="bg-white rounded-2xl border border-slate-200/80 overflow-hidden p-6 space-y-5 shadow-xs">
+        <div {{ $serverSubTab === 'confirm' ? '' : 'x-cloak style=display:none;' }} x-show="orderSubTab === 'confirm'" class="bg-white rounded-2xl border border-slate-200/80 overflow-hidden p-6 space-y-5 shadow-xs">
             <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-100 pb-4">
                 <div>
                     <h3 class="font-bold text-lg text-slate-900">Validasi &amp; Konfirmasi Kedatangan Barang (Batch 1)</h3>
@@ -3413,7 +3477,7 @@
         <!-- ======================================================== -->
         <!-- SUB-TAB 3: PESANAN BACKORDER                             -->
         <!-- ======================================================== -->
-        <div x-show="orderSubTab === 'backorder'" class="bg-white rounded-2xl border border-slate-200/80 overflow-hidden p-6 space-y-5 shadow-xs">
+        <div {{ $serverSubTab === 'backorder' ? '' : 'x-cloak style=display:none;' }} x-show="orderSubTab === 'backorder'" class="bg-white rounded-2xl border border-slate-200/80 overflow-hidden p-6 space-y-5 shadow-xs">
             <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-slate-100 pb-4">
                 <div>
                     <span class="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-800 uppercase tracking-wider bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-200/80">
@@ -4049,7 +4113,7 @@
         </div>
 
         <!-- SUB-TAB 4: PEMBAYARAN MIDTRANS (INVOICE PER BATCH) -->
-        <div x-show="orderSubTab === 'payment'" class="bg-white rounded-2xl border border-slate-200/80 overflow-hidden p-6 space-y-5 shadow-xs">
+        <div {{ $serverSubTab === 'payment' ? '' : 'x-cloak style=display:none;' }} x-show="orderSubTab === 'payment'" class="bg-white rounded-2xl border border-slate-200/80 overflow-hidden p-6 space-y-5 shadow-xs">
             <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b border-slate-100 pb-4">
                 <div>
                     <span class="text-[10px] font-bold text-[#ea580c] uppercase tracking-wider">Tagihan Resmi Sesuai Batch Pengiriman</span>
@@ -4228,7 +4292,7 @@
         </div>
 
         <!-- SUB-TAB 5: RATING & ULASAN -->
-        <div x-show="orderSubTab === 'rating'" class="space-y-6">
+        <div {{ $serverSubTab === 'rating' ? '' : 'x-cloak style=display:none;' }} x-show="orderSubTab === 'rating'" class="space-y-6">
 
             <!-- MODAL FORMULIR RATING & ULASAN -->
             <div x-cloak x-show="showReviewModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
@@ -4432,7 +4496,7 @@
     <!-- ========================================================= -->
     <!-- TAB 4: DASHBOARD ANALISIS UMKM                            -->
     <!-- ========================================================= -->
-    <div x-show="activeTab === 'dashboard'" class="space-y-6">
+    <div {{ $serverActiveTab === 'dashboard' ? '' : 'x-cloak style=display:none;' }} x-show="activeTab === 'dashboard'" class="space-y-6">
 
         <!-- PAGE HEADER -->
         <div class="border-b border-slate-200/80 pb-4">
@@ -4800,7 +4864,7 @@
     <!-- ========================================================= -->
     <!-- TAB 5: SUPPLIER PERFORMANCE TRACKER & CONTRACT MONITORING -->
     <!-- ========================================================= -->
-    <div x-show="activeTab === 'monitoring'" class="space-y-6">
+    <div {{ $serverActiveTab === 'monitoring' ? '' : 'x-cloak style=display:none;' }} x-show="activeTab === 'monitoring'" class="space-y-6">
 
         <div class="border-b border-slate-200/80 pb-4">
             <h2 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Pemantauan &amp; SLA Pemasok</h2>

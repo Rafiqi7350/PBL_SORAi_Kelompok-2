@@ -12,6 +12,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 
 class AdminDashboardController extends Controller
@@ -154,7 +155,7 @@ class AdminDashboardController extends Controller
             ->groupBy('category')
             ->pluck('count', 'cat_lower');
 
-        $dbCategories = CommodityCategory::orderBy('name')->get();
+        $dbCategories = Cache::remember('admin_db_categories', 1800, fn () => CommodityCategory::orderBy('name')->get());
         $categories = $dbCategories->map(function ($cat, $index) use ($commodityCounts) {
             $count = (int) ($commodityCounts[strtolower($cat->name)] ?? 0);
 
@@ -170,7 +171,7 @@ class AdminDashboardController extends Controller
         $maxCommodityCount = max(1, $categories->max('totalCommodities') ?: 1);
 
         // 5. Units & Total Commodities
-        $dbUnits = CommodityUnit::latest()->get();
+        $dbUnits = Cache::remember('admin_db_units', 1800, fn () => CommodityUnit::latest()->get());
         $units = $dbUnits->map(function ($unit) {
             return [
                 'id' => $unit->id,

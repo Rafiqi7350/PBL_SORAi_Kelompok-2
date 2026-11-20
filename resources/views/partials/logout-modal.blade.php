@@ -98,34 +98,3 @@
         </div>
     </div>
 </div>
-
-<script>
-    // Listener untuk mendeteksi penekanan tombol Backspace di luar input field
-    // atau navigasi history browser back
-    (function () {
-        // Tangani tombol Backspace
-        window.addEventListener('keydown', function (e) {
-            if (e.key === 'Backspace') {
-                const target = e.target;
-                const tag = (target.tagName || '').toLowerCase();
-                const isInputField = tag === 'input' || tag === 'textarea' || tag === 'select' || target.isContentEditable;
-
-                // Jika Backspace ditekan di luar input teks (perilaku navigasi kembali)
-                if (!isInputField) {
-                    e.preventDefault();
-                    window.dispatchEvent(new CustomEvent('open-logout-modal'));
-                }
-            }
-        });
-
-        // Tangani navigasi Back button browser jika sedang login
-        if (window.history && window.history.pushState) {
-            window.history.pushState({ page: 'auth_dashboard' }, document.title, window.location.href);
-            window.addEventListener('popstate', function (event) {
-                // Tahan navigasi back dan munculkan pop up konfirmasi keluar
-                window.history.pushState({ page: 'auth_dashboard' }, document.title, window.location.href);
-                window.dispatchEvent(new CustomEvent('open-logout-modal'));
-            });
-        }
-    })();
-</script>

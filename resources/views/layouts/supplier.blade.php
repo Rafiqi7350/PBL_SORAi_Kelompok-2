@@ -16,11 +16,8 @@
 
     <script>
         try {
-            if (localStorage.getItem('sorai_theme') === 'dark' || (!('sorai_theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
+            localStorage.removeItem('sorai_theme');
+            document.documentElement.classList.remove('dark');
         } catch (e) {}
     </script>
 
@@ -70,12 +67,6 @@
 <body class="bg-slate-50 text-slate-900 antialiased min-h-screen selection:bg-orange-100 selection:text-orange-900"
       x-data="{
           mobileNavOpen: false,
-          isDarkMode: document.documentElement.classList.contains('dark'),
-          toggleTheme() {
-              this.isDarkMode = !this.isDarkMode;
-              document.documentElement.classList.toggle('dark', this.isDarkMode);
-              try { localStorage.setItem('sorai_theme', this.isDarkMode ? 'dark' : 'light'); } catch (e) {}
-          },
           sidebarHidden: (() => { try { return window.localStorage.getItem('sorai_supplier_sidebar_hidden') === 'true'; } catch (e) { return false; } })(),
           toggleSidebar() {
               this.sidebarHidden = !this.sidebarHidden;
@@ -346,20 +337,6 @@
                 </span>
                 <span class="h-4 w-px bg-slate-200"></span>
 
-                {{-- Mode Gelap / Mode Terang Toggle --}}
-                <button type="button"
-                        @click="toggleTheme()"
-                        class="inline-flex items-center justify-center w-8 h-8 rounded-xl border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-600 hover:text-slate-900 transition cursor-pointer"
-                        :title="isDarkMode ? 'Beralih ke Mode Terang' : 'Beralih ke Mode Gelap'"
-                        aria-label="Toggle Mode Tampilan">
-                    <svg x-show="!isDarkMode" class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-                    </svg>
-                    <svg x-show="isDarkMode" x-cloak class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-                    </svg>
-                </button>
-
                 <a href="{{ route('supplier.account.edit') }}"
                    class="inline-flex items-center gap-2.5 pl-1.5 pr-3 py-1 rounded-xl border text-xs font-semibold transition-colors {{ request()->routeIs('supplier.account.*') ? 'bg-orange-50 text-[#c2410c] border-orange-200/90' : 'bg-white hover:bg-slate-50 text-slate-700 hover:text-[#ea580c] border-slate-200/90 hover:border-slate-300 shadow-2xs' }}"
                    title="Kelola Data Akun Pemasok">
@@ -446,19 +423,7 @@
                 },
 
                 init: function() {
-                    var self = this;
-                    this.checkForUpdates(true);
-
-                    this.pollTimer = setInterval(function() {
-                        self.checkForUpdates(false);
-                    }, 8000);
-
-                    setInterval(function() {
-                        if (self.hasPendingSync && !self.isAnyModalOrInputActive()) {
-                            self.hasPendingSync = false;
-                            self.performSafeReload();
-                        }
-                    }, 2000);
+                    // Polling dinonaktifkan demi stabilitas UI dan efisiensi database remote
                 },
 
                 checkForUpdates: function(isInitial) {
