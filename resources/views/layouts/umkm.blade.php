@@ -251,25 +251,22 @@
                         <button type="button"
                                 @click="setTab('katalog')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
-                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap {{ $layoutActiveTab === 'katalog' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium' }}"
+                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
                                   :class="activeTab === 'katalog' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
-                                <svg class="w-4 h-4 shrink-0 transition-colors {{ $layoutActiveTab === 'katalog' ? 'text-[#ea580c]' : 'text-slate-400' }}"
+                                <svg class="w-4 h-4 shrink-0 transition-colors"
                                      :class="activeTab === 'katalog' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                                 </svg>
                                 <span>Katalog Bahan Baku</span>
                             </span>
-                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150 {{ $layoutActiveTab === 'katalog' ? 'bg-[#ea580c]' : 'bg-transparent' }}"
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
                                   :class="activeTab === 'katalog' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
                         </button>
 
                         <button type="button"
                                 @click="setTab('riwayat-permintaan')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
-                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap {{ $layoutActiveTab === 'riwayat-permintaan' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium' }}"
-                                  :class="activeTab === 'riwayat-permintaan' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
-                                <svg class="w-4 h-4 shrink-0 transition-colors {{ $layoutActiveTab === 'riwayat-permintaan' ? 'text-[#ea580c]' : 'text-slate-400' }}"
                             <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
                                   :class="activeTab === 'riwayat-permintaan' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
                                 <svg class="w-4 h-4 shrink-0 transition-colors"
@@ -279,9 +276,6 @@
                                 </svg>
                                 <span>Riwayat Permintaan</span>
                             </span>
-                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150 {{ $layoutActiveTab === 'riwayat-permintaan' ? 'bg-[#ea580c]' : 'bg-transparent' }}"
-                                  :class="activeTab === 'riwayat-permintaan' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
-                        </button>
                             <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
                                   :class="activeTab === 'riwayat-permintaan' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
                         </button>
@@ -289,64 +283,64 @@
                         <button type="button"
                                 @click="setTab('supply-planning')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
-                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap {{ $layoutActiveTab === 'supply-planning' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium' }}"
+                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
                                   :class="activeTab === 'supply-planning' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
-                                <svg class="w-4 h-4 shrink-0 transition-colors {{ $layoutActiveTab === 'supply-planning' ? 'text-[#ea580c]' : 'text-slate-400' }}"
+                                <svg class="w-4 h-4 shrink-0 transition-colors"
                                      :class="activeTab === 'supply-planning' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                 </svg>
                                 <span>Perencanaan Pasokan</span>
                             </span>
-                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150 {{ $layoutActiveTab === 'supply-planning' ? 'bg-[#ea580c]' : 'bg-transparent' }}"
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
                                   :class="activeTab === 'supply-planning' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
                         </button>
 
                         <button type="button"
                                 @click="setTab('pemesanan')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
-                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap {{ $layoutActiveTab === 'pemesanan' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium' }}"
+                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
                                   :class="activeTab === 'pemesanan' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
-                                <svg class="w-4 h-4 shrink-0 transition-colors {{ $layoutActiveTab === 'pemesanan' ? 'text-[#ea580c]' : 'text-slate-400' }}"
+                                <svg class="w-4 h-4 shrink-0 transition-colors"
                                      :class="activeTab === 'pemesanan' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
                                 </svg>
                                 <span>Pesanan &amp; Pengiriman</span>
                             </span>
-                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150 {{ $layoutActiveTab === 'pemesanan' ? 'bg-[#ea580c]' : 'bg-transparent' }}"
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
                                   :class="activeTab === 'pemesanan' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
                         </button>
 
                         <button type="button"
                                 @click="setTab('dashboard')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
-                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap {{ $layoutActiveTab === 'dashboard' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium' }}"
+                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
                                   :class="activeTab === 'dashboard' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
-                                <svg class="w-4 h-4 shrink-0 transition-colors {{ $layoutActiveTab === 'dashboard' ? 'text-[#ea580c]' : 'text-slate-400' }}"
+                                <svg class="w-4 h-4 shrink-0 transition-colors"
                                      :class="activeTab === 'dashboard' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                                 </svg>
                                 <span>Analisis Pengadaan</span>
                             </span>
-                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150 {{ $layoutActiveTab === 'dashboard' ? 'bg-[#ea580c]' : 'bg-transparent' }}"
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
                                   :class="activeTab === 'dashboard' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
                         </button>
 
                         <button type="button"
                                 @click="setTab('monitoring')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
-                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap {{ $layoutActiveTab === 'monitoring' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium' }}"
+                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
                                   :class="activeTab === 'monitoring' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
-                                <svg class="w-4 h-4 shrink-0 transition-colors {{ $layoutActiveTab === 'monitoring' ? 'text-[#ea580c]' : 'text-slate-400' }}"
+                                <svg class="w-4 h-4 shrink-0 transition-colors"
                                      :class="activeTab === 'monitoring' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
                                 <span>Pemantauan Mutu &amp; SLA</span>
                             </span>
-                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150 {{ $layoutActiveTab === 'monitoring' ? 'bg-[#ea580c]' : 'bg-transparent' }}"
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
                                   :class="activeTab === 'monitoring' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
                         </button>
                     </nav>
@@ -421,8 +415,8 @@
                 <button type="button"
                         @click="setTab('katalog')"
                         :class="activeTab === 'katalog' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent hover:bg-slate-50 font-medium'"
-                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left {{ $layoutActiveTab === 'katalog' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent' }}">
-                    <svg class="w-4 h-4 shrink-0 {{ $layoutActiveTab === 'katalog' ? 'text-[#ea580c]' : 'text-slate-400' }}" :class="activeTab === 'katalog' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left">
+                    <svg class="w-4 h-4 shrink-0" :class="activeTab === 'katalog' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                     </svg>
                     <span>Katalog Bahan Baku</span>
@@ -431,8 +425,6 @@
                 <button type="button"
                         @click="setTab('riwayat-permintaan')"
                         :class="activeTab === 'riwayat-permintaan' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent hover:bg-slate-50 font-medium'"
-                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left {{ $layoutActiveTab === 'riwayat-permintaan' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent' }}">
-                    <svg class="w-4 h-4 shrink-0 {{ $layoutActiveTab === 'riwayat-permintaan' ? 'text-[#ea580c]' : 'text-slate-400' }}" :class="activeTab === 'riwayat-permintaan' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left">
                     <svg class="w-4 h-4 shrink-0" :class="activeTab === 'riwayat-permintaan' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
@@ -443,8 +435,8 @@
                 <button type="button"
                         @click="setTab('supply-planning')"
                         :class="activeTab === 'supply-planning' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent hover:bg-slate-50 font-medium'"
-                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left {{ $layoutActiveTab === 'supply-planning' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent' }}">
-                    <svg class="w-4 h-4 shrink-0 {{ $layoutActiveTab === 'supply-planning' ? 'text-[#ea580c]' : 'text-slate-400' }}" :class="activeTab === 'supply-planning' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left">
+                    <svg class="w-4 h-4 shrink-0" :class="activeTab === 'supply-planning' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>
                     <span>Perencanaan Pasokan</span>
@@ -453,8 +445,8 @@
                 <button type="button"
                         @click="setTab('pemesanan')"
                         :class="activeTab === 'pemesanan' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent hover:bg-slate-50 font-medium'"
-                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left {{ $layoutActiveTab === 'pemesanan' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent' }}">
-                    <svg class="w-4 h-4 shrink-0 {{ $layoutActiveTab === 'pemesanan' ? 'text-[#ea580c]' : 'text-slate-400' }}" :class="activeTab === 'pemesanan' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left">
+                    <svg class="w-4 h-4 shrink-0" :class="activeTab === 'pemesanan' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
                     </svg>
                     <span>Pesanan &amp; Pengiriman</span>
@@ -463,8 +455,8 @@
                 <button type="button"
                         @click="setTab('dashboard')"
                         :class="activeTab === 'dashboard' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent hover:bg-slate-50 font-medium'"
-                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left {{ $layoutActiveTab === 'dashboard' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent' }}">
-                    <svg class="w-4 h-4 shrink-0 {{ $layoutActiveTab === 'dashboard' ? 'text-[#ea580c]' : 'text-slate-400' }}" :class="activeTab === 'dashboard' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left">
+                    <svg class="w-4 h-4 shrink-0" :class="activeTab === 'dashboard' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                     </svg>
                     <span>Analisis Pengadaan</span>
@@ -473,11 +465,11 @@
                 <button type="button"
                         @click="setTab('monitoring')"
                         :class="activeTab === 'monitoring' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent hover:bg-slate-50 font-medium'"
-                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left {{ $layoutActiveTab === 'monitoring' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent' }}">
-                    <svg class="w-4 h-4 shrink-0 {{ $layoutActiveTab === 'monitoring' ? 'text-[#ea580c]' : 'text-slate-400' }}" :class="activeTab === 'monitoring' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left">
+                    <svg class="w-4 h-4 shrink-0" :class="activeTab === 'monitoring' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    <span>Pemantauan &amp; SLA</span>
+                    <span>Pemantauan Mutu &amp; SLA</span>
                 </button>
 
                 <div class="pt-2 mt-2 border-t border-slate-100">
