@@ -155,7 +155,7 @@ class AdminDashboardController extends Controller
             ->groupBy('category')
             ->pluck('count', 'cat_lower');
 
-        $dbCategories = Cache::remember('admin_db_categories', 1800, fn () => CommodityCategory::orderBy('name')->get());
+        $dbCategories = CommodityCategory::orderBy('name')->get();
         $categories = $dbCategories->map(function ($cat, $index) use ($commodityCounts) {
             $count = (int) ($commodityCounts[strtolower($cat->name)] ?? 0);
 
@@ -171,7 +171,7 @@ class AdminDashboardController extends Controller
         $maxCommodityCount = max(1, $categories->max('totalCommodities') ?: 1);
 
         // 5. Units & Total Commodities
-        $dbUnits = Cache::remember('admin_db_units', 1800, fn () => CommodityUnit::latest()->get());
+        $dbUnits = CommodityUnit::latest()->get();
         $units = $dbUnits->map(function ($unit) {
             return [
                 'id' => $unit->id,

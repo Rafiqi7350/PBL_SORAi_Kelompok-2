@@ -91,10 +91,8 @@ class KatalogController extends Controller
 
         $products = $query->paginate(12)->withQueryString();
 
-        // Get unique categories for the filter (cached to avoid redundant queries to remote DB)
-        $categories = Cache::remember('catalog_categories', 3600, function () {
-            return Commodity::select('category')->distinct()->pluck('category');
-        });
+        // Get unique categories for the filter
+        $categories = Commodity::select('category')->distinct()->pluck('category');
 
         // Ambil profil UMKM user yang sedang login atau fallback untuk demo UMKM
         $umkm = Auth::user()?->umkmProfile;
@@ -237,20 +235,14 @@ class KatalogController extends Controller
         // Gabungkan dengan supply plans dari schedule (jika belum ada di supply_plans)
         $supplyPlans = ! empty($formattedSupplyPlans) ? $formattedSupplyPlans : $supplyPlans;
 
-        // Ambil daftar supplier aktif untuk dropdown form Collaborative Supply Planning (cached)
-        $availableSuppliers = Cache::remember('catalog_available_suppliers', 600, function () {
-            return SupplierProfile::whereHas('user', function ($q) {
-                $q->where('status', 'active');
-            })->orderBy('company_name')->get();
-        });
+        // Ambil daftar supplier aktif untuk dropdown form Collaborative Supply Planning
+        $availableSuppliers = SupplierProfile::whereHas('user', function ($q) {
+            $q->where('status', 'active');
+        })->orderBy('company_name')->get();
 
-        // Ambil master komoditas & satuan untuk opsi pilihan kebutuhan UMKM (cached)
-        $availableCommodities = Cache::remember('catalog_available_commodities', 3600, function () {
-            return Commodity::orderBy('name')->get();
-        });
-        $availableUnits = Cache::remember('catalog_available_units', 3600, function () {
-            return CommodityUnit::orderBy('name')->get();
-        });
+        // Ambil master komoditas & satuan untuk opsi pilihan kebutuhan UMKM
+        $availableCommodities = Commodity::orderBy('name')->get();
+        $availableUnits = CommodityUnit::orderBy('name')->get();
 
         // Eliminasi query redundan: ekstrak langsung dari memory $allPartnerships
         $appliedProductIds = $allPartnerships
@@ -514,21 +506,6 @@ class KatalogController extends Controller
 
         $monthlyRealization = $monthlyAgg->pluck('delivered_vol', 'month_key')->toArray();
         $monthlyCost = $monthlyAgg->pluck('cost_total', 'month_key')->toArray();
-                ->selectRaw("{$monthFormatSql} as month_key, SUM(quantity_delivered) as delivered_vol")
-                ->groupBy(DB::raw($monthFormatSql))
-                ->pluck('delivered_vol', 'month_key')
-                ->toArray()
-            : [];
-
-        $monthlyCost = ($umkm && $partnershipIds->isNotEmpty())
-            ? OrderItem::whereHas('order', function ($oq) use ($partnershipIds) {
-                $oq->whereIn('partnership_id', $partnershipIds);
-            })
-                ->selectRaw("{$monthFormatSql} as month_key, SUM(subtotal) as cost_total")
-                ->groupBy(DB::raw($monthFormatSql))
-                ->pluck('cost_total', 'month_key')
-                ->toArray()
-            : [];
 
         $trendsData = [];
         $totalDeliveredAllMonths = 0.0;
