@@ -16,11 +16,8 @@
 
     <script>
         try {
-            if (localStorage.getItem('sorai_theme') === 'dark' || (!('sorai_theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
+            localStorage.removeItem('sorai_theme');
+            document.documentElement.classList.remove('dark');
         } catch (e) {}
     </script>
 
@@ -52,18 +49,15 @@
         [x-cloak] { display: none !important; }
     </style>
 </head>
+@php
+    $layoutActiveTab = request('tab') ?: 'katalog';
+@endphp
 <body class="min-h-screen bg-slate-50 text-slate-900 flex flex-col justify-between antialiased selection:bg-orange-100 selection:text-orange-900"
       x-data="{
           mobileNavOpen: false,
           profileMenuOpen: false,
           mobileProfileMenuOpen: false,
-          isDarkMode: document.documentElement.classList.contains('dark'),
-          toggleTheme() {
-              this.isDarkMode = !this.isDarkMode;
-              document.documentElement.classList.toggle('dark', this.isDarkMode);
-              try { localStorage.setItem('sorai_theme', this.isDarkMode ? 'dark' : 'light'); } catch (e) {}
-          },
-          activeTab: @if(request()->routeIs('umkm.katalog.index')) (new URLSearchParams(window.location.search).get('tab') || sessionStorage.getItem('sorai_umkm_active_tab') || 'katalog') @else '' @endif,
+          activeTab: @if(request()->routeIs('umkm.katalog.index')) (new URLSearchParams(window.location.search).get('tab') || '{{ request('tab') ?: '' }}' || sessionStorage.getItem('sorai_umkm_active_tab') || 'katalog') @else '' @endif,
           init() {
               @if(request()->routeIs('umkm.katalog.index'))
                   var self = this;
@@ -210,23 +204,15 @@
                                 <span>Kelola Akun</span>
                             </a>
 
-                            {{-- Mode Gelap / Mode Terang Toggle --}}
+                            {{-- Panduan Portal UMKM --}}
                             <button type="button"
-                                    @click="toggleTheme()"
+                                    @click="profileMenuOpen = false; $dispatch('open-umkm-guide')"
                                     role="menuitem"
-                                    class="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer text-left">
-                                <div class="flex items-center gap-2.5">
-                                    <svg x-show="!isDarkMode" class="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-                                    </svg>
-                                    <svg x-show="isDarkMode" x-cloak class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-                                    </svg>
-                                    <span x-text="isDarkMode ? 'Mode Terang' : 'Mode Gelap'"></span>
-                                </div>
-                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold"
-                                      :class="isDarkMode ? 'bg-amber-400/20 text-amber-300' : 'bg-slate-100 text-slate-600'"
-                                      x-text="isDarkMode ? 'Aktif' : 'Mati'"></span>
+                                    class="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition-colors cursor-pointer text-left">
+                                <svg class="w-4 h-4 shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <span>Panduan &amp; Alur Portal</span>
                             </button>
 
                             <div class="my-1 border-t border-slate-100"></div>
@@ -267,80 +253,94 @@
                         <button type="button"
                                 @click="setTab('katalog')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
-                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
+                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap {{ $layoutActiveTab === 'katalog' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium' }}"
                                   :class="activeTab === 'katalog' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
-                                <svg class="w-4 h-4 shrink-0 transition-colors"
+                                <svg class="w-4 h-4 shrink-0 transition-colors {{ $layoutActiveTab === 'katalog' ? 'text-[#ea580c]' : 'text-slate-400' }}"
                                      :class="activeTab === 'katalog' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                                 </svg>
                                 <span>Katalog Bahan Baku</span>
                             </span>
-                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150 {{ $layoutActiveTab === 'katalog' ? 'bg-[#ea580c]' : 'bg-transparent' }}"
                                   :class="activeTab === 'katalog' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
                         </button>
 
                         <button type="button"
+                                @click="setTab('riwayat-permintaan')"
+                                class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
+                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap {{ $layoutActiveTab === 'riwayat-permintaan' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium' }}"
+                                  :class="activeTab === 'riwayat-permintaan' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
+                                <svg class="w-4 h-4 shrink-0 transition-colors {{ $layoutActiveTab === 'riwayat-permintaan' ? 'text-[#ea580c]' : 'text-slate-400' }}"
+                                     :class="activeTab === 'riwayat-permintaan' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
+                                     fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                                </svg>
+                                <span>Riwayat Permintaan</span>
+                            </span>
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150 {{ $layoutActiveTab === 'riwayat-permintaan' ? 'bg-[#ea580c]' : 'bg-transparent' }}"
+                                  :class="activeTab === 'riwayat-permintaan' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
+                        </button>
                                 @click="setTab('supply-planning')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
-                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
+                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap {{ $layoutActiveTab === 'supply-planning' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium' }}"
                                   :class="activeTab === 'supply-planning' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
-                                <svg class="w-4 h-4 shrink-0 transition-colors"
+                                <svg class="w-4 h-4 shrink-0 transition-colors {{ $layoutActiveTab === 'supply-planning' ? 'text-[#ea580c]' : 'text-slate-400' }}"
                                      :class="activeTab === 'supply-planning' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                                 </svg>
                                 <span>Perencanaan Pasokan</span>
                             </span>
-                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150 {{ $layoutActiveTab === 'supply-planning' ? 'bg-[#ea580c]' : 'bg-transparent' }}"
                                   :class="activeTab === 'supply-planning' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
                         </button>
 
                         <button type="button"
                                 @click="setTab('pemesanan')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
-                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
+                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap {{ $layoutActiveTab === 'pemesanan' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium' }}"
                                   :class="activeTab === 'pemesanan' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
-                                <svg class="w-4 h-4 shrink-0 transition-colors"
+                                <svg class="w-4 h-4 shrink-0 transition-colors {{ $layoutActiveTab === 'pemesanan' ? 'text-[#ea580c]' : 'text-slate-400' }}"
                                      :class="activeTab === 'pemesanan' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
                                 </svg>
                                 <span>Pesanan &amp; Pengiriman</span>
                             </span>
-                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150 {{ $layoutActiveTab === 'pemesanan' ? 'bg-[#ea580c]' : 'bg-transparent' }}"
                                   :class="activeTab === 'pemesanan' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
                         </button>
 
                         <button type="button"
                                 @click="setTab('dashboard')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
-                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
+                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap {{ $layoutActiveTab === 'dashboard' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium' }}"
                                   :class="activeTab === 'dashboard' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
-                                <svg class="w-4 h-4 shrink-0 transition-colors"
+                                <svg class="w-4 h-4 shrink-0 transition-colors {{ $layoutActiveTab === 'dashboard' ? 'text-[#ea580c]' : 'text-slate-400' }}"
                                      :class="activeTab === 'dashboard' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                                 </svg>
                                 <span>Analisis Pengadaan</span>
                             </span>
-                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150 {{ $layoutActiveTab === 'dashboard' ? 'bg-[#ea580c]' : 'bg-transparent' }}"
                                   :class="activeTab === 'dashboard' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
                         </button>
 
                         <button type="button"
                                 @click="setTab('monitoring')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
-                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
+                            <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap {{ $layoutActiveTab === 'monitoring' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium' }}"
                                   :class="activeTab === 'monitoring' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
-                                <svg class="w-4 h-4 shrink-0 transition-colors"
+                                <svg class="w-4 h-4 shrink-0 transition-colors {{ $layoutActiveTab === 'monitoring' ? 'text-[#ea580c]' : 'text-slate-400' }}"
                                      :class="activeTab === 'monitoring' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                 </svg>
                                 <span>Pemantauan &amp; SLA</span>
                             </span>
-                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150 {{ $layoutActiveTab === 'monitoring' ? 'bg-[#ea580c]' : 'bg-transparent' }}"
                                   :class="activeTab === 'monitoring' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
                         </button>
                     </nav>
@@ -401,23 +401,6 @@
                     </a>
 
                     <button type="button"
-                            @click="toggleTheme()"
-                            class="w-full py-2 px-3 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center justify-between transition-colors cursor-pointer text-left">
-                        <div class="flex items-center gap-2.5">
-                            <svg x-show="!isDarkMode" class="w-4 h-4 text-amber-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
-                            </svg>
-                            <svg x-show="isDarkMode" x-cloak class="w-4 h-4 text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
-                            </svg>
-                            <span x-text="isDarkMode ? 'Mode Terang' : 'Mode Gelap'"></span>
-                        </div>
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold"
-                              :class="isDarkMode ? 'bg-amber-400/20 text-amber-300' : 'bg-slate-100 text-slate-600'"
-                              x-text="isDarkMode ? 'Aktif' : 'Mati'"></span>
-                    </button>
-
-                    <button type="button"
                             @click="mobileNavOpen = false; mobileProfileMenuOpen = false; $dispatch('open-logout-modal')"
                             class="w-full py-2 px-3 rounded-lg text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors cursor-pointer text-left">
                         <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -432,18 +415,26 @@
                 <button type="button"
                         @click="setTab('katalog')"
                         :class="activeTab === 'katalog' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent hover:bg-slate-50 font-medium'"
-                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left">
-                    <svg class="w-4 h-4 shrink-0" :class="activeTab === 'katalog' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left {{ $layoutActiveTab === 'katalog' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent' }}">
+                    <svg class="w-4 h-4 shrink-0 {{ $layoutActiveTab === 'katalog' ? 'text-[#ea580c]' : 'text-slate-400' }}" :class="activeTab === 'katalog' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
                     </svg>
                     <span>Katalog Bahan Baku</span>
                 </button>
 
                 <button type="button"
+                        @click="setTab('riwayat-permintaan')"
+                        :class="activeTab === 'riwayat-permintaan' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent hover:bg-slate-50 font-medium'"
+                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left {{ $layoutActiveTab === 'riwayat-permintaan' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent' }}">
+                    <svg class="w-4 h-4 shrink-0 {{ $layoutActiveTab === 'riwayat-permintaan' ? 'text-[#ea580c]' : 'text-slate-400' }}" :class="activeTab === 'riwayat-permintaan' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                    </svg>
+                    <span>Riwayat Permintaan</span>
+                </button>
                         @click="setTab('supply-planning')"
                         :class="activeTab === 'supply-planning' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent hover:bg-slate-50 font-medium'"
-                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left">
-                    <svg class="w-4 h-4 shrink-0" :class="activeTab === 'supply-planning' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left {{ $layoutActiveTab === 'supply-planning' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent' }}">
+                    <svg class="w-4 h-4 shrink-0 {{ $layoutActiveTab === 'supply-planning' ? 'text-[#ea580c]' : 'text-slate-400' }}" :class="activeTab === 'supply-planning' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
                     </svg>
                     <span>Perencanaan Pasokan</span>
@@ -452,8 +443,8 @@
                 <button type="button"
                         @click="setTab('pemesanan')"
                         :class="activeTab === 'pemesanan' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent hover:bg-slate-50 font-medium'"
-                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left">
-                    <svg class="w-4 h-4 shrink-0" :class="activeTab === 'pemesanan' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left {{ $layoutActiveTab === 'pemesanan' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent' }}">
+                    <svg class="w-4 h-4 shrink-0 {{ $layoutActiveTab === 'pemesanan' ? 'text-[#ea580c]' : 'text-slate-400' }}" :class="activeTab === 'pemesanan' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
                     </svg>
                     <span>Pesanan &amp; Pengiriman</span>
@@ -462,8 +453,8 @@
                 <button type="button"
                         @click="setTab('dashboard')"
                         :class="activeTab === 'dashboard' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent hover:bg-slate-50 font-medium'"
-                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left">
-                    <svg class="w-4 h-4 shrink-0" :class="activeTab === 'dashboard' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left {{ $layoutActiveTab === 'dashboard' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent' }}">
+                    <svg class="w-4 h-4 shrink-0 {{ $layoutActiveTab === 'dashboard' ? 'text-[#ea580c]' : 'text-slate-400' }}" :class="activeTab === 'dashboard' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
                     </svg>
                     <span>Analisis Pengadaan</span>
@@ -472,8 +463,8 @@
                 <button type="button"
                         @click="setTab('monitoring')"
                         :class="activeTab === 'monitoring' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent hover:bg-slate-50 font-medium'"
-                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left">
-                    <svg class="w-4 h-4 shrink-0" :class="activeTab === 'monitoring' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        class="w-full px-3.5 py-2.5 rounded-xl border text-xs flex items-center gap-2.5 transition cursor-pointer text-left {{ $layoutActiveTab === 'monitoring' ? 'bg-orange-50/90 text-[#c2410c] border-orange-200/80 font-semibold' : 'text-slate-700 border-transparent' }}">
+                    <svg class="w-4 h-4 shrink-0 {{ $layoutActiveTab === 'monitoring' ? 'text-[#ea580c]' : 'text-slate-400' }}" :class="activeTab === 'monitoring' ? 'text-[#ea580c]' : 'text-slate-400'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.9" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
                     <span>Pemantauan &amp; SLA</span>

@@ -46,25 +46,28 @@ class SupplierProduct extends Model
 
     public function getDisplayImageUrlAttribute(): ?string
     {
-        if (! empty($this->image_url)) {
-            if (str_starts_with($this->image_url, 'http://') || str_starts_with($this->image_url, 'https://')) {
-                return $this->image_url;
+        $imageUrl = $this->image_url;
+
+        if (empty($imageUrl) && ! empty($this->commodity?->photo)) {
+            $imageUrl = '/storage/'.ltrim($this->commodity->photo, '/');
+        }
+
+        if (! empty($imageUrl)) {
+            if (str_starts_with($imageUrl, 'http://') || str_starts_with($imageUrl, 'https://')) {
+                return $imageUrl;
             }
 
-            if (str_starts_with($this->image_url, '/storage/') || str_starts_with($this->image_url, 'storage/')) {
-                $relativePath = ltrim($this->image_url, '/');
-                if (file_exists(public_path($relativePath))) {
-                    return asset($this->image_url);
-                }
-
-                return null;
+            $relativePath = ltrim($imageUrl, '/');
+            if (file_exists(public_path($relativePath))) {
+                return asset($imageUrl);
             }
 
-            if (file_exists(public_path(ltrim($this->image_url, '/')))) {
-                return asset($this->image_url);
+            // Jika file fisik belum ada di storage lokal, fallback ke domain production sorai.web.id
+            if (str_starts_with($imageUrl, '/storage/') || str_starts_with($imageUrl, 'storage/')) {
+                return 'https://sorai.web.id/'.ltrim($imageUrl, '/');
             }
 
-            return asset($this->image_url);
+            return asset($imageUrl);
         }
 
         return null;
