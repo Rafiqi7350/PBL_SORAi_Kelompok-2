@@ -28,60 +28,39 @@
             showReviewModal: false,
             isSubmittingReview: false,
             notificationMsg: '',
-            catalogSearch: '{{ addslashes($search ?? '') }}',
-            visibleProductCount: {{ method_exists($products, 'total') ? $products->total() : $products->count() }},
-            _searchUrlTimer: null,
+            // Auto-Reload / Live-Sync State
+            lastFingerprint: '{{ $stateFingerprint ?? "" }}',
+            isSyncing: false,
+            hasPendingSync: false,
+            pollTimer: null,
+            liveSyncActive: true,
 
-            filterCatalog: function() {
-                var query = (this.catalogSearch || '').toLowerCase().trim();
-                var cards = document.querySelectorAll('.catalog-product-card');
-                if (!cards || cards.length === 0) return;
+            isAnyModalOpen: function() {
+                var isTyping = Boolean(
+                    document.activeElement &&
+                    ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName) &&
+                    document.activeElement.type !== 'button' &&
+                    document.activeElement.type !== 'submit'
+                );
 
-                var words = query ? query.split(/\s+/) : [];
-                var count = 0;
-
-                cards.forEach(function(card) {
-                    var text = (card.getAttribute('data-searchable') || '').toLowerCase();
-                    var match = true;
-
-                    if (words.length > 0) {
-                        for (var i = 0; i < words.length; i++) {
-                            if (!text.includes(words[i])) {
-                                match = false;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (match) {
-                        card.style.display = '';
-                        count++;
-                    } else {
-                        card.style.display = 'none';
-                    }
-                });
-
-                this.visibleProductCount = count;
-
-                // Sync URL query secara debounced tanpa reload halaman
-                clearTimeout(this._searchUrlTimer);
-                this._searchUrlTimer = setTimeout(function() {
-                    try {
-                        var url = new URL(window.location.href);
-                        if (query) {
-                            url.searchParams.set('search', query);
-                        } else {
-                            url.searchParams.delete('search');
-                        }
-                        url.searchParams.set('tab', 'katalog');
-                        window.history.replaceState({}, '', url.toString());
-                    } catch (e) {}
-                }, 300);
-            },
-
-            clearSearch: function() {
-                this.catalogSearch = '';
-                this.filterCatalog();
+                return Boolean(
+                    isTyping ||
+                    this.selectedCommodity ||
+                    this.showAjukanConfirmModal ||
+                    this.editingPermintaan ||
+                    this.cancellingPermintaan ||
+                    this.cancellingOrder ||
+                    this.confirmingOrderId ||
+                    this.confirmingBackorderId ||
+                    this.rejectingBackorderId ||
+                    this.approvingBackorderOrder ||
+                    this.previewAutoOrder ||
+                    this.payingOrder ||
+                    this.payingInvoice ||
+                    this.showReviewModal ||
+                    this.ratingInputOrder ||
+                    (this.selectedSupplierPerformance && !this.selectedSupplierPerformance.isClosed)
+                );
             },
 
             init: function() {
@@ -108,6 +87,14 @@
 
                 // Hitung mundur live timer sisa waktu edit 30 menit
                 setInterval(function() {
+                    if (self.hasPendingSync && !self.isAnyModalOpen()) {
+                        self.hasPendingSync = false;
+                        self.performSafeReload();
+                    }
+                }, 2000);
+
+                // Hitung mundur live timer sisa waktu edit 30 menit
+                setInterval(function() {
                     if (self.partnershipRequests && self.partnershipRequests.length > 0) {
                         self.partnershipRequests.forEach(function(item) {
                             if (item.remaining_seconds > 0) {
@@ -118,6 +105,62 @@
                                 }
                             }
                         });
+                    }
+                }, 1000);
+            },
+
+            performSafeReload: function() {
+                var self = this;
+                try {
+                    var targetUrl = new URL(window.location.href);
+                    // Ambil tab aktif dari URL atau sessionStorage atau 'katalog'
+                    var currentTab = (new URLSearchParams(window.location.search)).get('tab') 
+                        || sessionStorage.getItem('sorai_umkm_active_tab') 
+                        || 'katalog';
+                    
+                    targetUrl.searchParams.set('tab', currentTab);
+
+                    if (currentTab === 'pemesanan') {
+                        var currentSubTab = self.orderSubTab 
+                            || (new URLSearchParams(window.location.search)).get('subtab')
+                            || sessionStorage.getItem('sorai_umkm_order_subtab') 
+                            || 'auto-order';
+                        targetUrl.searchParams.set('subtab', currentSubTab);
+                    } else {
+                        targetUrl.searchParams.delete('subtab');
+                    }
+
+                    window.location.href = targetUrl.toString();
+                } catch (e) {
+                    window.location.reload();
+                }
+            },
+
+            checkForUpdates: function() {
+                var self = this;
+                if (!self.liveSyncActive || self.isSyncing) return;
+
+                fetch('{{ route("umkm.check-updates") }}', {
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(function(res) {
+                    if (!res.ok) throw new Error('Network error');
+                    return res.json();
+                })
+                .then(function(data) {
+                    if (data && data.fingerprint) {
+                        if (!self.lastFingerprint) {
+                            self.lastFingerprint = data.fingerprint;
+                            return;
+                        }
+
+                        if (data.fingerprint !== self.lastFingerprint) {
+                            self.lastFingerprint = data.fingerprint;
+                            self.handleNewDataDetected();
+                        }
                     }
                 }, 1000);
             },
@@ -291,6 +334,108 @@
 
             autoOrdersList: @json($autoOrdersList ?? []),
 
+            partnershipRequests: @json($partnershipRequests ?? []),
+            showAjukanConfirmModal: false,
+            editingPermintaan: null,
+            cancellingPermintaan: null,
+            cancellingOrder: null,
+            openBatalPermintaanModal: function(req) {
+                if (!req || !req.can_edit) {
+                    alert('Batas waktu pembatalan 30 menit telah berakhir atau pengajuan sudah diproses.');
+                    return;
+                }
+                this.cancellingPermintaan = req;
+            },
+            closeBatalPermintaanModal: function() {
+                this.cancellingPermintaan = null;
+            },
+            openBatalOrderModal: function(id, code, timeLeft) {
+                this.cancellingOrder = { id: id, code: code, timeLeft: timeLeft };
+            },
+            closeBatalOrderModal: function() {
+                this.cancellingOrder = null;
+            },
+            editForm: {
+                id: '',
+                volume_per_delivery: 100,
+                unit: 'kg',
+                frequency_type: '',
+                delivery_days: [],
+                delivery_time: '05:30',
+                start_date: '',
+                is_auto_order_active: true,
+                terms: [],
+                submission_details: ''
+            },
+            openAjukanConfirmModal: function() {
+                if (!this.formVolume || parseFloat(this.formVolume) <= 0) {
+                    alert('Mohon masukkan volume per pengiriman yang valid.');
+                    return;
+                }
+                if (!this.formDays || this.formDays.length === 0) {
+                    alert('Mohon pilih minimal 1 hari jadwal pengiriman.');
+                    return;
+                }
+                this.showAjukanConfirmModal = true;
+            },
+            submitFinalAjukan: function() {
+                if (this.$refs.ajukanForm) {
+                    this.$refs.ajukanForm.submit();
+                }
+            },
+            openEditPermintaanModal: function(req) {
+                if (!req || !req.can_edit) {
+                    alert('Batas waktu edit 30 menit telah berakhir atau status pengajuan sudah diproses.');
+                    return;
+                }
+                this.editingPermintaan = req;
+                this.editForm = {
+                    id: req.id,
+                    volume_per_delivery: req.volume_per_delivery,
+                    unit: req.unit,
+                    frequency_type: req.frequency_type,
+                    delivery_days: Array.isArray(req.delivery_days) ? [...req.delivery_days] : ['Senin', 'Kamis'],
+                    delivery_time: req.delivery_time || '05:30',
+                    start_date: req.start_date || '',
+                    is_auto_order_active: Boolean(req.is_auto_order_active),
+                    terms: Array.isArray(req.quality_terms) ? [...req.quality_terms] : [],
+                    submission_details: req.clean_notes || ''
+                };
+            },
+            closeEditPermintaanModal: function() {
+                this.editingPermintaan = null;
+            },
+            toggleEditDay: function(day) {
+                var idx = this.editForm.delivery_days.indexOf(day);
+                if (idx > -1) {
+                    if (this.editForm.delivery_days.length > 1) {
+                        this.editForm.delivery_days.splice(idx, 1);
+                    }
+                } else {
+                    this.editForm.delivery_days.push(day);
+                }
+            },
+            toggleEditQualityTerm: function(label) {
+                var idx = this.editForm.terms.indexOf(label);
+                if (idx > -1) {
+                    this.editForm.terms.splice(idx, 1);
+                } else {
+                    this.editForm.terms.push(label);
+                }
+            },
+            calculateEditMonthlyVolume: function() {
+                if (!this.editingPermintaan) return 0;
+                var vol = parseFloat(this.editForm.volume_per_delivery) || 0;
+                var daysCount = (this.editForm.delivery_days && this.editForm.delivery_days.length) ? this.editForm.delivery_days.length : 1;
+                return Math.round(vol * daysCount * 4);
+            },
+            calculateEditMonthlyTotal: function() {
+                if (!this.editingPermintaan) return 'Rp 0';
+                var totalVol = this.calculateEditMonthlyVolume();
+                var price = parseFloat(this.editingPermintaan.price) || 0;
+                return 'Rp ' + Math.round(totalVol * price).toLocaleString('id-ID');
+            },
+
             isPublishedToday: function(autoOrd) {
                 if (!autoOrd) return false;
                 if (autoOrd.isPublishedToday) return true;
@@ -351,7 +496,7 @@
                 };
                 this.orders.unshift(newOrd);
                 this.previewAutoOrder = null;
-                this.notify('✓ Pesanan berhasil diterbitkan untuk hari ini! Jadwal penerbitan selanjutnya: ' + nextText);
+                this.notify('Pesanan berhasil diterbitkan untuk hari ini! Jadwal penerbitan selanjutnya: ' + nextText);
                 this.orderSubTab = 'auto-order';
             },
 
@@ -731,7 +876,7 @@
                     self.isSubmittingReview = false;
                     self.showReviewModal = false;
                     self.ratingInputOrder = null;
-                    self.notify(resData.message || '✓ Ulasan & Rating berhasil disimpan!');
+                    self.notify(resData.message || 'Ulasan & Rating berhasil disimpan!');
                     setTimeout(function() {
                         window.location.href = '{{ route("umkm.katalog.index", ["tab" => "pemesanan", "subtab" => "rating"]) }}';
                     }, 400);
@@ -770,7 +915,7 @@
                     note: this.planningForm.notes || 'Estimasi kebutuhan bahan baku dapur.'
                 };
                 this.supplyPlans.unshift(newPlan);
-                this.notify('✓ Estimasi Collaborative Supply Plan (' + this.planningForm.volume + ' kg) berhasil dikirimkan ke Pemasok Mitra!');
+                this.notify('Estimasi Collaborative Supply Plan (' + this.planningForm.volume + ' kg) berhasil dikirimkan ke Pemasok Mitra!');
             },
 
             selectedSupplierPerformance: null,
@@ -954,7 +1099,7 @@
                             self.selectedSupplierPerformance = d;
                         }
 
-                        self.notify('✓ Skor ' + (d.company_name || 'pemasok') + ' berhasil dikalkulasi ulang secara realtime!');
+                        self.notify('Skor ' + (d.company_name || 'pemasok') + ' berhasil dikalkulasi ulang secara realtime!');
 
                         if (openModalAfter) {
                             self.openSupplierTrackerModal(supplierId, partnershipId);
@@ -985,7 +1130,7 @@
                 var topToolbar = '<div class="no-print-bar" style="background:#f8fafc;border:1px solid #e2e8f0;padding:12px 20px;margin-bottom:24px;border-radius:12px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 1px 3px rgba(0,0,0,0.05);font-family:sans-serif;">'
                     + '<div style="font-size:13px;color:#334155;font-weight:700;">Pratinjau Faktur Invoice &bull; ' + docTitle + '</div>'
                     + '<div style="display:flex;gap:8px;">'
-                    + '<button type="button" onclick="window.print()" style="background:#ea580c;color:#fff;border:none;padding:9px 20px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;">🖨️ Cetak / Simpan PDF</button>'
+                    + '<button type="button" onclick="window.print()" style="background:#ea580c;color:#fff;border:none;padding:9px 20px;border-radius:8px;font-weight:700;cursor:pointer;font-size:13px;">Cetak / Simpan PDF</button>'
                     + '<button type="button" onclick="window.close()" style="background:#fff;color:#475569;border:1px solid #cbd5e1;padding:9px 18px;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px;">Tutup</button>'
                     + '</div></div>';
 
@@ -1048,7 +1193,7 @@
                                     </table>
                                     <div style="margin-top:10px;">
                                         <span style="display:inline-block; border:2px solid #059669; color:#059669; background:#ecfdf5; font-weight:800; font-size:11px; padding:4px 14px; border-radius:4px; text-transform:uppercase; letter-spacing:1.2px;">
-                                            ✓ LUNAS / TERVERIFIKASI
+                                            LUNAS / TERVERIFIKASI
                                         </span>
                                     </div>
                                 </td>
@@ -1197,7 +1342,7 @@
                                     </table>
                                     <div style="margin-top:10px;">
                                         ${isPaid
-                                            ? '<span style="display:inline-block; border:2px solid #059669; color:#059669; background:#ecfdf5; font-weight:800; font-size:11px; padding:4px 14px; border-radius:4px; text-transform:uppercase; letter-spacing:1.2px;">✓ LUNAS / PAID</span>'
+                                            ? '<span style="display:inline-block; border:2px solid #059669; color:#059669; background:#ecfdf5; font-weight:800; font-size:11px; padding:4px 14px; border-radius:4px; text-transform:uppercase; letter-spacing:1.2px;">LUNAS / PAID</span>'
                                             : '<span style="display:inline-block; border:2px solid #d97706; color:#d97706; background:#fffbeb; font-weight:800; font-size:11px; padding:4px 14px; border-radius:4px; text-transform:uppercase; letter-spacing:1.2px;">MENUNGGU PEMBAYARAN</span>'
                                         }
                                     </div>
@@ -1221,7 +1366,7 @@
                                     <td style="padding:12px; border:1px solid #e2e8f0; vertical-align:top;">
                                         <div style="font-weight:700; font-size:12px; color:#0f172a;">${ord.commodity}</div>
                                         <div style="font-size:10px; color:#64748b; margin-top:3px;">Pemasok: ${ord.supplierName} &bull; Pengiriman langsung ke dapur operasional.</div>
-                                        ${ord.rating ? `<div style="margin-top:5px; font-size:10px; color:#d97706; font-weight:700;">★ Rating Dapur: ${ord.rating}.0 / 5</div>` : ''}
+                                        ${ord.rating ? `<div style="margin-top:5px; font-size:10px; color:#d97706; font-weight:700;">Rating Dapur: ${ord.rating}.0 / 5</div>` : ''}
                                     </td>
                                     <td style="padding:12px; text-align:center; font-weight:700; font-variant-numeric:tabular-nums; border:1px solid #e2e8f0; vertical-align:top;">
                                         ${ord.approvedQty} ${ord.unit}
@@ -1332,6 +1477,7 @@
     <!-- TAB: RIWAYAT PENGAJUAN PERMINTAAN (< 30 MENIT EDIT)       -->
     <!-- ========================================================= -->
     <div {{ $serverActiveTab === 'riwayat-permintaan' ? '' : 'x-cloak style=display:none;' }} x-show="activeTab === 'riwayat-permintaan'" class="space-y-6">
+    <div x-cloak x-show="activeTab === 'riwayat-permintaan'" class="space-y-6">
 
         <!-- HEADER SECTION -->
         <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-4">
@@ -1351,6 +1497,22 @@
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
                     <span>Ajukan Pasokan Baru</span>
                 </button>
+            </div>
+        </div>
+
+        <!-- INFO BANNER PERATURAN 30 MENIT -->
+        <div class="p-4 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex items-start gap-3.5 text-xs text-amber-950">
+            <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div class="space-y-0.5 leading-relaxed">
+                <p class="font-bold text-amber-900">Ketentuan Perubahan Data Pengajuan (&lt; 30 Menit)</p>
+                <p class="text-[11px] text-amber-800">
+                    Sistem memberikan fleksibilitas bagi dapur Anda untuk merevisi volume, jadwal tiba, atau spesifikasi mutu selama <strong>30 menit pertama</strong>. Setelah melewati 30 menit atau disetujui oleh pemasok, data pengajuan otomatis terkunci permanen untuk kepastian operasional armada pemasok.
+                </p>
+            </div>
+        </div>
+
             </div>
         </div>
 
@@ -1550,6 +1712,7 @@
     <!-- TAB 1: KATALOG BAHAN BAKU                                -->
     <!-- ========================================================= -->
     <div {{ $serverActiveTab === 'katalog' ? '' : 'x-cloak style=display:none;' }} x-show="activeTab === 'katalog'" class="space-y-6">
+    <div x-show="activeTab === 'katalog'" class="space-y-6">
 
         <!-- 1. HERO BANNER: PASOKAN BAHAN BAKU SEGAR LANGSUNG DARI PETANI LOKAL -->
         <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#f59e0b] text-white p-6 sm:p-8 lg:p-8 shadow-xl border border-orange-400/30">
@@ -1599,11 +1762,14 @@
                         <button type="button"
                                 @click="document.getElementById('katalog-search-bar')?.scrollIntoView({ behavior: 'smooth' })"
                                 class="px-5 py-2.5 rounded-xl bg-white hover:bg-amber-50 text-[#ea580c] text-xs font-black transition shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 group/btn cursor-pointer">
+                        <a href="#katalog-search-bar"
+                           class="px-5 py-2.5 rounded-xl bg-white hover:bg-amber-50 text-[#ea580c] text-xs font-black transition shadow-md hover:shadow-lg flex items-center justify-center gap-1.5 group/btn cursor-pointer">
                             <span>Lihat Semua Bahan Baku</span>
                             <svg class="w-3.5 h-3.5 group-hover/btn:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/>
                             </svg>
                         </button>
+                        </a>
 
                         <button type="button" 
                                 @click="$dispatch('open-umkm-guide')" 
@@ -1733,7 +1899,11 @@
         <!-- 3. CONTAINER SEARCH & ADVANCED FILTERS -->
         <div class="bg-white p-5 sm:p-6 rounded-3xl shadow-xs border border-slate-200/80 space-y-4">
             <form method="GET" action="{{ route('umkm.katalog.index') }}" @submit.prevent="filterCatalog()" class="space-y-4">
+            <form method="GET" action="{{ route('umkm.katalog.index') }}" class="space-y-4">
                 <input type="hidden" name="tab" value="katalog">
+                @if($category && $category !== 'Semua Kategori')
+                    <input type="hidden" name="category" value="{{ $category }}">
+                @endif
 
                 <div class="relative">
                     <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-slate-400 pointer-events-none">
@@ -1748,6 +1918,10 @@
                         @input="filterCatalog()"
                         placeholder="Cari nama bahan baku (misal: Daging Ayam, Bawang Merah, Cabai) atau nama pemasok..."
                         class="w-full pl-10 pr-24 py-3 text-xs sm:text-sm font-medium bg-slate-50 border border-slate-200/90 rounded-2xl text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition"
+                        value="{{ $search }}"
+                        placeholder="Cari nama bahan baku (misal: Daging Ayam, Bawang Merah, Cabai) atau nama pemasok..."
+                        class="w-full pl-10 pr-10 py-3 text-xs sm:text-sm font-medium bg-slate-50 border border-slate-200/90 rounded-2xl text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition"
+                        @input.debounce.700ms="$event.target.form.submit()"
                         {{ request()->has('search') ? 'autofocus' : '' }}
                     />
                     <div class="absolute inset-y-0 right-0 pr-2 flex items-center gap-1">
@@ -1766,29 +1940,26 @@
                             Cari
                         </button>
                     </div>
+                    @if($search)
+                        <a href="{{ route('umkm.katalog.index', array_merge(request()->except(['search', 'page']), ['tab' => 'katalog'])) }}"
+                           class="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-700 transition"
+                           title="Hapus pencarian">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                            </svg>
+                        </a>
+                    @endif
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 pt-4 border-t border-slate-100 text-xs">
-                    <div>
-                        <label class="block text-slate-600 font-semibold mb-1.5 text-[11px]">Kategori Bahan Baku</label>
-                        <select 
-                            name="category"
-                            onchange="this.form.submit()"
-                            class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-800 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition cursor-pointer">
-                            <option value="Semua Kategori">Semua Kategori</option>
-                            @foreach($categories as $cat)
-                                <option value="{{ $cat }}" {{ $category == $cat ? 'selected' : '' }}>{{ strtoupper($cat) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-4 border-t border-slate-100 text-xs">
                     <div>
                         <label class="block text-slate-600 font-semibold mb-1.5 text-[11px]">Harga Maksimal (Rp)</label>
                         <input 
                             type="number" 
                             name="max_price"
-                            placeholder="Contoh: 35000" 
+                            placeholder="Contoh: 50000" 
                             value="{{ $maxPrice }}"
+                            @input.debounce.700ms="$event.target.form.submit()"
                             class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-800 font-medium tabular-nums placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition"
                         />
                     </div>
@@ -1798,7 +1969,7 @@
                         <select 
                             name="stock_status"
                             onchange="this.form.submit()"
-                            class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-800 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition cursor-pointer">
+                            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-800 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition cursor-pointer">
                             <option value="Semua Status" {{ ($stockStatus ?? '') == 'Semua Status' ? 'selected' : '' }}>Semua Status Stok</option>
                             <option value="Tersedia" {{ ($stockStatus ?? '') == 'Tersedia' ? 'selected' : '' }}>Stok Tersedia</option>
                             <option value="Stok Terbatas" {{ ($stockStatus ?? '') == 'Stok Terbatas' ? 'selected' : '' }}>Stok Terbatas</option>
@@ -1812,7 +1983,7 @@
                         <select 
                             name="sort"
                             onchange="this.form.submit()"
-                            class="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-800 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition cursor-pointer">
+                            class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-800 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition cursor-pointer">
                             <option value="terbaru" {{ ($sort ?? 'terbaru') == 'terbaru' ? 'selected' : '' }}>Terbaru</option>
                             <option value="harga_terendah" {{ ($sort ?? '') == 'harga_terendah' ? 'selected' : '' }}>Harga Terendah</option>
                             <option value="harga_tertinggi" {{ ($sort ?? '') == 'harga_tertinggi' ? 'selected' : '' }}>Harga Tertinggi</option>
@@ -1820,8 +1991,8 @@
                         </select>
                     </div>
 
-                    <div class="flex items-center justify-between lg:items-end lg:pb-1.5 gap-2">
-                        <label class="flex items-center gap-2 cursor-pointer font-semibold text-slate-700 bg-slate-50 border border-slate-200/80 px-3 py-2.5 rounded-xl hover:bg-slate-100/70 transition">
+                    <div class="flex items-center justify-between sm:items-end sm:pb-0.5 gap-2">
+                        <label class="flex items-center gap-2 cursor-pointer font-semibold text-slate-700 bg-slate-50 border border-slate-200/80 px-3.5 py-2.5 rounded-xl hover:bg-slate-100/70 transition w-full justify-center">
                             <input 
                                 type="checkbox" 
                                 name="is_halal"
@@ -1834,7 +2005,7 @@
                         </label>
 
                         @if($search || ($category && $category !== 'Semua Kategori') || $maxPrice || !empty($isHalal) || ($stockStatus && $stockStatus !== 'Semua Status') || ($sort && $sort !== 'terbaru'))
-                            <a href="{{ route('umkm.katalog.index', ['tab' => 'katalog']) }}" class="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline whitespace-nowrap">
+                            <a href="{{ route('umkm.katalog.index', ['tab' => 'katalog']) }}" class="text-xs font-semibold text-rose-600 hover:text-rose-700 hover:underline whitespace-nowrap px-2">
                                 Reset
                             </a>
                         @else
@@ -1851,6 +2022,7 @@
         <div class="flex items-center justify-between text-xs text-slate-500 px-1">
             <div>
                 Menampilkan <strong class="text-slate-900 font-bold" x-text="visibleProductCount">{{ method_exists($products, 'total') ? $products->total() : $products->count() }}</strong> pilihan bahan baku segar
+                Menampilkan <strong class="text-slate-900 font-bold">{{ method_exists($products, 'total') ? $products->total() : $products->count() }}</strong> pilihan bahan baku segar
                 @if($category && $category !== 'Semua Kategori')
                     pada kategori <span class="text-[#ea580c] font-bold">{{ $category }}</span>
                 @endif
@@ -1865,15 +2037,23 @@
 
         <!-- 5. GRID KATALOG KOMODITAS BAHAN BAKU -->
         @if($products->isEmpty())
-            <div class="bg-white rounded-2xl p-12 text-center shadow-xs border border-slate-200/80 space-y-3">
-                <div class="w-12 h-12 mx-auto rounded-2xl bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-500">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+            <div class="bg-white rounded-3xl p-12 text-center shadow-xs border border-slate-200/80 space-y-4">
+                <div class="w-16 h-16 mx-auto rounded-3xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#ea580c]">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                 </div>
                 <div class="space-y-1">
-                    <h3 class="text-base font-bold text-slate-900">Tidak Ada Komoditas Bahan Baku Ditemukan</h3>
-                    <p class="text-xs text-slate-500 font-medium max-w-md mx-auto">Silakan sesuaikan kata kunci pencarian, kategori, status stok, atau rentang harga maksimal Anda.</p>
+                    <h3 class="text-lg font-bold text-slate-900">Tidak Ada Komoditas Bahan Baku Ditemukan</h3>
+                    <p class="text-xs text-slate-500 font-medium max-w-md mx-auto leading-relaxed">
+                        Silakan sesuaikan kata kunci pencarian, ubah pilihan kategori, atau reset filter Anda untuk menemukan komoditas lainnya.
+                    </p>
+                </div>
+                <div>
+                    <a href="{{ route('umkm.katalog.index', ['tab' => 'katalog']) }}" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#ea580c] hover:bg-[#c2410c] text-white text-xs font-bold transition shadow-xs">
+                        <span>Tampilkan Semua Komoditas</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </a>
                 </div>
             </div>
         @else
@@ -1903,172 +2083,235 @@
                 @foreach($products as $product)
                     <div class="catalog-product-card bg-white rounded-3xl overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-lg hover:border-orange-200 transition-all duration-300 border border-slate-200/80 group"
                          data-searchable="{{ strtolower(e(($product->commodity?->name ?? '') . ' ' . ($product->commodity?->category ?? '') . ' ' . ($product->supplier?->company_name ?? '') . ' ' . ($product->supplier?->delivery_area ?? '') . ' ' . ($product->quality_grade ?? '') . ' ' . ($product->description ?? ''))) }}">
+                    <div class="bg-white rounded-3xl overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-lg hover:border-orange-200 transition-all duration-300 border border-slate-200/80 group">
                         
                         <!-- Gambar Komoditas & Badges -->
-                        <div class="relative h-44 w-full bg-slate-100 overflow-hidden flex items-center justify-center">
+                        <div class="relative h-48 w-full bg-slate-100 overflow-hidden flex items-center justify-center">
                             @if($product->display_image_url)
                                 <img src="{{ $product->display_image_url }}" 
                                      alt="{{ $product->commodity->name }}" 
                                      class="h-full w-full object-cover group-hover:scale-105 transition-transform duration-500">
                             @else
-                                <div class="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-50 border-b border-slate-100">
-                                    <svg class="w-9 h-9 mb-1 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
-                                    <span class="text-[10px] font-semibold text-slate-400">Belum Ada Foto</span>
+                                @php
+                                    $fallbackGradient = match(strtolower($product->commodity->category)) {
+                                        'daging & unggas' => 'from-rose-50 via-orange-50 to-amber-50 text-rose-500',
+                                        'bumbu & rempah' => 'from-amber-50 via-orange-50 to-red-50 text-amber-600',
+                                        'sembako' => 'from-emerald-50 via-teal-50 to-amber-50 text-emerald-600',
+                                        default => 'from-orange-50 via-amber-50 to-slate-50 text-[#ea580c]'
+                                    };
+                                    $isCatDaging = str_contains(strtolower($product->commodity->category), 'daging');
+                                    $isCatBumbu = str_contains(strtolower($product->commodity->category), 'bumbu') || str_contains(strtolower($product->commodity->category), 'rempah');
+                                    $isCatSembako = str_contains(strtolower($product->commodity->category), 'sembako');
+                                @endphp
+                                <div class="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br {{ $fallbackGradient }} p-4 text-center">
+                                    <div class="w-12 h-12 rounded-2xl bg-white/85 backdrop-blur-xs flex items-center justify-center shadow-xs mb-2 text-[#ea580c]">
+                                        @if($isCatDaging)
+                                            <svg class="w-6 h-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 2a4 4 0 00-4 4c0 1.95 1.4 3.58 3.25 3.93A7.502 7.502 0 004 17.5V20a1 1 0 001 1h14a1 1 0 001-1v-2.5a7.502 7.502 0 00-7.25-7.57A4.001 4.001 0 0012 2z"/>
+                                            </svg>
+                                        @elseif($isCatBumbu)
+                                            <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343a7.975 7.975 0 012.344 5.657c0 2.12-.838 4.156-2.343 5.657z"/>
+                                            </svg>
+                                        @elseif($isCatSembako)
+                                            <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                                            </svg>
+                                        @else
+                                            <svg class="w-6 h-6 text-[#ea580c]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+                                            </svg>
+                                        @endif
+                                    </div>
+                                    <span class="text-xs font-bold text-slate-800 line-clamp-1">{{ $product->commodity->name }}</span>
+                                    <span class="text-[10px] text-slate-500 font-medium">Komoditas Mitra Lokal</span>
                                 </div>
                             @endif
 
+                            <!-- Top-Left Badge: Applied or Category -->
                             @if(in_array($product->id, $appliedProductIds ?? []))
-                                <span class="absolute top-3 left-3 bg-emerald-600 text-white text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-xs inline-flex items-center gap-1">
+                                <span class="absolute top-3 left-3 bg-emerald-600/95 backdrop-blur-xs text-white text-[10px] font-bold px-2.5 py-1 rounded-lg shadow-sm inline-flex items-center gap-1">
                                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                                     </svg>
                                     <span>Sudah Diajukan</span>
                                 </span>
                             @else
-                                <span class="absolute top-3 left-3 bg-white/95 backdrop-blur-xs text-slate-700 border border-slate-200/70 text-[10px] font-bold px-2.5 py-1 rounded-lg shadow-2xs uppercase tracking-wide">
+                                <span class="absolute top-3 left-3 bg-white/95 backdrop-blur-md text-slate-800 border border-slate-200/70 text-[10px] font-bold px-2.5 py-1 rounded-lg shadow-2xs uppercase tracking-wide">
                                     {{ $product->commodity->category }}
                                 </span>
                             @endif
 
+                            <!-- Top-Right Badge: Stock Status -->
                             <div class="absolute top-3 right-3">
                                 @if($product->stock_status === 'Tersedia')
-                                    <span class="bg-emerald-50/95 backdrop-blur-xs text-emerald-700 border border-emerald-200/80 text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-2xs inline-flex items-center gap-1.5">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                        <span>Stok Ada</span>
+                                    <span class="bg-emerald-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg shadow-sm inline-flex items-center gap-1.5">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                                        <span>Tersedia</span>
                                     </span>
                                 @elseif($product->stock_status === 'Stok Terbatas')
-                                    <span class="bg-amber-50/95 backdrop-blur-xs text-amber-800 border border-amber-200/80 text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-2xs inline-flex items-center gap-1.5">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+                                    <span class="bg-amber-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg shadow-sm inline-flex items-center gap-1.5">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
                                         <span>Terbatas</span>
                                     </span>
                                 @elseif($product->stock_status === 'Pre-Order')
-                                    <span class="bg-sky-50/95 backdrop-blur-xs text-sky-700 border border-sky-200/80 text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-2xs inline-flex items-center gap-1.5">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-sky-500"></span>
+                                    <span class="bg-sky-500 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg shadow-sm inline-flex items-center gap-1.5">
                                         <span>Pre-Order</span>
                                     </span>
                                 @else
-                                    <span class="bg-rose-50/95 backdrop-blur-xs text-rose-700 border border-rose-200/80 text-[10px] font-semibold px-2.5 py-1 rounded-lg shadow-2xs inline-flex items-center gap-1.5">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
+                                    <span class="bg-slate-700 text-white text-[10px] font-bold px-2.5 py-1 rounded-lg shadow-sm inline-flex items-center gap-1.5">
                                         <span>Habis</span>
                                     </span>
                                 @endif
                             </div>
 
+                            <!-- Bottom-Left Badge: Halal Certified -->
                             @if($product->is_halal_certified)
-                                <span class="absolute bottom-2.5 left-3 bg-white/95 backdrop-blur-xs text-emerald-700 border border-emerald-200/70 text-[10px] font-semibold px-2 py-0.5 rounded-lg shadow-2xs inline-flex items-center gap-1">
-                                    <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2">
+                                <span class="absolute bottom-2.5 left-3 bg-emerald-50/95 backdrop-blur-md text-emerald-800 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-lg shadow-2xs inline-flex items-center gap-1">
+                                    <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
-                                    <span>Halal Resmi</span>
+                                    <span>Halal</span>
+                                </span>
+                            @endif
+
+                            <!-- Bottom-Right Badge: Quality Grade -->
+                            @if(!empty($product->quality_grade))
+                                <span class="absolute bottom-2.5 right-3 bg-white/95 backdrop-blur-md text-slate-800 border border-slate-200 text-[10px] font-bold px-2 py-0.5 rounded-lg shadow-2xs">
+                                    {{ $product->quality_grade }}
                                 </span>
                             @endif
                         </div>
 
                         <!-- Konten Kartu -->
                         <div class="p-5 flex-1 flex flex-col justify-between space-y-4">
-                            <div class="space-y-2">
-                                <h3 class="font-bold text-[15px] text-slate-900 group-hover:text-[#ea580c] transition leading-snug line-clamp-2">
+                            <div class="space-y-2.5">
+                                <h3 class="font-bold text-[15px] sm:text-base text-slate-900 group-hover:text-[#ea580c] transition leading-snug line-clamp-1">
                                     {{ $product->commodity->name }}
                                 </h3>
+
                                 <div class="space-y-1">
-                                    <p class="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                                        <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                                    <div class="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
+                                        <svg class="w-3.5 h-3.5 text-[#ea580c] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                             <path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5m0 0h4m-4 0V11m0 0h4m-4 0H9m4 0V5" />
                                         </svg>
-                                        <span class="truncate">{{ $product->supplier->company_name }}</span>
-                                    </p>
-                                    <p class="text-[11px] text-slate-500 truncate flex items-center gap-1.5">
+                                        <span class="truncate font-bold text-slate-800">{{ $product->supplier->company_name }}</span>
+                                    </div>
+                                    <div class="flex items-center gap-1.5 text-[11px] text-slate-500">
                                         <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                                         <span class="truncate">{{ $product->supplier->warehouse_address }}</span>
-                                    </p>
+                                    </div>
                                 </div>
 
+                                <!-- SLA & Performa Pemasok -->
                                 @php
                                     $perfScore = $product->supplier?->latestPerformanceScore;
                                 @endphp
-                                <div class="pt-2.5 flex items-center justify-between gap-2 text-[11px] border-t border-slate-100 tabular-nums">
+                                <div class="pt-2 flex items-center justify-between gap-2 text-[11px] border-t border-slate-100 tabular-nums">
                                     <div class="flex items-center gap-1.5 flex-wrap">
                                         @if($perfScore && $perfScore->grade !== \App\Models\SupplierPerformanceScore::GRADE_UNRATED)
                                             <span class="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border {{ $perfScore->getGradeBadgeColor() }}">
                                                 Grade {{ $perfScore->grade }}
                                             </span>
-                                            <span class="text-slate-800 font-semibold inline-flex items-center gap-0.5 text-[11px]">
+                                            <span class="text-slate-800 font-bold inline-flex items-center gap-0.5 text-[11px]">
                                                 <svg class="w-3 h-3 text-amber-500 fill-amber-500" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                                                {{ number_format($perfScore->star_rating, 1) }}
+                                                {{ number_format((float) ($perfScore->star_rating ?? 0), 1) }}
                                             </span>
-                                            <span class="text-slate-400 text-[10px] font-medium">
-                                                {{ number_format($perfScore->metrics_breakdown['delivery']['otd_rate'] ?? 100, 0) }}% OTD
+                                            <span class="text-slate-500 text-[10px] font-medium">
+                                                {{ number_format((float) ($perfScore->metrics_breakdown['delivery']['otd_rate'] ?? 100), 0) }}% Tepat Waktu
                                             </span>
                                         @else
                                             <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200/80">
-                                                Vendor Baru
+                                                Vendor Terverifikasi
                                             </span>
                                         @endif
                                     </div>
                                     <button 
                                         type="button" 
                                         @click.stop="openSupplierTrackerModal('{{ $product->supplier->id }}')" 
-                                        class="font-semibold text-slate-600 hover:text-[#ea580c] transition inline-flex items-center gap-0.5 cursor-pointer shrink-0">
+                                        class="font-bold text-[#ea580c] hover:underline transition inline-flex items-center gap-0.5 cursor-pointer shrink-0 text-[11px]">
                                         <span>Rapor SLA</span>
-                                        <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                                     </button>
                                 </div>
                             </div>
 
-                            <div class="border-t border-slate-100 pt-3.5 space-y-3">
+                            <!-- Harga & Kalkulasi Acuan Pemerintah -->
+                            <div class="border-t border-slate-100 pt-3 space-y-2">
                                 <div class="flex justify-between items-baseline gap-2">
-                                    <span class="text-[11px] font-medium text-slate-500">Harga Grosir</span>
-                                    <span class="font-bold text-base text-[#ea580c] tabular-nums">
-                                        Rp {{ number_format($product->price, 0, ',', '.') }}<span class="text-xs text-slate-400 font-medium">/{{ $product->commodity->unit }}</span>
+                                    <span class="text-[11px] font-semibold text-slate-500">Harga Pasokan</span>
+                                    <span class="font-extrabold text-lg text-[#ea580c] tabular-nums">
+                                        Rp {{ number_format((float) ($product->price ?? 0), 0, ',', '.') }}<span class="text-xs text-slate-400 font-medium">/{{ $product->commodity->unit }}</span>
                                     </span>
                                 </div>
 
+                                @if($product->commodity->government_ref_price && (float) $product->price < (float) $product->commodity->government_ref_price)
+                                    @php
+                                        $diff = (float) $product->commodity->government_ref_price - (float) $product->price;
+                                        $pct = round(($diff / (float) $product->commodity->government_ref_price) * 100);
+                                    @endphp
+                                    <div class="bg-emerald-50/80 border border-emerald-200/70 rounded-lg px-2.5 py-1 flex items-center justify-between text-[10px] font-bold text-emerald-800">
+                                        <span class="flex items-center gap-1">
+                                            <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 14l-7 7m0 0l-7-7m7 7V3"/></svg>
+                                            <span>Hemat {{ $pct }}%</span>
+                                        </span>
+                                        <span class="text-emerald-700/80 font-medium">Acuan: Rp {{ number_format((float) ($product->commodity->government_ref_price ?? 0), 0, ',', '.') }}</span>
+                                    </div>
+                                @endif
+
+                                <!-- Kapasitas Pasokan -->
+                                <div class="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
+                                    <span>Kapasitas Stok</span>
+                                    <span class="font-semibold text-slate-800 tabular-nums">{{ number_format((float) ($product->stock_capacity ?? 0), 0, ',', '.') }} {{ $product->commodity->unit }}</span>
+                                </div>
+
+                                <!-- CTA Action Button -->
                                 @php
                                     $isAlreadyApplied = in_array($product->id, $appliedProductIds ?? []);
                                 @endphp
 
-                                @if($isAlreadyApplied)
-                                    <button 
-                                        type="button"
-                                        disabled
-                                        class="w-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 font-semibold py-2.5 px-3 rounded-xl text-xs cursor-not-allowed flex items-center justify-center gap-1.5">
-                                        <svg class="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                            <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                                        </svg>
-                                        <span>Sudah Diajukan Kemitraan</span>
-                                    </button>
-                                @elseif($product->stock_status !== 'Stok Habis')
-                                    <button 
-                                        type="button"
-                                        @click="openAjukanModal({{ json_encode([
-                                             'id' => $product->id,
-                                             'supplier_id' => $product->supplier->id,
-                                             'company_name' => $product->supplier->company_name,
-                                             'commodity_name' => $product->commodity->name,
-                                             'unit' => $product->commodity->unit,
-                                             'price' => 'Rp ' . number_format($product->price, 0, ',', '.') . ' / ' . $product->commodity->unit,
-                                             'numeric_price' => $product->price,
-                                             'stock_status' => $product->stock_status,
-                                             'stock_capacity' => $product->stock_capacity,
-                                             'is_halal' => $product->is_halal_certified,
-                                             'image_url' => $product->display_image_url,
-                                         ]) }})" 
-                                        class="w-full bg-[#ea580c] hover:bg-[#c2410c] text-white font-semibold py-2.5 px-3 rounded-xl text-xs transition shadow-xs hover:shadow-sm active:scale-[0.98] cursor-pointer flex items-center justify-center gap-1.5">
-                                        <span>Ajukan Permintaan</span>
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                                        </svg>
-                                    </button>
-                                @else
-                                    <button 
-                                        type="button"
-                                        disabled
-                                        class="w-full bg-slate-100 border border-slate-200/80 text-slate-400 font-semibold py-2.5 px-3 rounded-xl text-xs cursor-not-allowed">
-                                        Stok Tidak Tersedia
-                                    </button>
-                                @endif
+                                <div class="pt-1.5">
+                                    @if($isAlreadyApplied)
+                                        <button 
+                                            type="button"
+                                            @click="setTab('riwayat-permintaan')"
+                                            class="w-full bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold py-2.5 px-3 rounded-xl text-xs transition flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs">
+                                            <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                                            </svg>
+                                            <span>Kemitraan Diajukan</span>
+                                        </button>
+                                    @elseif($product->stock_status !== 'Stok Habis')
+                                        <button 
+                                            type="button"
+                                            @click="openAjukanModal({{ json_encode([
+                                                 'id' => $product->id,
+                                                 'supplier_id' => $product->supplier->id,
+                                                 'company_name' => $product->supplier->company_name,
+                                                 'commodity_name' => $product->commodity->name,
+                                                 'unit' => $product->commodity->unit,
+                                                 'price' => 'Rp ' . number_format((float) ($product->price ?? 0), 0, ',', '.') . ' / ' . $product->commodity->unit,
+                                                 'numeric_price' => $product->price,
+                                                 'stock_status' => $product->stock_status,
+                                                 'stock_capacity' => $product->stock_capacity,
+                                                 'is_halal' => $product->is_halal_certified,
+                                                 'image_url' => $product->display_image_url,
+                                             ]) }})" 
+                                            class="w-full bg-[#ea580c] hover:bg-[#c2410c] active:scale-[0.98] text-white font-bold py-2.5 px-3 rounded-xl text-xs transition shadow-xs hover:shadow flex items-center justify-center gap-2 cursor-pointer group/btn">
+                                            <span>Jadwalkan Pasokan</span>
+                                            <svg class="w-3.5 h-3.5 group-hover/btn:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.2">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                                            </svg>
+                                        </button>
+                                    @else
+                                        <button 
+                                            type="button"
+                                            disabled
+                                            class="w-full bg-slate-100 border border-slate-200/80 text-slate-400 font-semibold py-2.5 px-3 rounded-xl text-xs cursor-not-allowed">
+                                            Stok Tidak Tersedia
+                                        </button>
+                                    @endif
+                                </div>
                             </div>
                         </div>
 
@@ -2076,8 +2319,30 @@
                 @endforeach
             </div>
 
-            <!-- 6. PAGINASI KATALOG -->
+2            <!-- 6. PAGINASI KATALOG -->
             <div x-show="visibleProductCount > 0 && (!catalogSearch || catalogSearch.trim() === '')" class="mt-8 flex justify-center">
+            <!-- 6. TIPS & JAMINAN KEAMANAN DAPUR UMKM -->
+            <div class="bg-gradient-to-r from-orange-50/80 via-amber-50/50 to-white rounded-3xl p-5 sm:p-6 border border-orange-200/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xs mt-4">
+                <div class="flex items-start gap-3.5">
+                    <div class="w-10 h-10 rounded-2xl bg-orange-100 text-[#ea580c] flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h4 class="font-bold text-slate-900 text-sm">Jaminan Proteksi Rekening Bersama (Escrow SORAI)</h4>
+                        <p class="text-xs text-slate-600 mt-0.5 leading-relaxed max-w-2xl">
+                            Setiap pembayaran faktur yang Anda lakukan aman terlindungi di rekening bersama SORAI. Dana baru dicairkan kepada pemasok setelah Anda memeriksa dan memvalidasi langsung penerimaan bahan baku segar di dapur Anda.
+                        </p>
+                    </div>
+                </div>
+                <button type="button" @click="$dispatch('open-umkm-guide')" class="px-4 py-2.5 bg-white hover:bg-orange-50 text-[#ea580c] border border-orange-200 font-bold text-xs rounded-xl transition shrink-0 cursor-pointer shadow-2xs">
+                    Pelajari Alur Lengkap
+                </button>
+            </div>
+
+            <!-- 7. PAGINASI KATALOG -->
+            <div class="mt-8 flex justify-center">
                 {{ $products->links() }}
             </div>
         @endif
@@ -2198,7 +2463,7 @@
                                 Estimasi Kuantitas &amp; Satuan <span class="text-rose-500">*</span>
                             </label>
                             <div class="flex rounded-xl overflow-hidden bg-slate-50 border border-slate-200/90 focus-within:bg-white focus-within:border-[#ea580c] focus-within:ring-2 focus-within:ring-orange-500/15 transition">
-                                <input type="number" step="0.1" min="0.1" name="estimated_quantity" x-model="planningForm.volume" required placeholder="Contoh: 200" class="w-full px-3.5 py-2.5 bg-transparent text-slate-900 font-semibold tabular-nums placeholder:text-slate-400 border-0 focus:outline-none" />
+                                <input type="number" step="0.1" min="0.1" name="estimated_quantity" x-model="planningForm.volume" required placeholder="Masukkan kuantitas kebutuhan" class="w-full px-3.5 py-2.5 bg-transparent text-slate-900 font-semibold tabular-nums placeholder:text-slate-400 border-0 focus:outline-none" />
                                 <select name="unit" x-model="planningForm.unit" class="bg-slate-100 border-l border-slate-200/80 px-3 py-2.5 text-slate-700 font-semibold focus:outline-none cursor-pointer text-xs">
                                     @forelse($availableUnits as $unit)
                                         <option value="{{ $unit->name }}">{{ $unit->name }} ({{ $unit->symbol }})</option>
@@ -2227,7 +2492,7 @@
                         <label class="block mb-1.5 text-slate-700 font-semibold">
                             Catatan Khusus Kebutuhan Dapur (Opsional)
                         </label>
-                        <textarea name="notes" x-model="planningForm.notes" rows="3" placeholder="Contoh: Potongan dada fillet dingin 4°C, pengiriman subuh jam 05.00 WIB 2x seminggu..." class="w-full p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-800 font-medium placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition"></textarea>
+                        <textarea name="notes" x-model="planningForm.notes" rows="3" placeholder="Masukkan catatan spesifikasi kebutuhan pasokan (misal: suhu dingin 4°C, pengiriman subuh jam 05.00 WIB)..." class="w-full p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-800 font-medium placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition"></textarea>
                     </div>
 
                     <!-- Form Actions -->
@@ -2475,30 +2740,135 @@
         <!-- HEADER TITLE -->
         <div class="border-b border-slate-200/80 pb-4">
             <h2 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Pesanan &amp; Pengiriman</h2>
-            <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Pantau status pengiriman pesanan, penerimaan bahan baku, dan pembayaran.</p>
+            <p class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 mt-1 leading-relaxed">Pantau status pengiriman pesanan rutin, konfirmasi fisik kedatangan bahan baku, dan pelunasan aman.</p>
+        </div>
+
+        <!-- PANDUAN LANGKAH ALUR PENGADAAN DAPUR UNTUK UMKM -->
+        <div class="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs space-y-3">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <div class="flex items-center gap-2">
+                    <span class="w-6 h-6 rounded-lg bg-orange-100 text-[#ea580c] flex items-center justify-center shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>
+                    </span>
+                    <span class="text-xs font-bold text-slate-900">Alur Pengadaan Bahan Baku Dapur:</span>
+                </div>
+                <span class="text-[11px] text-slate-400 hidden sm:inline">Klik tahapan di bawah untuk membuka langsung status pesanan Anda</span>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3 text-xs">
+                <!-- Tahap 1: Pengiriman -->
+                <button type="button" 
+                        @click="orderSubTab = 'auto-order'"
+                        class="p-3 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between"
+                        :class="orderSubTab === 'auto-order' ? 'bg-orange-50/70 border-orange-300 ring-1 ring-orange-400/30' : 'bg-slate-50/70 border-slate-200/90 hover:bg-slate-100/70'">
+                    <div class="flex items-center justify-between gap-1 mb-1.5">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Langkah 1</span>
+                        <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    </div>
+                    <p class="font-bold text-slate-900 text-xs">1. Jadwal Dikirim</p>
+                    <p class="text-[10px] text-slate-500 mt-0.5 leading-snug">Pemasok siapkan armada &amp; jalan ke dapur</p>
+                </button>
+
+                <!-- Tahap 2: Cek Fisik Barang -->
+                <button type="button" 
+                        @click="orderSubTab = 'confirm'"
+                        class="p-3 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between relative"
+                        :class="orderSubTab === 'confirm' ? 'bg-orange-50/70 border-orange-300 ring-1 ring-orange-400/30' : 'bg-slate-50/70 border-slate-200/90 hover:bg-slate-100/70'">
+                    <div class="flex items-center justify-between gap-1 mb-1.5">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Langkah 2</span>
+                        <template x-if="pendingValidationCount > 0">
+                            <span class="inline-flex items-center gap-1 text-[10px] bg-[#ea580c] text-white px-1.5 py-0.2 rounded font-bold" x-text="pendingValidationCount + ' Perlu Cek'"></span>
+                        </template>
+                    </div>
+                    <p class="font-bold text-slate-900 text-xs">2. Cek Fisik &amp; Terima</p>
+                    <p class="text-[10px] text-slate-500 mt-0.5 leading-snug">Periksa timbangan &amp; foto bukti kedatangan</p>
+                </button>
+
+                <!-- Tahap 3: Bayar Invoice Aman -->
+                <button type="button" 
+                        @click="orderSubTab = 'payment'"
+                        class="p-3 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between"
+                        :class="orderSubTab === 'payment' ? 'bg-orange-50/70 border-orange-300 ring-1 ring-orange-400/30' : 'bg-slate-50/70 border-slate-200/90 hover:bg-slate-100/70'">
+                    <div class="flex items-center justify-between gap-1 mb-1.5">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Langkah 3</span>
+                        <template x-if="pendingPaymentCount > 0">
+                            <span class="inline-flex items-center gap-1 text-[10px] bg-amber-500 text-white px-1.5 py-0.2 rounded font-bold" x-text="pendingPaymentCount + ' Siap Bayar'"></span>
+                        </template>
+                    </div>
+                    <p class="font-bold text-slate-900 text-xs">3. Bayar via Midtrans</p>
+                    <p class="text-[10px] text-slate-500 mt-0.5 leading-snug">Dana aman di Rekening Bersama per kloter</p>
+                </button>
+
+                <!-- Tahap 4: Ulas Mutu -->
+                <button type="button" 
+                        @click="orderSubTab = 'rating'"
+                        class="p-3 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between"
+                        :class="orderSubTab === 'rating' ? 'bg-orange-50/70 border-orange-300 ring-1 ring-orange-400/30' : 'bg-slate-50/70 border-slate-200/90 hover:bg-slate-100/70'">
+                    <div class="flex items-center justify-between gap-1 mb-1.5">
+                        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Langkah 4</span>
+                        <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                    </div>
+                    <p class="font-bold text-slate-900 text-xs">4. Nilai Mutu Pemasok</p>
+                    <p class="text-[10px] text-slate-500 mt-0.5 leading-snug">Rating kesegaran komoditas &amp; ketepatan waktu</p>
+                </button>
+            </div>
         </div>
 
         <!-- SUB-NAVIGASI TAB CLEAN UNDERLINE DESIGN -->
         <div class="border-b border-slate-200/90 flex items-center gap-6 sm:gap-8 text-xs font-semibold overflow-x-auto">
-            <!-- 1. Pemesanan Otomatis -->
+            <!-- 1. Jadwal Pengiriman -->
             <button 
                 type="button"
                 @click="orderSubTab = 'auto-order'"
                 class="pb-3.5 relative transition flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
                 :class="orderSubTab === 'auto-order' ? 'text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'">
-                <span>Pemesanan Otomatis</span>
+                <span>1. Jadwal Pengiriman</span>
                 <template x-if="orderSubTab === 'auto-order'">
                     <span class="absolute bottom-0 left-0 w-full h-0.5 bg-[#ea580c] rounded-full"></span>
                 </template>
             </button>
 
-            <!-- 2. Persetujuan Backorder -->
+            <!-- 2. Konfirmasi Terima Barang -->
+            <button 
+                type="button"
+                @click="orderSubTab = 'confirm'"
+                class="pb-3.5 relative transition flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
+                :class="orderSubTab === 'confirm' ? 'text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'">
+                <span>2. Konfirmasi Terima Barang</span>
+                <template x-if="pendingValidationCount > 0">
+                    <span class="bg-[#ea580c] text-white text-[10px] px-2 py-0.5 rounded-md font-semibold tabular-nums"
+                          x-text="pendingValidationCount">
+                    </span>
+                </template>
+                <template x-if="orderSubTab === 'confirm'">
+                    <span class="absolute bottom-0 left-0 w-full h-0.5 bg-[#ea580c] rounded-full"></span>
+                </template>
+            </button>
+
+            <!-- 3. Pembayaran Midtrans -->
+            <button 
+                type="button"
+                @click="orderSubTab = 'payment'"
+                class="pb-3.5 relative transition flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
+                :class="orderSubTab === 'payment' ? 'text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'">
+                <span>3. Bayar Tagihan (Midtrans)</span>
+                <template x-if="pendingPaymentCount > 0">
+                    <span class="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-md font-semibold tabular-nums"
+                          x-text="pendingPaymentCount">
+                    </span>
+                </template>
+                <template x-if="orderSubTab === 'payment'">
+                    <span class="absolute bottom-0 left-0 w-full h-0.5 bg-[#ea580c] rounded-full"></span>
+                </template>
+            </button>
+
+            <!-- 4. Pasokan Menyusul (Backorder) -->
             <button 
                 type="button"
                 @click="orderSubTab = 'backorder'"
                 class="pb-3.5 relative transition flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
                 :class="orderSubTab === 'backorder' ? 'text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'">
-                <span>Persetujuan Backorder</span>
+                <span>Pasokan Menyusul (Kloter 2)</span>
                 <template x-if="pendingBackorderApprovalCount > 0">
                     <span class="bg-rose-600 text-white text-[10px] px-2 py-0.5 rounded-md font-semibold tabular-nums animate-pulse"
                           x-text="pendingBackorderApprovalCount + ' Pengajuan'">
@@ -2514,47 +2884,13 @@
                 </template>
             </button>
 
-            <!-- 3. Konfirmasi Pesanan -->
-            <button 
-                type="button"
-                @click="orderSubTab = 'confirm'"
-                class="pb-3.5 relative transition flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
-                :class="orderSubTab === 'confirm' ? 'text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'">
-                <span>Konfirmasi Pesanan</span>
-                <template x-if="pendingValidationCount > 0">
-                    <span class="bg-[#ea580c] text-white text-[10px] px-2 py-0.5 rounded-md font-semibold tabular-nums"
-                          x-text="pendingValidationCount">
-                    </span>
-                </template>
-                <template x-if="orderSubTab === 'confirm'">
-                    <span class="absolute bottom-0 left-0 w-full h-0.5 bg-[#ea580c] rounded-full"></span>
-                </template>
-            </button>
-
-            <!-- 4. Pembayaran Midtrans -->
-            <button 
-                type="button"
-                @click="orderSubTab = 'payment'"
-                class="pb-3.5 relative transition flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
-                :class="orderSubTab === 'payment' ? 'text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'">
-                <span>Pembayaran Midtrans</span>
-                <template x-if="pendingPaymentCount > 0">
-                    <span class="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-md font-semibold tabular-nums"
-                          x-text="pendingPaymentCount">
-                    </span>
-                </template>
-                <template x-if="orderSubTab === 'payment'">
-                    <span class="absolute bottom-0 left-0 w-full h-0.5 bg-[#ea580c] rounded-full"></span>
-                </template>
-            </button>
-
             <!-- 5. Rating & Ulasan -->
             <button 
                 type="button"
                 @click="orderSubTab = 'rating'"
                 class="pb-3.5 relative transition flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
                 :class="orderSubTab === 'rating' ? 'text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'">
-                <span>Rating &amp; Ulasan</span>
+                <span>4. Rating &amp; Ulasan</span>
                 @if(isset($reviewOrders) && $reviewOrders->isNotEmpty())
                     <span class="bg-orange-50 text-[#ea580c] border border-orange-200/70 text-[10px] px-2 py-0.5 rounded-md font-bold tabular-nums">
                         {{ $reviewOrders->count() }}
@@ -2752,22 +3088,22 @@
                                             </div>
                                         @elseif($batch1 && $batch1->backorder_action === 'create_backorder')
                                             <div class="bg-orange-50/80 border border-orange-200/80 text-orange-950 px-2.5 py-1.5 rounded-lg text-[11px] leading-tight">
-                                                <span>Terkirim Parsial: <strong>{{ number_format($deliveredQty, 0) }}/{{ number_format($totalQty, 0) }} {{ $unit }}</strong></span>
-                                                <span class="text-[#ea580c] block font-semibold mt-0.5">— Sisa {{ number_format($remainingQty, 0) }} {{ $unit }} dalam antrean Backorder</span>
+                                                <span>Terkirim Parsial: <strong>{{ number_format((float) ($deliveredQty ?? 0), 0) }}/{{ number_format((float) ($totalQty ?? 0), 0) }} {{ $unit }}</strong></span>
+                                                <span class="text-[#ea580c] block font-semibold mt-0.5">— Sisa {{ number_format((float) ($remainingQty ?? 0), 0) }} {{ $unit }} dalam antrean Backorder</span>
                                             </div>
                                         @elseif($batch1 && $batch1->backorder_action === 'no_backorder')
                                             <div class="bg-rose-50 border border-rose-200/80 text-rose-950 px-2.5 py-1.5 rounded-lg text-[11px] leading-tight">
-                                                <span>Terkirim Parsial: <strong>{{ number_format($deliveredQty, 0) }}/{{ number_format($totalQty, 0) }} {{ $unit }}</strong></span>
-                                                <span class="text-rose-700 block font-semibold mt-0.5">— Sisa {{ number_format(max(0, $totalQty - $deliveredQty), 0) }} {{ $unit }} Dibatalkan (Tagihan Disesuaikan)</span>
+                                                <span>Terkirim Parsial: <strong>{{ number_format((float) ($deliveredQty ?? 0), 0) }}/{{ number_format((float) ($totalQty ?? 0), 0) }} {{ $unit }}</strong></span>
+                                                <span class="text-rose-700 block font-semibold mt-0.5">— Sisa {{ number_format((float) max(0, (float)$totalQty - (float)$deliveredQty), 0) }} {{ $unit }} Dibatalkan (Tagihan Disesuaikan)</span>
                                             </div>
                                         @else
                                             <div class="text-slate-500 text-[11px]">
-                                                Pengiriman Penuh: <strong class="text-slate-700">{{ number_format($totalQty, 0) }} {{ $unit }}</strong>
+                                                Pengiriman Penuh: <strong class="text-slate-700">{{ number_format((float) ($totalQty ?? 0), 0) }} {{ $unit }}</strong>
                                             </div>
                                         @endif
                                     </td>
                                     <td class="px-4 py-3.5 font-bold text-slate-900 whitespace-nowrap tabular-nums">
-                                        Rp {{ number_format($dbOrder->total_amount, 0, ',', '.') }}
+                                        Rp {{ number_format((float) ($dbOrder->total_amount ?? 0), 0, ',', '.') }}
                                     </td>
                                     <td class="px-4 py-3.5">
                                         @if($dbOrder->order_status === 'cancelled')
@@ -2796,7 +3132,7 @@
                                             @elseif(! $isBatch1Confirmed)
                                                 <span class="bg-sky-50 border border-sky-200/80 text-sky-800 px-2.5 py-1 rounded-lg text-[10px] font-semibold inline-flex items-center gap-1.5 tabular-nums">
                                                     <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping"></span>
-                                                    <span>Kloter 1 Dikirim ({{ number_format($deliveredQty, 0) }} {{ $unit }})</span>
+                                                    <span>Kloter 1 Dikirim ({{ number_format((float) ($deliveredQty ?? 0), 0) }} {{ $unit }})</span>
                                                 </span>
                                             @elseif($isBatch2Shipped && ! $isBatch2Confirmed)
                                                 <span class="bg-sky-50 text-sky-900 border border-sky-300/80 px-2.5 py-1 rounded-lg text-[10px] font-semibold inline-flex items-center gap-1.5 animate-pulse">
@@ -2818,7 +3154,7 @@
                                             @if(! $isBatch1Confirmed)
                                                 <span class="bg-sky-50 border border-sky-200/80 text-sky-800 px-2.5 py-1 rounded-lg text-[10px] font-semibold inline-flex items-center gap-1.5 tabular-nums">
                                                     <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping"></span>
-                                                    <span>Armada Mengirim ({{ number_format($deliveredQty, 0) }} {{ $unit }})</span>
+                                                    <span>Armada Mengirim ({{ number_format((float) ($deliveredQty ?? 0), 0) }} {{ $unit }})</span>
                                                 </span>
                                             @else
                                                 <span class="bg-slate-100 border border-slate-200/80 text-slate-700 px-2.5 py-1 rounded-lg text-[10px] font-semibold inline-flex items-center gap-1">
@@ -2865,7 +3201,21 @@
                                         @if($dbOrder->order_status === 'cancelled')
                                             <span class="text-xs text-rose-600 font-semibold">Pesanan Batal</span>
                                         @elseif(in_array($dbOrder->order_status, ['pending', 'confirmed']))
-                                            <span class="text-xs text-slate-400 font-medium italic">Menunggu Armada Dikirim</span>
+                                            @php
+                                                $orderDiffMinutes = $dbOrder->created_at ? abs(now()->diffInMinutes($dbOrder->created_at)) : 999;
+                                                $orderCanCancel = $orderDiffMinutes < 30 && (! $batch1 || $batch1->shipped_at === null);
+                                            @endphp
+                                            <div class="flex flex-col items-center gap-1.5">
+                                                <span class="text-xs text-slate-400 font-medium italic">Menunggu Armada Dikirim</span>
+                                                @if($orderCanCancel)
+                                                    <button type="button"
+                                                            @click="openBatalOrderModal('{{ $dbOrder->id }}', '#ORD-{{ strtoupper(substr($dbOrder->id, 0, 8)) }}', '{{ 30 - $orderDiffMinutes }} menit')"
+                                                            class="px-2.5 py-1 text-[10px] font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition cursor-pointer inline-flex items-center gap-1 shadow-2xs">
+                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                        <span>Batalkan Pesanan (&lt;30m)</span>
+                                                    </button>
+                                                @endif
+                                            </div>
                                         @elseif($batch1 && $batch1->shipped_at === null)
                                             <span class="text-xs text-amber-700 font-medium">
                                                 @if($batch1->backorder_approval_status === 'pending' || $dbOrder->order_status === 'waiting_backorder_approval')
@@ -3006,7 +3356,7 @@
                                                 type="button" 
                                                 @click="stopCamera()" 
                                                 class="text-xs font-semibold text-slate-300 hover:text-white bg-white/10 hover:bg-white/20 px-3.5 py-2 rounded-xl transition cursor-pointer">
-                                                ✕ Batal Kamera
+                                                Batal Kamera
                                             </button>
                                             <button 
                                                 type="button" 
@@ -3014,7 +3364,7 @@
                                                 :disabled="isTakingPhoto"
                                                 class="text-xs font-bold text-white bg-[#ea580c] hover:bg-[#c2410c] px-4 py-2 rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50">
                                                 <svg class="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                                <span x-text="isTakingPhoto ? 'Mengambil...' : '📸 Jepret Foto'"></span>
+                                                <span x-text="isTakingPhoto ? 'Mengambil...' : 'Jepret Foto'"></span>
                                             </button>
                                         </div>
                                     </div>
@@ -3027,18 +3377,18 @@
                                             <img :src="confirmPhotoPreview" class="max-h-52 mx-auto rounded-xl object-contain shadow-xs" alt="Bukti Penerimaan">
                                             <span class="absolute top-4 left-4 text-[10px] font-bold px-2.5 py-1 rounded-lg text-white shadow-xs backdrop-blur-md"
                                                   :class="confirmPhotoSource === 'camera' ? 'bg-[#ea580c]/90' : 'bg-sky-600/90'"
-                                                  x-text="confirmPhotoSource === 'camera' ? '📸 Dari Kamera' : '🖼️ Dari Galeri'">
+                                                  x-text="confirmPhotoSource === 'camera' ? 'Kamera Langsung' : 'Unggahan Galeri'">
                                             </span>
                                         </div>
                                         <div class="flex items-center justify-center gap-2">
                                             <button type="button" @click="startCamera('batch1')" class="text-[11px] font-semibold text-slate-600 hover:text-[#ea580c] bg-slate-100 hover:bg-orange-50 px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1 cursor-pointer">
-                                                <span>📸 Foto Ulang Kamera</span>
+                                                <span>Foto Ulang Kamera</span>
                                             </button>
                                             <button type="button" @click="confirmPhotoSource = 'gallery'; $refs.galleryInput.click()" class="text-[11px] font-semibold text-slate-600 hover:text-sky-600 bg-slate-100 hover:bg-sky-50 px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1 cursor-pointer">
-                                                <span>🖼️ Ganti Galeri</span>
+                                                <span>Ganti Galeri</span>
                                             </button>
                                             <button type="button" @click="resetConfirmPhoto()" class="text-[11px] font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1 cursor-pointer">
-                                                <span>✕ Hapus</span>
+                                                <span>Hapus Foto</span>
                                             </button>
                                         </div>
                                     </div>
@@ -3075,12 +3425,35 @@
                         </div>
 
                         <div>
-                            <label class="block text-xs font-semibold text-slate-700 mb-1.5">Catatan Kondisi Kedatangan (Opsional)</label>
+                            <div class="flex items-center justify-between mb-1.5">
+                                <label class="block text-xs font-semibold text-slate-700">Catatan Kondisi Kedatangan (Opsional)</label>
+                                <span class="text-[10px] text-slate-400">Pilih cepat:</span>
+                            </div>
+
+                            <!-- Quick Tags untuk Dapur Cepat -->
+                            <div class="flex flex-wrap gap-1.5 mb-2">
+                                <button type="button" 
+                                        @click="confirmNotes = (confirmNotes ? confirmNotes + ', ' : '') + 'Kondisi segar & timbangan pas.'"
+                                        class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-orange-50 text-slate-700 hover:text-orange-700 text-[11px] font-medium border border-slate-200/80 transition cursor-pointer">
+                                    + Segar &amp; Pas
+                                </button>
+                                <button type="button" 
+                                        @click="confirmNotes = (confirmNotes ? confirmNotes + ', ' : '') + 'Kemasan rapi & higienis.'"
+                                        class="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-orange-50 text-slate-700 hover:text-orange-700 text-[11px] font-medium border border-slate-200/80 transition cursor-pointer">
+                                    + Kemasan Rapi
+                                </button>
+                                <button type="button" 
+                                        @click="confirmNotes = (confirmNotes ? confirmNotes + ', ' : '') + 'Ada sedikit susut timbangan / cacat fisik.'"
+                                        class="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 text-[11px] font-medium border border-amber-200 transition cursor-pointer">
+                                    + Ada Cacat/Susut
+                                </button>
+                            </div>
+
                             <textarea
                                 name="confirmation_notes"
                                 rows="3"
                                 x-model="confirmNotes"
-                                placeholder="Contoh: Kondisi bahan baku segar, kuantitas kloter 1 sesuai timbangan dapur."
+                                placeholder="Masukkan catatan kondisi fisik bahan baku yang diterima di dapur..."
                                 class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-900 text-xs font-medium placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition">
                             </textarea>
                         </div>
@@ -3108,11 +3481,11 @@
             <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-slate-100 pb-4">
                 <div>
                     <span class="inline-flex items-center gap-1.5 text-[10px] font-bold text-amber-800 uppercase tracking-wider bg-amber-50 px-2.5 py-0.5 rounded-lg border border-amber-200/80">
-                        Split Shipment / Backorder
+                        Pengiriman Bertahap &bull; Kloter 2
                     </span>
-                    <h3 class="font-bold text-lg text-slate-900 mt-1.5">Pemantauan Pengiriman Sisa Pasokan (Backorder)</h3>
+                    <h3 class="font-bold text-lg text-slate-900 mt-1.5">Pemantauan Sisa Pasokan Menyusul (Kloter 2)</h3>
                     <p class="text-xs text-slate-500 mt-0.5">
-                        Pesanan di bawah ini dikirim secara bertahap oleh pemasok mitra. Konfirmasi kedatangan fisik Batch 2 saat sisa barang tiba di dapur.
+                        Pesanan di bawah ini dikirim bertahap oleh pemasok mitra. Anda hanya membayar kuantitas bahan baku yang telah tiba &amp; dicek di dapur, sedangkan sisa bahan dipantau di sini hingga tiba lengkap.
                     </p>
                 </div>
                 <span class="bg-amber-50 border border-amber-200/80 text-amber-900 font-semibold text-xs px-3.5 py-1.5 rounded-xl w-fit tabular-nums">
@@ -3269,7 +3642,7 @@
                                     @else
                                         <span class="bg-amber-50 border border-amber-200/80 text-amber-900 text-[11px] font-semibold px-3 py-1 rounded-lg inline-flex items-center gap-1.5 tabular-nums">
                                             <svg class="w-3.5 h-3.5 text-amber-700 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                            <span>Kloter 1 Terkirim — Menunggu Jadwal Kirim Sisa Backorder ({{ number_format($remainingQty, 0) }} {{ $unit }})</span>
+                                            <span>Kloter 1 Terkirim — Menunggu Jadwal Kirim Sisa Backorder ({{ number_format((float) ($remainingQty ?? 0), 0) }} {{ $unit }})</span>
                                         </span>
                                     @endif
                                 </div>
@@ -3299,9 +3672,9 @@
                                             </div>
                                             <p class="text-xs text-slate-800 leading-relaxed pt-0.5 tabular-nums">
                                                 @if($batch1?->backorder_action === 'no_backorder')
-                                                    Pemasok hanya sanggup mengirimkan <strong class="text-emerald-700 font-bold">{{ number_format($deliveredQty, 0) }} {{ $unit }}</strong> dan <strong class="text-rose-700 font-bold">tidak dapat mengirimkan sisa {{ number_format($remainingQty, 0) }} {{ $unit }}</strong> karena stok gudang habis. Jika Anda setuju, sisa pesanan ditiadakan, tagihan disesuaikan hanya untuk {{ number_format($deliveredQty, 0) }} {{ $unit }}, dan pemasok akan memberangkatkan barang.
+                                                    Pemasok hanya sanggup mengirimkan <strong class="text-emerald-700 font-bold">{{ number_format((float) ($deliveredQty ?? 0), 0) }} {{ $unit }}</strong> dan <strong class="text-rose-700 font-bold">tidak dapat mengirimkan sisa {{ number_format((float) ($remainingQty ?? 0), 0) }} {{ $unit }}</strong> karena stok gudang habis. Jika Anda setuju, sisa pesanan ditiadakan, tagihan disesuaikan hanya untuk {{ number_format((float) ($deliveredQty ?? 0), 0) }} {{ $unit }}, dan pemasok akan memberangkatkan barang.
                                                 @else
-                                                    Pemasok hanya dapat mengirimkan <strong class="text-emerald-700 font-bold">{{ number_format($deliveredQty, 0) }} {{ $unit }}</strong> saat ini dan mengajukan pengiriman sisa <strong class="text-[#ea580c] font-bold">{{ number_format($remainingQty, 0) }} {{ $unit }}</strong> pada tanggal <strong class="text-slate-900 underline">{{ $estimatedDateText }}</strong>. Apakah Anda setuju?
+                                                    Pemasok hanya dapat mengirimkan <strong class="text-emerald-700 font-bold">{{ number_format((float) ($deliveredQty ?? 0), 0) }} {{ $unit }}</strong> saat ini dan mengajukan pengiriman sisa <strong class="text-[#ea580c] font-bold">{{ number_format((float) ($remainingQty ?? 0), 0) }} {{ $unit }}</strong> pada tanggal <strong class="text-slate-900 underline">{{ $estimatedDateText }}</strong>. Apakah Anda setuju?
                                                 @endif
                                             </p>
                                             @if($batch1?->backorder_notes)
@@ -3319,7 +3692,7 @@
                                                 @click="rejectingBackorderId = '{{ $boOrder->id }}'; rejectionReason = ''; rejectingAction = '{{ $batch1?->backorder_action ?? 'create_backorder' }}';"
                                                 class="bg-white hover:bg-rose-50 text-rose-700 border border-rose-200 hover:border-rose-300 px-4 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 tabular-nums">
                                             <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                            <span>{{ $batch1?->backorder_action === 'no_backorder' ? 'Tolak & Batalkan Pesanan' : 'Tolak & Batalkan Sisa (' . number_format($remainingQty, 0) . ' ' . $unit . ')' }}</span>
+                                            <span>{{ $batch1?->backorder_action === 'no_backorder' ? 'Tolak & Batalkan Pesanan' : 'Tolak & Batalkan Sisa (' . number_format((float) ($remainingQty ?? 0), 0) . ' ' . $unit . ')' }}</span>
                                         </button>
 
                                         <button type="button"
@@ -3328,8 +3701,8 @@
                                                     orderCode: '#ORD-{{ strtoupper(substr($boOrder->id, 0, 8)) }}',
                                                     supplier: '{{ addslashes($boOrder->partnership?->supplier?->company_name ?? 'Pemasok Mitra') }}',
                                                     commodity: '{{ addslashes($firstItem?->supplierProduct?->commodity?->name ?? 'Bahan Baku') }}',
-                                                    deliveredQty: '{{ number_format($deliveredQty, 0) }}',
-                                                    remainingQty: '{{ number_format($remainingQty, 0) }}',
+                                                    deliveredQty: '{{ number_format((float) ($deliveredQty ?? 0), 0) }}',
+                                                    remainingQty: '{{ number_format((float) ($remainingQty ?? 0), 0) }}',
                                                     unit: '{{ $unit }}',
                                                     eta: '{{ $estimatedDateText }}',
                                                     action: '{{ $batch1?->backorder_action ?? 'create_backorder' }}',
@@ -3347,7 +3720,7 @@
                                     <div>
                                         <strong class="font-bold flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-rose-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg><span>Pengajuan {{ $batch1?->backorder_action === 'no_backorder' ? 'Pemenuhan Sebagian' : 'Backorder' }} Ditolak</span></strong>
                                         <span class="text-[11px] text-rose-700 block mt-0.5 tabular-nums">
-                                            {{ $batch1?->backorder_action === 'no_backorder' ? 'Seluruh pesanan dibatalkan sesuai keputusan penolakan Anda.' : 'Sisa barang ditiadakan permanen. Total tagihan telah dipotong hanya untuk ' . number_format($deliveredQty, 0) . ' ' . $unit . '.' }}
+                                            {{ $batch1?->backorder_action === 'no_backorder' ? 'Seluruh pesanan dibatalkan sesuai keputusan penolakan Anda.' : 'Sisa barang ditiadakan permanen. Total tagihan telah dipotong hanya untuk ' . number_format((float) ($deliveredQty ?? 0), 0) . ' ' . $unit . '.' }}
                                         </span>
                                         @if($batch1?->backorder_rejection_reason)
                                             <p class="text-[10px] text-slate-600 italic mt-1">Alasan UMKM: "{{ $batch1->backorder_rejection_reason }}"</p>
@@ -3369,7 +3742,7 @@
                                         </span>
                                     @else
                                         <span class="text-emerald-800 text-[11px]">
-                                            Sisa ditiadakan. Tagihan disesuaikan untuk {{ number_format($deliveredQty, 0) }} {{ $unit }}.
+                                            Sisa ditiadakan. Tagihan disesuaikan untuk {{ number_format((float) ($deliveredQty ?? 0), 0) }} {{ $unit }}.
                                         </span>
                                     @endif
                                 </div>
@@ -3383,7 +3756,7 @@
                                         {{ $firstItem?->supplierProduct?->commodity?->name ?? 'Bahan Baku' }}
                                     </h4>
                                     <p class="text-xs text-slate-500">
-                                        Total Kontrak: <strong class="text-slate-700">{{ number_format($totalQty, 0) }} {{ $unit }}</strong>
+                                        Total Kontrak: <strong class="text-slate-700">{{ number_format((float) ($totalQty ?? 0), 0) }} {{ $unit }}</strong>
                                     </p>
                                 </div>
 
@@ -3391,11 +3764,11 @@
                                 <div class="md:col-span-5 bg-white p-3.5 rounded-xl border border-slate-200/80 space-y-1.5 text-xs tabular-nums">
                                     <div class="flex justify-between items-center text-emerald-800 font-semibold">
                                         <span class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg><span>Kloter 1 Diterima:</span></span>
-                                        <strong>{{ number_format($deliveredQty, 0) }} {{ $unit }}</strong>
+                                        <strong>{{ number_format((float) ($deliveredQty ?? 0), 0) }} {{ $unit }}</strong>
                                     </div>
                                     <div class="flex justify-between items-center text-amber-900 font-bold border-t border-slate-100 pt-1.5">
                                         <span class="flex items-center gap-1.5"><svg class="w-3.5 h-3.5 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg><span>Sisa Backorder (Kloter 2):</span></span>
-                                        <span class="text-amber-600 font-bold text-sm">{{ number_format($remainingQty, 0) }} {{ $unit }}</span>
+                                        <span class="text-amber-600 font-bold text-sm">{{ number_format((float) ($remainingQty ?? 0), 0) }} {{ $unit }}</span>
                                     </div>
                                     @if($batch2?->tracking_notes)
                                         <p class="text-[10px] text-slate-500 italic pt-1 border-t border-slate-100">
@@ -3521,7 +3894,7 @@
                                                 type="button" 
                                                 @click="stopCamera()" 
                                                 class="text-xs font-semibold text-slate-300 hover:text-white bg-white/10 hover:bg-white/20 px-3.5 py-2 rounded-xl transition cursor-pointer">
-                                                ✕ Batal Kamera
+                                                Batal Kamera
                                             </button>
                                             <button 
                                                 type="button" 
@@ -3529,7 +3902,7 @@
                                                 :disabled="isTakingPhoto"
                                                 class="text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-xl transition shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50">
                                                 <svg class="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                                                <span x-text="isTakingPhoto ? 'Mengambil...' : '📸 Jepret Foto'"></span>
+                                                <span x-text="isTakingPhoto ? 'Mengambil...' : 'Jepret Foto'"></span>
                                             </button>
                                         </div>
                                     </div>
@@ -3542,18 +3915,18 @@
                                             <img :src="confirmBackorderPhotoPreview" class="max-h-52 mx-auto rounded-xl object-contain shadow-xs" alt="Bukti Penerimaan Batch 2">
                                             <span class="absolute top-4 left-4 text-[10px] font-bold px-2.5 py-1 rounded-lg text-white shadow-xs backdrop-blur-md"
                                                   :class="confirmBackorderPhotoSource === 'camera' ? 'bg-amber-600/90' : 'bg-sky-600/90'"
-                                                  x-text="confirmBackorderPhotoSource === 'camera' ? '📸 Dari Kamera' : '🖼️ Dari Galeri'">
+                                                  x-text="confirmBackorderPhotoSource === 'camera' ? 'Kamera Langsung' : 'Unggahan Galeri'">
                                             </span>
                                         </div>
                                         <div class="flex items-center justify-center gap-2">
                                             <button type="button" @click="startCamera('batch2')" class="text-[11px] font-semibold text-slate-600 hover:text-amber-700 bg-slate-100 hover:bg-amber-50 px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1 cursor-pointer">
-                                                <span>📸 Foto Ulang Kamera</span>
+                                                <span>Foto Ulang Kamera</span>
                                             </button>
                                             <button type="button" @click="confirmBackorderPhotoSource = 'gallery'; $refs.galleryBackorderInput.click()" class="text-[11px] font-semibold text-slate-600 hover:text-sky-600 bg-slate-100 hover:bg-sky-50 px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1 cursor-pointer">
-                                                <span>🖼️ Ganti Galeri</span>
+                                                <span>Ganti Galeri</span>
                                             </button>
                                             <button type="button" @click="resetConfirmBackorderPhoto()" class="text-[11px] font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1 cursor-pointer">
-                                                <span>✕ Hapus</span>
+                                                <span>Hapus Foto</span>
                                             </button>
                                         </div>
                                     </div>
@@ -3595,7 +3968,7 @@
                                 name="confirmation_notes"
                                 rows="3"
                                 x-model="confirmBackorderNotes"
-                                placeholder="Contoh: Sisa 50 kg diterima lengkap dan mutu baik."
+                                placeholder="Masukkan catatan penerimaan sisa pasokan..."
                                 class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-900 text-xs font-medium placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition">
                             </textarea>
                         </div>
@@ -3639,7 +4012,7 @@
                                       x-model="rejectionReason"
                                       rows="3"
                                       required
-                                      placeholder="Contoh: Kebutuhan dapur sangat mendesak, sisa bahan baku akan kami beli mandiri hari ini."
+                                      placeholder="Masukkan alasan penolakan sisa pasokan (misal: kebutuhan dapur mendesak, sisa bahan dibeli mandiri)..."
                                       class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-900 text-xs font-medium placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition"></textarea>
                             <p class="text-[11px] text-slate-400" x-text="rejectingAction === 'no_backorder' ? 'Pemasok akan menerima pemberitahuan bahwa seluruh pesanan dibatalkan.' : 'Pemasok akan menerima pemberitahuan bahwa sisa pesanan tidak perlu dikirimkan lagi.'"></p>
                         </div>
@@ -3810,7 +4183,7 @@
                                     </td>
                                     <td class="px-4 py-3.5 whitespace-nowrap tabular-nums">
                                         <span class="font-bold text-slate-900 text-sm block">
-                                            Rp {{ number_format($inv->amount, 0, ',', '.') }}
+                                            Rp {{ number_format((float) ($inv->amount ?? 0), 0, ',', '.') }}
                                         </span>
                                         <span class="text-[10px] text-slate-400 block">Sesuai kuantitas batch</span>
                                     </td>
@@ -3892,7 +4265,7 @@
                                                             commodityName: '{{ addslashes($commodityName) }}',
                                                             batchName: '{{ $batchBadge }}',
                                                             quantity: '{{ number_format((float) ($inv->quantity_billed ?: 0), 1) }} {{ $unit }}',
-                                                            amount: 'Rp {{ number_format($inv->amount, 0, ',', '.') }}',
+                                                            amount: 'Rp {{ number_format((float) ($inv->amount ?? 0), 0, ',', '.') }}',
                                                             paymentMethod: '{{ $inv->payment_method ?? 'Midtrans Instant' }}',
                                                             paidAt: '{{ ($inv->paid_at ?? $inv->transaction_time ?? now())->format('d/m/Y H:i') }} WIB',
                                                             refNumber: '{{ $inv->midtrans_transaction_id ?? '-' }}'
@@ -3960,7 +4333,7 @@
                                 x-model="reviewText" 
                                 required 
                                 maxlength="1000"
-                                placeholder="Contoh: Kualitas daging sangat segar, higienis, dan pengiriman tepat waktu sesuai standar dapur kami..." 
+                                placeholder="Masukkan ulasan kualitas komoditas, kesegaran bahan, dan ketepatan pengiriman armada..." 
                                 class="w-full p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-900 font-medium placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition"></textarea>
                             <div class="flex justify-between text-[11px] text-slate-400 mt-1 tabular-nums">
                                 <span>Wajib diisi</span>
@@ -4135,7 +4508,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 tabular-nums">
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-xs border border-slate-200/80 space-y-1.5">
                 <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Total Pengeluaran Bulan Ini</span>
-                <p class="text-2xl font-bold text-[#ea580c]">Rp {{ number_format($totalPengeluaranBulanIni ?? 0, 0, ',', '.') }}</p>
+                <p class="text-2xl font-bold text-[#ea580c]">Rp {{ number_format((float) ($totalPengeluaranBulanIni ?? 0), 0, ',', '.') }}</p>
             </div>
 
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-xs border border-slate-200/80 space-y-1.5">
@@ -4145,13 +4518,13 @@
 
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-xs border border-slate-200/80 space-y-1.5">
                 <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Total Diterima</span>
-                <p class="text-2xl font-bold text-slate-900">{{ number_format($totalDiterimaKg ?? 0, 0, ',', '.') }} kg</p>
+                <p class="text-2xl font-bold text-slate-900">{{ number_format((float) ($totalDiterimaKg ?? 0), 0, ',', '.') }} kg</p>
             </div>
 
             <div class="bg-white p-5 sm:p-6 rounded-2xl shadow-xs border border-slate-200/80 space-y-1.5">
                 <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Ketepatan Waktu Kirim</span>
                 @if(($onTimeDeliveryRate ?? 0) > 0)
-                    <p class="text-2xl font-bold text-emerald-600">{{ number_format($onTimeDeliveryRate, 1) }}%</p>
+                    <p class="text-2xl font-bold text-emerald-600">{{ number_format((float) ($onTimeDeliveryRate ?? 0), 1) }}%</p>
                 @else
                     <p class="text-2xl font-bold text-slate-400">0%</p>
                 @endif
@@ -4275,7 +4648,7 @@
                                         stroke="{{ $pt['is_active'] && $hasVolume ? '#ffffff' : '#ea580c' }}"
                                         stroke-width="2.5"
                                         class="{{ $pt['is_active'] && $hasVolume ? 'animate-pulse' : '' }}" />
-                                <title>{{ $pt['label'] }}: {{ number_format($pt['vol'], 0, ',', '.') }} kg</title>
+                                <title>{{ $pt['label'] }}: {{ number_format((float) ($pt['vol'] ?? 0), 0, ',', '.') }} kg</title>
                             </g>
                         @endforeach
 
@@ -4298,9 +4671,9 @@
                 <div class="flex items-center justify-between text-xs text-slate-500 pt-3 border-t border-slate-100 flex-wrap gap-2 tabular-nums">
                     <span class="inline-flex items-center gap-1.5 font-medium">
                         <span class="w-2 h-2 rounded-full {{ ($realisasiPasokanBulanIni ?? 0) > 0 ? 'bg-emerald-500' : 'bg-slate-300' }}"></span>
-                        Realisasi Pasokan: <strong class="text-slate-900 font-semibold">{{ number_format($realisasiPasokanBulanIni ?? 0, 0, ',', '.') }} Kg</strong> bulan ini
+                        Realisasi Pasokan: <strong class="text-slate-900 font-semibold">{{ number_format((float) ($realisasiPasokanBulanIni ?? 0), 0, ',', '.') }} Kg</strong> bulan ini
                     </span>
-                    <span class="text-[11px] font-medium text-slate-400">Target Bulan Depan: {{ number_format($targetBulanDepan ?? 0, 0, ',', '.') }} Kg</span>
+                    <span class="text-[11px] font-medium text-slate-400">Target Bulan Depan: {{ number_format((float) ($targetBulanDepan ?? 0), 0, ',', '.') }} Kg</span>
                 </div>
             </div>
 
@@ -4512,21 +4885,21 @@
             <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-2">
                 <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Skor Rata-Rata</span>
                 <div class="text-2xl sm:text-3xl font-bold text-[#ea580c] tracking-tight">
-                    <span x-text="monitoringAvgScore">{{ number_format($avgScore, 1) }}</span><span class="text-xs font-medium text-slate-400">/100</span>
+                    <span x-text="monitoringAvgScore">{{ number_format((float) ($avgScore ?? 0), 1) }}</span><span class="text-xs font-medium text-slate-400">/100</span>
                 </div>
             </div>
 
             <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-2">
                 <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Ketepatan Waktu Kirim</span>
                 <div class="text-2xl sm:text-3xl font-bold text-emerald-600 tracking-tight">
-                    <span x-text="monitoringAvgOtd">{{ number_format($avgOtd, 1) }}</span><span class="text-sm font-semibold text-emerald-600/75">%</span>
+                    <span x-text="monitoringAvgOtd">{{ number_format((float) ($avgOtd ?? 0), 1) }}</span><span class="text-sm font-semibold text-emerald-600/75">%</span>
                 </div>
             </div>
 
             <div class="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs space-y-2">
                 <span class="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block">Pemenuhan Kuota</span>
                 <div class="text-2xl sm:text-3xl font-bold text-sky-600 tracking-tight">
-                    <span x-text="monitoringAvgFill">{{ number_format($avgFulfillment, 1) }}</span><span class="text-sm font-semibold text-sky-600/75">%</span>
+                    <span x-text="monitoringAvgFill">{{ number_format((float) ($avgFulfillment ?? 0), 1) }}</span><span class="text-sm font-semibold text-sky-600/75">%</span>
                 </div>
             </div>
 
@@ -4636,14 +5009,14 @@
                                             <span class="inline-flex items-center gap-1 text-xs font-semibold text-amber-600">
                                                 <svg class="w-3.5 h-3.5 text-amber-500 fill-amber-500" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
                                                 <span x-text="Number(supplierScores['{{ $sup?->id }}']?.star_rating || {{ $score?->star_rating ?? 5.0 }}).toFixed(1)">
-                                                    {{ number_format($score?->star_rating ?? 5.0, 1) }}
+                                                    {{ number_format((float) ($score?->star_rating ?? 5.0), 1) }}
                                                 </span>
                                             </span>
                                         </div>
                                         <p class="text-xs text-slate-500 mt-1 flex items-center gap-1.5 flex-wrap tabular-nums">
                                             <span>{{ $sup?->warehouse_address ?? 'Area Lokal' }}</span>
                                             <span class="text-slate-300">•</span>
-                                            <span>Komoditas: <strong class="text-slate-800 font-semibold">{{ $item['commodity_name'] }}</strong> ({{ number_format($item['volume_per_delivery'], 0) }} {{ $item['unit'] }}/jadwal)</span>
+                                            <span>Komoditas: <strong class="text-slate-800 font-semibold">{{ $item['commodity_name'] }}</strong> ({{ number_format((float) ($item['volume_per_delivery'] ?? 0), 0) }} {{ $item['unit'] }}/jadwal)</span>
                                         </p>
                                     </div>
                                 </div>
@@ -4674,13 +5047,13 @@
                                 <div class="bg-emerald-50/55 p-4 rounded-xl border border-emerald-200/60 space-y-2">
                                     <div class="flex justify-between items-center text-xs">
                                         <span class="font-semibold text-slate-800">1. Ketepatan Waktu (OTD)</span>
-                                        <span class="font-bold text-emerald-700" x-text="Number(supplierScores['{{ $sup?->id }}']?.otd_rate ?? {{ $otdRate }}).toFixed(1) + '%'">{{ number_format($otdRate, 1) }}%</span>
+                                        <span class="font-bold text-emerald-700" x-text="Number(supplierScores['{{ $sup?->id }}']?.otd_rate ?? {{ $otdRate }}).toFixed(1) + '%'">{{ number_format((float) ($otdRate ?? 0), 1) }}%</span>
                                     </div>
                                     <div class="w-full bg-emerald-100 h-2 rounded-full overflow-hidden">
                                         <div class="bg-emerald-600 h-2 rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, (supplierScores['{{ $sup?->id }}']?.otd_rate ?? {{ $otdRate }})) + '%'" style="width: {{ min(100, $otdRate) }}%"></div>
                                     </div>
                                     <div class="flex justify-between text-[11px] text-slate-500">
-                                        <span x-text="'Rerata telat: ' + Number(supplierScores['{{ $sup?->id }}']?.avg_delay ?? {{ $avgDelay }}).toFixed(1) + ' jam'">Rerata telat: {{ number_format($avgDelay, 1) }} jam</span>
+                                        <span x-text="'Rerata telat: ' + Number(supplierScores['{{ $sup?->id }}']?.avg_delay ?? {{ $avgDelay }}).toFixed(1) + ' jam'">Rerata telat: {{ number_format((float) ($avgDelay ?? 0), 1) }} jam</span>
                                     </div>
                                 </div>
 
@@ -4688,13 +5061,13 @@
                                 <div class="bg-sky-50/55 p-4 rounded-xl border border-sky-200/60 space-y-2">
                                     <div class="flex justify-between items-center text-xs">
                                         <span class="font-semibold text-slate-800">2. Pemenuhan Kuota (OFR)</span>
-                                        <span class="font-bold text-sky-700" x-text="Number(supplierScores['{{ $sup?->id }}']?.fill_rate ?? {{ $fillRate }}).toFixed(1) + '%'">{{ number_format($fillRate, 1) }}%</span>
+                                        <span class="font-bold text-sky-700" x-text="Number(supplierScores['{{ $sup?->id }}']?.fill_rate ?? {{ $fillRate }}).toFixed(1) + '%'">{{ number_format((float) ($fillRate ?? 0), 1) }}%</span>
                                     </div>
                                     <div class="w-full bg-sky-100 h-2 rounded-full overflow-hidden">
                                         <div class="bg-sky-600 h-2 rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, (supplierScores['{{ $sup?->id }}']?.fill_rate ?? {{ $fillRate }})) + '%'" style="width: {{ min(100, $fillRate) }}%"></div>
                                     </div>
                                     <div class="flex justify-between text-[11px] text-slate-500">
-                                        <span x-text="'Rasio Backorder: ' + Number(supplierScores['{{ $sup?->id }}']?.backorder_rate ?? {{ $backorderRate }}).toFixed(1) + '%'">Rasio Backorder: {{ number_format($backorderRate, 1) }}%</span>
+                                        <span x-text="'Rasio Backorder: ' + Number(supplierScores['{{ $sup?->id }}']?.backorder_rate ?? {{ $backorderRate }}).toFixed(1) + '%'">Rasio Backorder: {{ number_format((float) ($backorderRate ?? 0), 1) }}%</span>
                                     </div>
                                 </div>
 
@@ -4702,7 +5075,7 @@
                                 <div class="bg-amber-50/55 p-4 rounded-xl border border-amber-200/60 space-y-2">
                                     <div class="flex justify-between items-center text-xs">
                                         <span class="font-semibold text-slate-800">3. Bebas Retur &amp; Cacat</span>
-                                        <span class="font-bold text-amber-700" x-text="Number(supplierScores['{{ $sup?->id }}']?.defect_free ?? {{ $defectFree }}).toFixed(1) + '%'">{{ number_format($defectFree, 1) }}%</span>
+                                        <span class="font-bold text-amber-700" x-text="Number(supplierScores['{{ $sup?->id }}']?.defect_free ?? {{ $defectFree }}).toFixed(1) + '%'">{{ number_format((float) ($defectFree ?? 0), 1) }}%</span>
                                     </div>
                                     <div class="w-full bg-amber-100 h-2 rounded-full overflow-hidden">
                                         <div class="bg-amber-500 h-2 rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, (supplierScores['{{ $sup?->id }}']?.defect_free ?? {{ $defectFree }})) + '%'" style="width: {{ min(100, $defectFree) }}%"></div>
@@ -4833,7 +5206,7 @@
                 </template>
             </div>
 
-            <form method="POST" action="{{ route('umkm.katalog.ajukan') }}" class="space-y-4 text-xs">
+            <form x-ref="ajukanForm" method="POST" action="{{ route('umkm.katalog.ajukan') }}" class="space-y-4 text-xs">
                 @csrf
                 <input type="hidden" name="supplier_product_id" :value="selectedCommodity?.id">
                 <input type="hidden" name="supplier_id" :value="selectedCommodity?.supplier_id">
@@ -5025,7 +5398,7 @@
                     <textarea 
                         name="submission_details" 
                         rows="2" 
-                        placeholder="Contoh: Pemotongan ayam karkas dibagi 8 bagian, toleransi tiba sebelum jam 06.00 WIB, kemasan per 2 kg..."
+                        placeholder="Masukkan spesifikasi khusus dapur Anda (misal: pemotongan ayam 8 bagian, toleransi tiba sebelum jam 06.00 WIB)..."
                         class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-900 font-medium text-xs placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition"
                     ></textarea>
                 </div>
@@ -5035,12 +5408,360 @@
                     <button type="button" @click="selectedCommodity = null" class="w-1/2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 py-2.5 rounded-xl font-semibold transition cursor-pointer">
                         Batal
                     </button>
-                    <button type="submit" class="w-1/2 bg-[#ea580c] hover:bg-[#c2410c] text-white py-2.5 px-4 rounded-xl font-semibold shadow-xs transition cursor-pointer inline-flex items-center justify-center gap-1.5">
+                    <button type="button" @click="openAjukanConfirmModal()" class="w-1/2 bg-[#ea580c] hover:bg-[#c2410c] text-white py-2.5 px-4 rounded-xl font-semibold shadow-xs transition cursor-pointer inline-flex items-center justify-center gap-1.5">
                         <span>Kirim Pengajuan Kemitraan</span>
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
                     </button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- POP UP KONFIRMASI: APAKAH DATA PENGAJUAN SUDAH SESUAI?    -->
+    <!-- ========================================================= -->
+    <div x-cloak x-show="showAjukanConfirmModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
+        <div @click.away="showAjukanConfirmModal = false" class="bg-white max-w-lg w-full rounded-3xl p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-5 animate-scale-up">
+
+            <!-- Header Modal -->
+            <div class="text-center space-y-2">
+                <div class="w-12 h-12 mx-auto rounded-2xl bg-orange-100 text-[#ea580c] flex items-center justify-center shadow-xs">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900 tracking-tight">
+                    Apakah Data Pengajuan Anda Sudah Sesuai?
+                </h3>
+                <p class="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+                    Mohon pastikan rincian volume pasokan, jadwal kedatangan, dan komitmen mutu berikut sudah sesuai kebutuhan dapur Anda.
+                </p>
+            </div>
+
+            <!-- Ringkasan Rincian Pengajuan -->
+            <div class="bg-slate-50 rounded-2xl border border-slate-200/80 p-4 space-y-2.5 text-xs">
+                <div class="flex items-start justify-between gap-3 pb-2 border-b border-slate-200/70">
+                    <span class="text-slate-500 font-medium shrink-0">Komoditas &amp; Pemasok:</span>
+                    <span class="font-bold text-slate-900 text-right">
+                        <span x-text="selectedCommodity?.commodity_name"></span> &bull; <span class="text-slate-600" x-text="selectedCommodity?.company_name"></span>
+                    </span>
+                </div>
+
+                <div class="flex items-start justify-between gap-3 pb-2 border-b border-slate-200/70">
+                    <span class="text-slate-500 font-medium shrink-0">Volume per Kirim:</span>
+                    <span class="font-bold text-slate-900 text-right tabular-nums" x-text="formVolume + ' ' + (selectedCommodity?.unit ?? 'kg')"></span>
+                </div>
+
+                <div class="flex items-start justify-between gap-3 pb-2 border-b border-slate-200/70">
+                    <span class="text-slate-500 font-medium shrink-0">Pola &amp; Hari Kirim:</span>
+                    <span class="font-semibold text-slate-800 text-right" x-text="formFrequency + ' (' + formDays.join(', ') + ')'"></span>
+                </div>
+
+                <div class="flex items-start justify-between gap-3 pb-2 border-b border-slate-200/70">
+                    <span class="text-slate-500 font-medium shrink-0">Jam Tiba di Dapur:</span>
+                    <span class="font-semibold text-slate-800 text-right font-mono" x-text="formTime + ' WIB'"></span>
+                </div>
+
+                <div class="flex items-start justify-between gap-3 pb-2 border-b border-slate-200/70">
+                    <span class="text-slate-500 font-medium shrink-0">Mulai Kirim Perdana:</span>
+                    <span class="font-semibold text-slate-800 text-right" x-text="formStartDate"></span>
+                </div>
+
+                <div class="flex items-start justify-between gap-3 pb-2 border-b border-slate-200/70">
+                    <span class="text-slate-500 font-medium shrink-0">Proyeksi Pengeluaran:</span>
+                    <span class="font-bold text-[#ea580c] text-right text-sm tabular-nums" x-text="calculateMonthlyTotal() + ' / bulan'"></span>
+                </div>
+
+                <div class="flex items-start justify-between gap-3 pt-0.5">
+                    <span class="text-slate-500 font-medium shrink-0">Ketentuan Mutu:</span>
+                    <span class="font-medium text-slate-700 text-right text-[11px]" x-text="selectedQualityTerms.join(', ') || 'Standar Pemasok'"></span>
+                </div>
+            </div>
+
+            <!-- Notice Sisa Waktu 30 Menit -->
+            <div class="bg-amber-50 border border-amber-200/90 rounded-xl p-3 flex items-start gap-2.5 text-[11px] text-amber-900">
+                <svg class="w-4 h-4 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                <span><strong>Catatan Penting:</strong> Anda memiliki waktu <strong>&lt; 30 menit</strong> setelah pengajuan dikirim untuk mengubah data jika ada penyesuaian. Setelah 30 menit, data terkunci otomatis.</span>
+            </div>
+
+            <!-- Tombol Aksi Modal -->
+            <div class="grid grid-cols-2 gap-3 pt-1">
+                <button type="button"
+                        @click="showAjukanConfirmModal = false"
+                        class="w-full bg-slate-100 hover:bg-slate-200 active:scale-[0.99] text-slate-700 font-bold text-xs py-3 rounded-full transition cursor-pointer">
+                    Periksa Kembali
+                </button>
+
+                <button type="button"
+                        @click="submitFinalAjukan()"
+                        class="w-full bg-[#ea580c] hover:bg-[#c2410c] active:scale-[0.99] text-white font-bold text-xs py-3 rounded-full shadow-sm transition cursor-pointer flex items-center justify-center gap-1.5">
+                    <span>Ya, Kirim Pengajuan</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- MODAL EDIT DATA PENGAJUAN PERMINTAAN (< 30 MENIT)         -->
+    <!-- ========================================================= -->
+    <div x-cloak x-show="editingPermintaan" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div @click.away="closeEditPermintaanModal()" class="bg-white max-w-xl w-full rounded-2xl p-6 sm:p-7 space-y-5 shadow-xl relative border border-slate-200/80 max-h-[92vh] overflow-y-auto">
+
+            <div class="flex justify-between items-start border-b border-slate-100 pb-3.5">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-[11px] font-bold text-[#ea580c] uppercase tracking-wider">Ubah Data Pengajuan</span>
+                        <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-orange-50 text-[#ea580c] font-bold" x-text="editingPermintaan?.contract_code"></span>
+                    </div>
+                    <h3 class="text-xl font-bold text-slate-900 tracking-tight mt-0.5" x-text="editingPermintaan?.commodity_name"></h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Pemasok: <span class="font-semibold text-slate-900" x-text="editingPermintaan?.supplier_name"></span></p>
+                </div>
+                <button type="button" @click="closeEditPermintaanModal()" class="text-slate-400 hover:text-slate-700 cursor-pointer p-1.5 rounded-lg hover:bg-slate-100 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Sisa Waktu Warning Banner -->
+            <div class="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between gap-3 text-xs text-amber-900">
+                <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4 text-amber-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span>Sisa Waktu Edit: <strong class="font-bold text-amber-950" x-text="editingPermintaan?.remaining_minutes + ' menit'"></strong></span>
+                </div>
+                <span class="text-[11px] text-amber-700 font-medium">Batas maksimum: 30 menit</span>
+            </div>
+
+            <form :action="'{{ url('umkm/katalog/permintaan') }}/' + editingPermintaan?.id" method="POST" class="space-y-4 text-xs">
+                @csrf
+                @method('PUT')
+
+                <template x-for="day in editForm.delivery_days" :key="'edit-day-' + day">
+                    <input type="hidden" name="delivery_days[]" :value="day">
+                </template>
+
+                <!-- 1. Volume Pengiriman per Jadwal -->
+                <div class="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80 space-y-2">
+                    <label class="text-slate-800 font-semibold block">Volume per Pengiriman</label>
+                    <div class="relative">
+                        <input type="number"
+                               name="volume_per_delivery"
+                               required
+                               x-model.number="editForm.volume_per_delivery"
+                               min="0.1"
+                               step="any"
+                               class="w-full pl-3.5 pr-14 py-2.5 rounded-xl bg-white text-slate-900 font-bold tabular-nums border border-slate-200/90 focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition" />
+                        <span class="absolute right-3.5 top-2.5 text-slate-400 font-bold uppercase text-xs" x-text="editForm.unit"></span>
+                    </div>
+                </div>
+
+                <!-- 2. Hari Pengiriman Terjadwal -->
+                <div class="bg-slate-50/70 p-3.5 rounded-xl border border-slate-200/80 space-y-2">
+                    <div class="flex justify-between items-center">
+                        <span class="text-slate-700 font-semibold text-[11px]">Hari Pengiriman Terjadwal</span>
+                        <span class="text-slate-400 text-[10px] tabular-nums" x-text="editForm.delivery_days.length + ' hari terpilih'"></span>
+                    </div>
+                    <div class="flex flex-wrap gap-1.5">
+                        <template x-for="day in availableDays" :key="'edit-pill-' + day">
+                            <button type="button"
+                                    @click="toggleEditDay(day)"
+                                    class="px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer inline-flex items-center gap-1"
+                                    :class="editForm.delivery_days.includes(day)
+                                        ? 'bg-[#ea580c] text-white shadow-2xs'
+                                        : 'bg-white border border-slate-200/90 text-slate-600 hover:bg-slate-100'">
+                                <span x-text="day"></span>
+                                <svg x-show="editForm.delivery_days.includes(day)" class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- 3. Jam Tiba & Tanggal Mulai -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div>
+                        <label class="block text-slate-700 font-semibold mb-1.5">Target Jam Tiba di Dapur (WIB)</label>
+                        <input type="time"
+                               name="delivery_time"
+                               x-model="editForm.delivery_time"
+                               required
+                               class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-900 font-medium tabular-nums focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition" />
+                    </div>
+
+                    <div>
+                        <label class="block text-slate-700 font-semibold mb-1.5">Tanggal Mulai Pengiriman</label>
+                        <input type="date"
+                               name="start_date"
+                               x-model="editForm.start_date"
+                               required
+                               class="w-full px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-900 font-medium tabular-nums focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition" />
+                    </div>
+                </div>
+
+                <!-- 4. Ketentuan Mutu -->
+                <div class="space-y-2">
+                    <label class="block text-slate-800 font-semibold text-xs">Ketentuan Mutu &amp; Aturan Pasok</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <template x-for="item in availableQualityTerms" :key="'edit-term-' + item.id">
+                            <button type="button"
+                                    @click="toggleEditQualityTerm(item.label)"
+                                    class="p-2.5 rounded-xl border text-left transition flex items-start gap-2.5 cursor-pointer"
+                                    :class="editForm.terms.includes(item.label)
+                                        ? 'bg-orange-50/90 border-[#ea580c] text-orange-950 shadow-2xs'
+                                        : 'bg-white border-slate-200/90 text-slate-700 hover:bg-slate-50 hover:border-slate-300'">
+                                <div class="mt-0.5 w-4 h-4 rounded-md flex items-center justify-center shrink-0 transition"
+                                     :class="editForm.terms.includes(item.label) ? 'bg-[#ea580c] text-white' : 'border border-slate-300 bg-white'">
+                                    <template x-if="editForm.terms.includes(item.label)">
+                                        <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                                    </template>
+                                </div>
+                                <div class="min-w-0">
+                                    <span class="text-xs font-bold block leading-tight" x-text="item.label"></span>
+                                    <span class="text-[10px] text-slate-500 block mt-0.5 leading-snug" x-text="item.desc"></span>
+                                </div>
+                            </button>
+                        </template>
+                    </div>
+
+                    <template x-for="t in editForm.terms" :key="'edit-hidden-term-' + t">
+                        <input type="hidden" name="terms[]" :value="t">
+                    </template>
+                </div>
+
+                <!-- 5. Catatan Spesifikasi Tambahan -->
+                <div>
+                    <label class="block text-slate-700 font-semibold mb-1 text-xs">Catatan Spesifikasi Tambahan (Opsional)</label>
+                    <textarea name="submission_details"
+                              rows="2"
+                              x-model="editForm.submission_details"
+                              placeholder="Masukkan catatan spesifikasi khusus dapur Anda..."
+                              class="w-full px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-900 font-medium text-xs placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition"></textarea>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-3 pt-2">
+                    <button type="button" @click="closeEditPermintaanModal()" class="w-1/2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 py-2.5 rounded-xl font-semibold transition cursor-pointer">
+                        Batal
+                    </button>
+                    <button type="submit" class="w-1/2 bg-[#ea580c] hover:bg-[#c2410c] text-white py-2.5 px-4 rounded-xl font-semibold shadow-xs transition cursor-pointer inline-flex items-center justify-center gap-1.5">
+                        <span>Simpan Perubahan Data</span>
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                    </button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- MODAL KONFIRMASI BATALKAN PENGAJUAN KEMITRAAN (< 30 MENIT)-->
+    <!-- ========================================================= -->
+    <div x-cloak x-show="cancellingPermintaan" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div @click.away="closeBatalPermintaanModal()" class="bg-white max-w-md w-full rounded-2xl p-6 sm:p-7 space-y-5 shadow-xl relative border border-slate-200/80">
+
+            <div class="flex items-start gap-3.5">
+                <div class="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900 tracking-tight">Batalkan Pengajuan Pasokan?</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Kode Kontrak: <span class="font-mono font-bold text-slate-700" x-text="cancellingPermintaan?.contract_code"></span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Detail Ringkasan Pengajuan yang Akan Dibatalkan -->
+            <div class="bg-rose-50/60 border border-rose-200/70 rounded-xl p-3.5 space-y-2 text-xs">
+                <div class="flex justify-between items-center text-slate-700">
+                    <span class="text-slate-500">Komoditas Bahan Baku:</span>
+                    <strong class="font-bold text-slate-900" x-text="cancellingPermintaan?.commodity_name"></strong>
+                </div>
+                <div class="flex justify-between items-center text-slate-700">
+                    <span class="text-slate-500">Mitra Pemasok:</span>
+                    <span class="font-semibold text-slate-800" x-text="cancellingPermintaan?.supplier_name"></span>
+                </div>
+                <div class="flex justify-between items-center text-slate-700">
+                    <span class="text-slate-500">Volume Pasokan:</span>
+                    <span class="font-semibold text-slate-800" x-text="cancellingPermintaan?.volume_per_delivery + ' ' + cancellingPermintaan?.unit + '/kirim'"></span>
+                </div>
+                <div class="flex justify-between items-center text-rose-800 pt-1.5 border-t border-rose-200/60 font-semibold">
+                    <span>Sisa Waktu Pembatalan:</span>
+                    <span class="font-bold" x-text="cancellingPermintaan?.remaining_minutes + ' menit'"></span>
+                </div>
+            </div>
+
+            <p class="text-xs text-slate-600 leading-relaxed">
+                Pengajuan ini masih dalam batas waktu <strong>&lt; 30 menit</strong> dan belum diproses oleh pihak pemasok. Jika dibatalkan sekarang, pengajuan akan ditarik permanen dan komoditas ini dapat Anda ajukan kembali jika dibutuhkan.
+            </p>
+
+            <!-- Action Buttons -->
+            <form :action="'{{ url('umkm/katalog/permintaan') }}/' + cancellingPermintaan?.id + '/batal'" method="POST" class="pt-1">
+                @csrf
+                <div class="flex gap-2.5">
+                    <button type="button"
+                            @click="closeBatalPermintaanModal()"
+                            class="w-1/2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer">
+                        Kembali
+                    </button>
+                    <button type="submit"
+                            class="w-1/2 bg-rose-600 hover:bg-rose-700 text-white py-2.5 px-3 rounded-xl font-bold text-xs shadow-xs transition cursor-pointer flex items-center justify-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        <span>Ya, Batalkan</span>
+                    </button>
+                </div>
+            </form>
+
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- MODAL KONFIRMASI BATALKAN PESANAN HARIAN (< 30 MENIT)     -->
+    <!-- ========================================================= -->
+    <div x-cloak x-show="cancellingOrder" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+        <div @click.away="closeBatalOrderModal()" class="bg-white max-w-md w-full rounded-2xl p-6 sm:p-7 space-y-5 shadow-xl relative border border-slate-200/80">
+
+            <div class="flex items-start gap-3.5">
+                <div class="w-12 h-12 rounded-2xl bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shrink-0">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-slate-900 tracking-tight">Batalkan Pesanan Ini?</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                        Nomor Pesanan: <span class="font-mono font-bold text-slate-700" x-text="cancellingOrder?.code"></span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="bg-rose-50/60 border border-rose-200/70 rounded-xl p-3.5 space-y-1.5 text-xs">
+                <p class="text-slate-700">
+                    Pesanan ini diterbitkan dalam waktu <strong>&lt; 30 menit</strong> yang lalu (<span x-text="cancellingOrder?.timeLeft"></span> sisa waktu) dan armada pemasok belum diberangkatkan.
+                </p>
+                <p class="text-rose-800 font-semibold">
+                    Apakah Anda yakin ingin membatalkan pengiriman pesanan ini untuk hari ini?
+                </p>
+            </div>
+
+            <!-- Action Buttons -->
+            <form :action="'{{ url('umkm/pemesanan') }}/' + cancellingOrder?.id + '/batal'" method="POST" class="pt-1">
+                @csrf
+                <div class="flex gap-2.5">
+                    <button type="button"
+                            @click="closeBatalOrderModal()"
+                            class="w-1/2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 py-2.5 rounded-xl font-semibold text-xs transition cursor-pointer">
+                        Kembali
+                    </button>
+                    <button type="submit"
+                            class="w-1/2 bg-rose-600 hover:bg-rose-700 text-white py-2.5 px-3 rounded-xl font-bold text-xs shadow-xs transition cursor-pointer flex items-center justify-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                        <span>Ya, Batalkan Pesanan</span>
+                    </button>
+                </div>
+            </form>
+
         </div>
     </div>
 
@@ -5196,9 +5917,18 @@
                 @csrf
                 <input type="hidden" name="payment_method" :value="selectedPaymentMethod">
 
-                <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3 flex items-start gap-2.5 text-xs text-slate-600">
-                    <svg class="w-4 h-4 text-slate-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                    <p class="text-[11px] text-slate-600 leading-relaxed">Metode pembayaran (QRIS, Virtual Account BCA, Mandiri, BNI, BRI, e-Wallet) dapat dipilih langsung di jendela resmi Midtrans.</p>
+                <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-2.5 text-xs text-slate-600">
+                    <div class="flex items-start gap-2.5">
+                        <svg class="w-4 h-4 text-[#ea580c] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                        <div class="space-y-0.5 leading-relaxed">
+                            <p class="font-bold text-slate-800 text-[11px]">Proteksi Rekening Bersama SORAI</p>
+                            <p class="text-[11px] text-slate-600">Dana pembayaran ditahan aman per kloter kedatangan fisik. Pilihan kanal bayar (QRIS, VA Bank BCA/Mandiri/BNI/BRI, e-Wallet) dipilih langsung di jendela Midtrans.</p>
+                        </div>
+                    </div>
+                    <div class="pt-2 border-t border-slate-200/80 flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                        <span>Batas Pelunasan:</span>
+                        <span class="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200/80">Maks. 1×24 Jam</span>
+                    </div>
                 </div>
 
                 <div class="space-y-2 pt-1">

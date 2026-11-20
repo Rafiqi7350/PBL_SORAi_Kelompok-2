@@ -1,9 +1,7 @@
 <header class="w-full bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-50 transition-all">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
         <a href="#beranda" class="flex items-center gap-3.5 group">
-            <div class="w-10 h-10 rounded-xl bg-orange-600 text-white font-extrabold text-xl flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform duration-200">
-                S
-            </div>
+            <img src="{{ asset('images/logo.png') }}" alt="Logo SORAI" class="w-10 h-10 object-contain group-hover:scale-105 transition-transform duration-200 shrink-0">
             <div class="flex flex-col">
                 <span class="font-extrabold text-slate-900 text-xl tracking-tight leading-none group-hover:text-orange-600 transition-colors">SORAi</span>
                 <span class="text-[10px] font-bold text-slate-400 tracking-wider uppercase mt-1">Portal Dapur & Pemasok B2B</span>

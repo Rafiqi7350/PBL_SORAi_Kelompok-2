@@ -120,7 +120,7 @@ class PartnershipQualityTermsTest extends TestCase
             'submission_details' => 'Kemas per kantong 5 kg.',
         ]);
 
-        $response->assertRedirect(route('umkm.katalog.index'));
+        $response->assertRedirect(route('umkm.katalog.index', ['tab' => 'riwayat-permintaan']));
 
         $partnership = Partnership::where('umkm_id', $this->umkmProfile->id)
             ->where('supplier_id', $this->supplierProfile->id)

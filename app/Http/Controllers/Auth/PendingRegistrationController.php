@@ -45,7 +45,7 @@ class PendingRegistrationController extends Controller
      */
     public function checkStatus(Request $request): JsonResponse
     {
-        $email = $request->query('email');
+        $email = $request->query('email') ?? auth()->user()?->email;
 
         if (! $email) {
             return response()->json([

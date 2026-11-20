@@ -30,7 +30,7 @@ class AdminTest extends TestCase
 
         $response = $this->actingAs($admin)->get('/admin');
         $response->assertOk();
-        $response->assertSee('Dashboard Admin');
+        $response->assertSee('Dasbor Admin');
     }
 
     public function test_admin_can_update_user_status(): void

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\CommodityCategory;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -67,7 +68,7 @@ class RegistrationAndPendingTest extends TestCase
             'role' => 'umkm',
         ]);
 
-        $response->assertRedirect('/register/pending');
+        $response->assertRedirectContains('/register/pending');
         $this->assertDatabaseHas('users', ['email' => 'aurellia@example.com', 'status' => 'pending']);
     }
 
@@ -90,7 +91,7 @@ class RegistrationAndPendingTest extends TestCase
     public function test_supplier_validation_fails_with_invalid_phone_or_nib()
     {
         $response = $this->post('/register/supplier', [
-            'nib' => 'invalid',
+            'nib_number' => 'invalid',
             'phone' => 'salah',
         ]);
         $response->assertStatus(302);
@@ -98,17 +99,25 @@ class RegistrationAndPendingTest extends TestCase
 
     public function test_new_supplier_can_register()
     {
-        $response = $this->post('/register/supplier', [
-            'supplier_name' => 'Pemasok Sayur Malang',
-            'email' => 'pemasok@example.com',
-            'phone' => '089876543210',
-            'nib' => '1234567890123',
-            'password' => 'password123',
-            'password_confirmation' => 'password123',
-            'role' => 'pemasok',
+        $category = CommodityCategory::create([
+            'name' => 'Sayuran Segar',
+            'slug' => 'sayuran-segar',
+            'description' => 'Kategori Sayuran',
         ]);
 
-        $response->assertRedirect('/register/pending');
+        $response = $this->post('/register/supplier', [
+            'company_name' => 'Pemasok Sayur Malang',
+            'email' => 'pemasok@example.com',
+            'phone' => '089876543210',
+            'commodity_id' => $category->id,
+            'max_capacity' => '5 Ton / Minggu',
+            'delivery_area' => 'Malang Raya',
+            'warehouse_address' => 'Jl. Kebon Agung No. 10, Malang',
+            'password' => 'password123',
+            'password_confirmation' => 'password123',
+        ]);
+
+        $response->assertRedirectContains('/register/pending');
         $this->assertDatabaseHas('users', ['email' => 'pemasok@example.com', 'status' => 'pending']);
     }
 

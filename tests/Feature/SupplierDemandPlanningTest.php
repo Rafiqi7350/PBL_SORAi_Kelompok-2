@@ -4,10 +4,14 @@ namespace Tests\Feature;
 
 use App\Models\Commodity;
 use App\Models\DemandForecastRun;
+use App\Models\Partnership;
+use App\Models\PartnershipDeliverySchedule;
 use App\Models\SupplierInventoryItem;
 use App\Models\SupplierMaterialSource;
+use App\Models\SupplierProduct;
 use App\Models\SupplierProfile;
 use App\Models\SupplierPurchaseSuggestion;
+use App\Models\UmkmProfile;
 use App\Models\User;
 use App\Services\Planning\SupplierDemandPlanningService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -46,6 +50,44 @@ class SupplierDemandPlanningTest extends TestCase
             'category' => 'Daging & Unggas',
             'unit' => 'kg',
             'government_ref_price' => 35000.00,
+        ]);
+
+        $product = SupplierProduct::create([
+            'supplier_id' => $this->supplier->id,
+            'commodity_id' => $this->commodity->id,
+            'price' => 32000.00,
+            'stock_capacity' => 1000.00,
+            'stock_status' => 'Tersedia',
+            'quality_grade' => 'Grade A',
+            'is_halal_certified' => true,
+        ]);
+
+        $umkmUser = User::factory()->create(['role' => 'umkm']);
+        $umkm = UmkmProfile::create([
+            'user_id' => $umkmUser->id,
+            'business_name' => 'Dapur Sejahtera',
+            'owner_name' => 'Siti Aminah',
+            'phone' => '081233344455',
+            'address' => 'Malang',
+        ]);
+
+        $partnership = Partnership::create([
+            'umkm_id' => $umkm->id,
+            'supplier_id' => $this->supplier->id,
+            'status' => 'BERJALAN',
+        ]);
+
+        PartnershipDeliverySchedule::create([
+            'partnership_id' => $partnership->id,
+            'supplier_product_id' => $product->id,
+            'volume_per_delivery' => 100.0,
+            'total_contract_volume' => 800.0,
+            'unit' => 'kg',
+            'frequency_type' => '3x Seminggu',
+            'delivery_days' => ['Senin', 'Rabu', 'Jumat'],
+            'delivery_time' => '05:30:00',
+            'start_date' => now()->toDateString(),
+            'is_auto_order_active' => true,
         ]);
     }
 

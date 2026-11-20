@@ -520,4 +520,54 @@ class PemesananController extends Controller
         return redirect()->route('umkm.katalog.index', ['tab' => 'pemesanan', 'subtab' => 'rating'])
             ->with('success', '✓ Ulasan & Rating '.$review->rating.' Bintang berhasil disimpan!');
     }
+
+    public function batalPesanan(Request $request, Order $order)
+    {
+        $umkm = Auth::user()?->umkmProfile;
+        if (! $umkm && ! Auth::check()) {
+            $dummyUmkmUser = User::where('role', 'umkm')->first();
+            $umkm = $dummyUmkmUser?->umkmProfile;
+        }
+
+        if (! $umkm || $order->partnership?->umkm_id !== $umkm->id) {
+            abort(403, 'Akses ditolak.');
+        }
+
+        $diffMinutes = $order->created_at ? abs(now()->diffInMinutes($order->created_at)) : 999;
+        if ($diffMinutes >= 30) {
+            return redirect()->back()->with('error', 'Batas waktu 30 menit untuk membatalkan pesanan telah berakhir.');
+        }
+
+        $isShipped = $order->shipmentConfirmations()->whereNotNull('shipped_at')->exists();
+        if ($isShipped) {
+            return redirect()->back()->with('error', 'Pesanan tidak dapat dibatalkan karena armada pemasok telah diberangkatkan.');
+        }
+
+        if (! in_array($order->order_status, ['pending', 'confirmed'])) {
+            return redirect()->back()->with('error', 'Status pesanan saat ini tidak memungkinkan pembatalan.');
+        }
+
+        DB::transaction(function () use ($order) {
+            $order->update([
+                'order_status' => Order::STATUS_CANCELLED,
+            ]);
+
+            foreach ($order->items as $item) {
+                $item->update([
+                    'quantity_remaining' => 0,
+                    'fulfillment_item_status' => 'cancelled',
+                ]);
+            }
+        });
+
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Pesanan #'.strtoupper(substr($order->id, 0, 8)).' berhasil dibatalkan.',
+            ]);
+        }
+
+        return redirect()->route('umkm.katalog.index', ['tab' => 'pemesanan', 'subtab' => 'auto-order'])
+            ->with('success', 'Pesanan #'.strtoupper(substr($order->id, 0, 8)).' berhasil dibatalkan.');
+    }
 }

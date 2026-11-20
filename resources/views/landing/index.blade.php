@@ -6,6 +6,7 @@
     <title>SORAi — Portal Dapur UMKM & Pengadaan Bahan Baku Lokal</title>
 
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('favicon.png') }}">
     <link rel="alternate icon" href="{{ asset('favicon.ico') }}">
 
     <!-- Google Fonts -->
