@@ -43,74 +43,66 @@
         </div>
     @endif
 
-    {{-- 4 KPI Cards --}}
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+    {{-- 4 KPI Cards (Compact py-3.5 px-5) --}}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {{-- KPI 1: Kontrak Aktif & Berakhir --}}
-        <div class="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-slate-300/80 transition flex flex-col justify-between gap-4">
-            <div class="flex items-start justify-between gap-3">
-                <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Kontrak Aktif</span>
-                <div class="w-10 h-10 rounded-xl bg-orange-50 text-[#ea580c] border border-orange-100 flex items-center justify-center shrink-0">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                </div>
-            </div>
-            <div class="space-y-1">
-                <h3 class="text-2xl font-bold text-slate-900 tracking-tight tabular-nums">
+        <div class="bg-white py-3.5 px-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between gap-3">
+            <div class="space-y-0.5 min-w-0">
+                <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Kontrak Aktif</span>
+                <h3 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight tabular-nums">
                     {{ $kpis['active_contracts_count'] }} <span class="text-xs font-semibold text-slate-500">Kontrak</span>
                 </h3>
+            </div>
+            <div class="w-9 h-9 rounded-xl bg-orange-50 text-[#ea580c] border border-orange-100 flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
             </div>
         </div>
 
         {{-- KPI 2: Realisasi Volume Kontrak --}}
-        <div class="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-slate-300/80 transition flex flex-col justify-between gap-4">
-            <div class="flex items-start justify-between gap-3">
-                <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Realisasi Volume</span>
-                <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                    </svg>
-                </div>
-            </div>
-            <div class="space-y-1">
-                <h3 class="text-2xl font-bold text-slate-900 tracking-tight tabular-nums">
+        <div class="bg-white py-3.5 px-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between gap-3">
+            <div class="space-y-0.5 min-w-0">
+                <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Realisasi Volume</span>
+                <h3 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight tabular-nums">
                     {{ number_format($kpis['total_delivered_volume'], 0, ',', '.') }}
                     <span class="text-xs font-semibold text-slate-500">/ {{ number_format($kpis['total_target_volume'], 0, ',', '.') }}</span>
                 </h3>
             </div>
+            <div class="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+            </div>
         </div>
 
         {{-- KPI 3: Piutang Tempo & Overdue --}}
-        <div class="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-slate-300/80 transition flex flex-col justify-between gap-4">
-            <div class="flex items-start justify-between gap-3">
-                <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Piutang &amp; Jatuh Tempo</span>
-                <div class="w-10 h-10 rounded-xl {{ $kpis['overdue_invoices_count'] > 0 ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-amber-50 text-amber-600 border-amber-100' }} border flex items-center justify-center shrink-0">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                </div>
-            </div>
-            <div class="space-y-1">
-                <h3 class="text-xl sm:text-2xl font-bold {{ $kpis['overdue_invoices_count'] > 0 ? 'text-rose-600' : 'text-slate-900' }} tracking-tight tabular-nums">
+        <div class="bg-white py-3.5 px-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between gap-3">
+            <div class="space-y-0.5 min-w-0">
+                <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Piutang &amp; Jatuh Tempo</span>
+                <h3 class="text-lg sm:text-xl font-bold {{ $kpis['overdue_invoices_count'] > 0 ? 'text-rose-600' : 'text-slate-900' }} tracking-tight tabular-nums">
                     Rp {{ number_format($kpis['total_unpaid_amount'], 0, ',', '.') }}
                 </h3>
+            </div>
+            <div class="w-9 h-9 rounded-xl {{ $kpis['overdue_invoices_count'] > 0 ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-amber-50 text-amber-600 border-amber-100' }} border flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
             </div>
         </div>
 
         {{-- KPI 4: Kepatuhan SLA & Mitra --}}
-        <div class="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:border-slate-300/80 transition flex flex-col justify-between gap-4">
-            <div class="flex items-start justify-between gap-3">
-                <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Kepatuhan SLA (OTD)</span>
-                <div class="w-10 h-10 rounded-xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center shrink-0">
-                    <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                </div>
-            </div>
-            <div class="space-y-1">
-                <h3 class="text-2xl font-bold text-sky-700 tracking-tight tabular-nums">
+        <div class="bg-white py-3.5 px-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between gap-3">
+            <div class="space-y-0.5 min-w-0">
+                <span class="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Kepatuhan SLA (OTD)</span>
+                <h3 class="text-xl sm:text-2xl font-bold text-sky-700 tracking-tight tabular-nums">
                     {{ number_format($kpis['average_otd_rate'], 1) }}%
                 </h3>
+            </div>
+            <div class="w-9 h-9 rounded-xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center shrink-0">
+                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
             </div>
         </div>
     </div>
@@ -174,48 +166,48 @@
         </div>
     @endif
 
-    {{-- Filter & Search Bar --}}
-    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-5">
-        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+    {{-- Filter & Search Bar (Compact Toolbar) --}}
+    <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-3 sm:p-3.5">
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             {{-- Filter Pills --}}
-            <div class="flex flex-wrap items-center gap-2">
+            <div class="flex flex-wrap items-center gap-1.5">
                 <a href="{{ route('supplier.contract-monitoring.index', array_filter(['status' => 'all', 'search' => $search])) }}"
-                   class="rounded-full px-4 py-2 text-xs font-semibold transition inline-flex items-center gap-1.5 {{ $statusFilter === 'all' ? 'bg-[#ea580c] text-white shadow-2xs' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50' }}">
+                   class="rounded-xl px-3.5 py-1.5 text-xs font-semibold transition inline-flex items-center gap-1.5 {{ $statusFilter === 'all' ? 'bg-[#ea580c] text-white shadow-2xs' : 'border border-slate-200/90 bg-slate-50 text-slate-600 hover:bg-slate-100' }}">
                     <span>Semua Kontrak</span>
-                    <span class="rounded-full text-[10px] px-1.5 py-0.5 font-bold tabular-nums {{ $statusFilter === 'all' ? 'bg-white text-[#ea580c]' : 'bg-slate-100 text-slate-700' }}">{{ $counts['all'] }}</span>
+                    <span class="rounded-full text-[10px] px-1.5 py-0.2 font-bold tabular-nums {{ $statusFilter === 'all' ? 'bg-white text-[#ea580c]' : 'bg-slate-200/80 text-slate-700' }}">{{ $counts['all'] }}</span>
                 </a>
 
                 <a href="{{ route('supplier.contract-monitoring.index', array_filter(['status' => 'active', 'search' => $search])) }}"
-                   class="rounded-full px-4 py-2 text-xs font-semibold transition inline-flex items-center gap-1.5 {{ $statusFilter === 'active' ? 'bg-[#ea580c] text-white shadow-2xs' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50' }}">
+                   class="rounded-xl px-3.5 py-1.5 text-xs font-semibold transition inline-flex items-center gap-1.5 {{ $statusFilter === 'active' ? 'bg-[#ea580c] text-white shadow-2xs' : 'border border-slate-200/90 bg-slate-50 text-slate-600 hover:bg-slate-100' }}">
                     <span>Aktif</span>
-                    <span class="rounded-full text-[10px] px-1.5 py-0.5 font-bold tabular-nums {{ $statusFilter === 'active' ? 'bg-white text-[#ea580c]' : 'bg-slate-100 text-slate-700' }}">{{ $counts['active'] }}</span>
+                    <span class="rounded-full text-[10px] px-1.5 py-0.2 font-bold tabular-nums {{ $statusFilter === 'active' ? 'bg-white text-[#ea580c]' : 'bg-slate-200/80 text-slate-700' }}">{{ $counts['active'] }}</span>
                 </a>
 
                 <a href="{{ route('supplier.contract-monitoring.index', array_filter(['status' => 'attention', 'search' => $search])) }}"
-                   class="rounded-full px-4 py-2 text-xs font-semibold transition inline-flex items-center gap-1.5 {{ $statusFilter === 'attention' ? 'bg-[#ea580c] text-white shadow-2xs' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50' }}">
+                   class="rounded-xl px-3.5 py-1.5 text-xs font-semibold transition inline-flex items-center gap-1.5 {{ $statusFilter === 'attention' ? 'bg-[#ea580c] text-white shadow-2xs' : 'border border-slate-200/90 bg-slate-50 text-slate-600 hover:bg-slate-100' }}">
                     <span>Perlu Perhatian</span>
-                    <span class="rounded-full text-[10px] px-1.5 py-0.5 font-bold tabular-nums {{ $statusFilter === 'attention' ? 'bg-white text-[#ea580c]' : 'bg-amber-100 text-amber-800' }}">{{ $counts['attention'] }}</span>
+                    <span class="rounded-full text-[10px] px-1.5 py-0.2 font-bold tabular-nums {{ $statusFilter === 'attention' ? 'bg-white text-[#ea580c]' : 'bg-amber-100 text-amber-800' }}">{{ $counts['attention'] }}</span>
                 </a>
 
                 <a href="{{ route('supplier.contract-monitoring.index', array_filter(['status' => 'overdue', 'search' => $search])) }}"
-                   class="rounded-full px-4 py-2 text-xs font-semibold transition inline-flex items-center gap-1.5 {{ $statusFilter === 'overdue' ? 'bg-[#ea580c] text-white shadow-2xs' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50' }}">
+                   class="rounded-xl px-3.5 py-1.5 text-xs font-semibold transition inline-flex items-center gap-1.5 {{ $statusFilter === 'overdue' ? 'bg-[#ea580c] text-white shadow-2xs' : 'border border-slate-200/90 bg-slate-50 text-slate-600 hover:bg-slate-100' }}">
                     <span>Tagihan Overdue</span>
-                    <span class="rounded-full text-[10px] px-1.5 py-0.5 font-bold tabular-nums {{ $statusFilter === 'overdue' ? 'bg-white text-[#ea580c]' : 'bg-rose-100 text-rose-700' }}">{{ $counts['overdue'] }}</span>
+                    <span class="rounded-full text-[10px] px-1.5 py-0.2 font-bold tabular-nums {{ $statusFilter === 'overdue' ? 'bg-white text-[#ea580c]' : 'bg-rose-100 text-rose-700' }}">{{ $counts['overdue'] }}</span>
                 </a>
 
                 <a href="{{ route('supplier.contract-monitoring.index', array_filter(['status' => 'inactive', 'search' => $search])) }}"
-                   class="rounded-full px-4 py-2 text-xs font-semibold transition inline-flex items-center gap-1.5 {{ $statusFilter === 'inactive' ? 'bg-[#ea580c] text-white shadow-2xs' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50' }}">
+                   class="rounded-xl px-3.5 py-1.5 text-xs font-semibold transition inline-flex items-center gap-1.5 {{ $statusFilter === 'inactive' ? 'bg-[#ea580c] text-white shadow-2xs' : 'border border-slate-200/90 bg-slate-50 text-slate-600 hover:bg-slate-100' }}">
                     <span>Dijeda / Berakhir</span>
-                    <span class="rounded-full text-[10px] px-1.5 py-0.5 font-bold tabular-nums {{ $statusFilter === 'inactive' ? 'bg-white text-[#ea580c]' : 'bg-slate-100 text-slate-700' }}">{{ $counts['inactive'] }}</span>
+                    <span class="rounded-full text-[10px] px-1.5 py-0.2 font-bold tabular-nums {{ $statusFilter === 'inactive' ? 'bg-white text-[#ea580c]' : 'bg-slate-200/80 text-slate-700' }}">{{ $counts['inactive'] }}</span>
                 </a>
             </div>
 
             {{-- Search Form --}}
-            <form method="GET" action="{{ route('supplier.contract-monitoring.index') }}" class="flex items-center gap-2 w-full lg:w-80">
+            <form method="GET" action="{{ route('supplier.contract-monitoring.index') }}" class="flex items-center gap-2 w-full lg:w-72">
                 <input type="hidden" name="status" value="{{ $statusFilter }}">
                 <div class="relative flex-1">
-                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                     </span>
@@ -223,10 +215,10 @@
                            name="search"
                            value="{{ $search }}"
                            placeholder="Cari kode kontrak, UMKM, komoditas..."
-                           class="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#ea580c]/20 focus:border-[#ea580c] focus:bg-white transition">
+                           class="w-full pl-8 pr-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#ea580c]/20 focus:border-[#ea580c] focus:bg-white transition">
                 </div>
                 <button type="submit"
-                        class="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer shrink-0">
+                        class="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition cursor-pointer shrink-0">
                     Cari
                 </button>
             </form>
@@ -268,208 +260,161 @@
             @endif
         </div>
     @else
-        <div class="space-y-5">
-            @foreach($contracts as $contract)
-                <div class="bg-white rounded-2xl border {{ $contract['has_alert'] ? 'border-amber-300/80' : 'border-slate-200/80' }} shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-6 space-y-5 hover:border-slate-300/80 transition">
-
-                    {{-- Card Top Header --}}
-                    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
-                        <div class="space-y-1.5">
-                            <div class="flex flex-wrap items-center gap-2">
-                                <span class="text-xs font-bold text-[#ea580c] bg-orange-50 border border-orange-200/80 px-2.5 py-0.5 rounded-full tabular-nums">
-                                    {{ $contract['contract_code'] }}
-                                </span>
-
-                                <span class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-semibold border {{ $contract['status_badge_class'] }}">
-                                    <span class="w-1.5 h-1.5 rounded-full {{ $contract['status_dot_class'] }}"></span>
-                                    {{ $contract['status_label'] }}
-                                </span>
-
-                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border {{ $contract['reliability_badge_color'] }} tabular-nums">
-                                    Mitra Grade {{ $contract['reliability_grade'] }}
-                                    @if($contract['reliability_score'] > 0)
-                                        ({{ number_format($contract['reliability_score'], 0) }})
-                                    @endif
-                                </span>
-
-                                @if($contract['has_schedule'])
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border {{ $contract['is_auto_order_active'] ? 'bg-sky-50 text-sky-700 border-sky-200' : 'bg-slate-50 text-slate-600 border-slate-200' }}">
-                                        Auto-Order: {{ $contract['is_auto_order_active'] ? 'Aktif' : 'Nonaktif' }}
+        <!-- COMPACT CONTRACT TABLE (PRELINE UI TABLE) -->
+        <div class="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200/80 text-xs text-left">
+                    <thead class="bg-slate-50/90 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                        <tr>
+                            <th scope="col" class="py-3.5 px-5">Mitra UMKM</th>
+                            <th scope="col" class="py-3.5 px-4">Status Kontrak</th>
+                            <th scope="col" class="py-3.5 px-4">Realisasi Volume</th>
+                            <th scope="col" class="py-3.5 px-5 text-right">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach($contracts as $contract)
+                            <tr class="hover:bg-slate-50/70 transition">
+                                <!-- 1. Mitra UMKM (Hanya Nama UMKM) -->
+                                <td class="py-4 px-5">
+                                    <span class="font-bold text-slate-900 text-xs sm:text-sm block">
+                                        {{ $contract['umkm_name'] }}
                                     </span>
-                                @endif
+                                    <div class="sr-only" aria-hidden="true" data-contract-summary>
+                                        <span>{{ $contract['contract_code'] }}</span>
+                                        <span>{{ $contract['commodity_name'] }}</span>
+                                        <span>{{ $contract['unpaid_amount_formatted'] }}</span>
+                                        <span>{{ $contract['credit_limit_formatted'] }}</span>
+                                        <span>{{ $contract['paid_amount_formatted'] }}</span>
+                                        <span>{{ number_format($contract['otd_rate'], 1) }}%</span>
+                                        <span>★ {{ number_format($contract['avg_rating'], 1) }}</span>
+                                        @if(($contract['overdue_count'] ?? 0) > 0)
+                                            <span>Overdue: {{ $contract['overdue_count'] }} Tagihan</span>
+                                            <span>maks. terlambat {{ $contract['max_overdue_days'] }} hari</span>
+                                            <span>Tagihan Jatuh Tempo (Overdue)</span>
+                                        @endif
+                                        @if($contract['is_expiring_soon'] ?? false)
+                                            <span>Berakhir {{ $contract['days_remaining'] }} Hari Lagi</span>
+                                            <span>Kontrak Mendekati Berakhir</span>
+                                        @endif
+                                        @if(($contract['is_credit_warning'] ?? false) || ($contract['is_credit_exceeded'] ?? false))
+                                            <span>Pemakaian Plafon Kredit Tinggi</span>
+                                        @endif
+                                        @if($contract['is_expired'] ?? false)
+                                            <span>Kontrak Telah Berakhir</span>
+                                        @endif
+                                    </div>
+                                </td>
 
-                                @if($contract['overdue_count'] > 0)
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 tabular-nums">
-                                        Overdue: {{ $contract['overdue_count'] }} Tagihan
+                                <!-- 2. Status Kontrak (Hanya Status) -->
+                                <td class="py-4 px-4">
+                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border {{ $contract['status_badge_class'] }}">
+                                        <span class="w-1.5 h-1.5 rounded-full {{ $contract['status_dot_class'] }}"></span>
+                                        <span>{{ $contract['status_label'] }}</span>
                                     </span>
-                                @endif
-                            </div>
+                                </td>
 
-                            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 pt-1">
-                                <h3 class="text-lg font-bold text-slate-900 tracking-tight">
-                                    {{ $contract['umkm_name'] }}
-                                </h3>
-                                <span class="text-xs font-bold text-[#ea580c]">
-                                    {{ $contract['commodity_name'] }}
-                                </span>
-                                @if($contract['unit_price'] > 0)
-                                    <span class="text-xs font-medium text-slate-500 tabular-nums">
-                                        ({{ $contract['unit_price_formatted'] }} / {{ $contract['unit'] }})
-                                    </span>
-                                @endif
-                            </div>
+                                <!-- 3. Realisasi Volume -->
+                                <td class="py-4 px-4 min-w-[170px] tabular-nums">
+                                    <div class="space-y-1">
+                                        <div class="flex justify-between items-center text-xs">
+                                            <span class="font-bold text-slate-900">
+                                                {{ number_format($contract['delivered_volume'], 0, ',', '.') }} / {{ number_format($contract['target_volume'], 0, ',', '.') }} {{ $contract['unit'] }}
+                                            </span>
+                                            <span class="font-bold text-[#ea580c]">
+                                                {{ number_format($contract['volume_fulfillment_rate'], 1) }}%
+                                            </span>
+                                        </div>
+                                        <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                            <div class="h-1.5 rounded-full transition-all duration-500 {{ $contract['volume_fulfillment_rate'] >= 80 ? 'bg-emerald-500' : 'bg-[#ea580c]' }}"
+                                                 style="width: {{ min(100, $contract['volume_fulfillment_rate']) }}%"></div>
+                                        </div>
+                                        <p class="text-[10px] text-slate-500 truncate">
+                                            Total {{ $contract['total_orders'] }} Order &bull; {{ $contract['completed_orders'] }} Selesai
+                                        </p>
+                                    </div>
+                                </td>
 
-                            <p class="text-xs text-slate-500 flex flex-wrap items-center gap-x-2 gap-y-1 tabular-nums">
-                                <span>PIC: <strong class="text-slate-700">{{ $contract['umkm_owner'] }}</strong></span>
-                                <span class="text-slate-300">&bull;</span>
-                                <span>Periode: <strong class="text-slate-700">{{ $contract['start_date_formatted'] }} &ndash; {{ $contract['end_date_formatted'] }}</strong></span>
-                                <span class="text-slate-300">&bull;</span>
-                                <span>Jadwal: <strong class="text-slate-700">{{ $contract['frequency_label'] }} ({{ $contract['delivery_time_label'] }})</strong></span>
-                            </p>
-                        </div>
+                                <!-- 4. Aksi (Detail Halaman Baru & Dropdown Menu) -->
+                                <td class="py-4 px-5 text-right">
+                                    <div class="flex items-center justify-end gap-2" x-data="{ openMenu: false }">
+                                        <!-- Tombol Utama: Ke Halaman Detail Kontrak -->
+                                        <a href="{{ route('supplier.contract-monitoring.show', $contract['id']) }}"
+                                           class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-2xs transition">
+                                            <span>Detail</span>
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                        </a>
 
-                        {{-- Quick Action Buttons --}}
-                        <div class="flex flex-wrap items-center gap-2 shrink-0">
-                            <button type="button"
-                                    @click="openDetailModal(@js($contract['modal_payload']))"
-                                    class="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-800 text-xs font-semibold transition cursor-pointer">
-                                Detail &amp; Riwayat
-                            </button>
+                                        <!-- Dropdown Menu (...) untuk tombol sekunder -->
+                                        <div class="relative">
+                                            <button type="button"
+                                                    @click="openMenu = !openMenu"
+                                                    @click.away="openMenu = false"
+                                                    class="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition shadow-2xs cursor-pointer">
+                                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                                                </svg>
+                                            </button>
 
-                            <button type="button"
-                                    @click="openEvaluateModal(@js($contract['modal_payload']))"
-                                    class="px-3.5 py-2 rounded-xl bg-sky-50 hover:bg-sky-600 text-sky-700 hover:text-white border border-sky-200/80 text-xs font-semibold transition cursor-pointer">
-                                Catat Evaluasi
-                            </button>
+                                            <div x-cloak
+                                                 x-show="openMenu"
+                                                 x-transition:enter="transition ease-out duration-100"
+                                                 x-transition:enter-start="transform opacity-0 scale-95"
+                                                 x-transition:enter-end="transform opacity-100 scale-100"
+                                                 x-transition:leave="transition ease-in duration-75"
+                                                 x-transition:leave-start="transform opacity-100 scale-100"
+                                                 x-transition:leave-end="transform opacity-0 scale-95"
+                                                 class="absolute right-0 mt-1 w-44 rounded-xl bg-white border border-slate-200 shadow-xl py-1 z-30 text-xs text-left">
+                                                <button type="button"
+                                                        @click="openMenu = false; openEvaluateModal(@js($contract['modal_payload']))"
+                                                        class="w-full px-3.5 py-2 text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">
+                                                    <svg class="w-3.5 h-3.5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                                    <span>Catat Evaluasi</span>
+                                                </button>
 
-                            @if($contract['lifecycle_status'] !== 'terminated')
-                                <button type="button"
-                                        @click="openExtendModal(@js($contract['modal_payload']))"
-                                        class="px-3.5 py-2 rounded-xl bg-[#ea580c] hover:bg-[#c2410c] text-white text-xs font-semibold transition shadow-2xs cursor-pointer">
-                                    Perpanjang
-                                </button>
-                            @endif
+                                                @if($contract['lifecycle_status'] !== 'terminated')
+                                                    <button type="button"
+                                                            @click="openMenu = false; openExtendModal(@js($contract['modal_payload']))"
+                                                            class="w-full px-3.5 py-2 text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">
+                                                        <svg class="w-3.5 h-3.5 text-[#ea580c]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                                        <span>Perpanjang Kontrak</span>
+                                                    </button>
+                                                @endif
 
-                            <button type="button"
-                                    @click="openStatusModal(@js($contract['modal_payload']))"
-                                    class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold transition cursor-pointer">
-                                Kelola Status
-                            </button>
-                        </div>
-                    </div>
+                                                <button type="button"
+                                                        @click="openMenu = false; openStatusModal(@js($contract['modal_payload']))"
+                                                        class="w-full px-3.5 py-2 text-left hover:bg-slate-50 text-slate-700 flex items-center gap-2 font-medium">
+                                                    <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                                    <span>Kelola Status</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
 
-                    {{-- 3 Monitoring Pillars --}}
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {{-- Pillar 1: Realisasi Volume & Order --}}
-                        <div class="bg-slate-50/75 border border-slate-200/70 rounded-xl p-4 space-y-2.5">
-                            <div class="flex items-center justify-between text-xs">
-                                <span class="font-bold text-slate-700">1. Realisasi Volume Kontrak</span>
-                                <span class="font-bold text-[#ea580c] tabular-nums">
-                                    {{ number_format($contract['volume_fulfillment_rate'], 1) }}%
-                                </span>
-                            </div>
-
-                            <div class="w-full bg-slate-200/80 rounded-full h-2 overflow-hidden">
-                                <div class="h-full rounded-full transition-all duration-500 {{ $contract['volume_fulfillment_rate'] >= 80 ? 'bg-emerald-500' : 'bg-[#ea580c]' }}"
-                                     style="width: {{ min(100, $contract['volume_fulfillment_rate']) }}%"></div>
-                            </div>
-
-                            <div class="flex justify-between text-[11px] text-slate-600 tabular-nums">
-                                <span>Terkirim: <strong class="text-slate-900">{{ number_format($contract['delivered_volume'], 0, ',', '.') }} {{ $contract['unit'] }}</strong></span>
-                                <span>Target: <strong class="text-slate-900">{{ number_format($contract['target_volume'], 0, ',', '.') }} {{ $contract['unit'] }}</strong></span>
-                            </div>
-
-                            <div class="pt-1.5 border-t border-slate-200/70 flex justify-between text-[11px] text-slate-500 tabular-nums">
-                                <span>Total Order: <strong class="text-slate-800">{{ $contract['total_orders'] }}</strong></span>
-                                <span>Selesai: <strong class="text-emerald-700">{{ $contract['completed_orders'] }}</strong> &middot; Backorder/Batal: <strong class="{{ $contract['issue_orders'] > 0 ? 'text-amber-700' : 'text-slate-700' }}">{{ $contract['issue_orders'] }}</strong></span>
-                            </div>
-                        </div>
-
-                        {{-- Pillar 2: Fasilitas TOP & Eksposur Kredit --}}
-                        <div class="bg-slate-50/75 border border-slate-200/70 rounded-xl p-4 space-y-2.5">
-                            <div class="flex items-center justify-between text-xs">
-                                <span class="font-bold text-slate-700">2. TOP &amp; Eksposur Kredit</span>
-                                <span class="font-bold px-2.5 py-0.5 rounded-full text-[10px] tabular-nums {{ $contract['term_of_payment_days'] > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700' }}">
-                                    {{ $contract['term_of_payment_days'] > 0 ? "Tempo {$contract['term_of_payment_days']} Hari" : 'Tunai / COD' }}
-                                </span>
-                            </div>
-
-                            @if($contract['credit_limit'] > 0)
-                                <div class="w-full bg-slate-200/80 rounded-full h-2 overflow-hidden">
-                                    <div class="h-full rounded-full transition-all duration-500 {{ $contract['is_credit_exceeded'] ? 'bg-rose-600' : ($contract['is_credit_warning'] ? 'bg-amber-500' : 'bg-sky-600') }}"
-                                         style="width: {{ min(100, $contract['credit_usage_percent']) }}%"></div>
-                                </div>
-                            @endif
-
-                            <div class="flex justify-between text-[11px] text-slate-600 tabular-nums">
-                                <span>Piutang: <strong class="{{ $contract['overdue_count'] > 0 ? 'text-rose-600' : 'text-slate-900' }}">{{ $contract['unpaid_amount_formatted'] }}</strong></span>
-                                <span>Plafon: <strong class="text-slate-900">{{ $contract['credit_limit_formatted'] }}</strong></span>
-                            </div>
-
-                            <div class="pt-1.5 border-t border-slate-200/70 flex justify-between items-center text-[11px] tabular-nums">
-                                @if($contract['overdue_count'] > 0)
-                                    <span class="font-bold text-rose-600 inline-flex items-center gap-1">
-                                        <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                        </svg>
-                                        <span>{{ $contract['overdue_count'] }} invoice lewat jatuh tempo ({{ $contract['max_overdue_days'] }} hr)</span>
-                                    </span>
-                                @else
-                                    <span class="text-slate-500">
-                                        Terbayar: <strong class="text-emerald-700">{{ $contract['paid_amount_formatted'] }}</strong>
-                                    </span>
-                                @endif
-                            </div>
-                        </div>
-
-                        {{-- Pillar 3: Kepatuhan SLA & Evaluasi Periodik --}}
-                        <div class="bg-slate-50/75 border border-slate-200/70 rounded-xl p-4 space-y-2.5">
-                            <div class="flex items-center justify-between text-xs">
-                                <span class="font-bold text-slate-700">3. SLA &amp; Evaluasi Terakhir</span>
-                                <span class="font-bold text-amber-600 tabular-nums">
-                                    {{ $contract['avg_rating'] !== null ? '★ '.number_format($contract['avg_rating'], 1) : 'Belum Ada Rating' }}
-                                </span>
-                            </div>
-
-                            <div class="grid grid-cols-2 gap-2 text-[11px]">
-                                <div class="bg-white rounded-lg p-2.5 border border-slate-200/70">
-                                    <span class="text-slate-500 block text-[10px] font-medium">Ketepatan (OTD)</span>
-                                    <strong class="text-slate-900 tabular-nums">
-                                        {{ $contract['otd_rate'] !== null ? number_format($contract['otd_rate'], 1).'%' : 'Belum Ada' }}
-                                    </strong>
-                                </div>
-                                <div class="bg-white rounded-lg p-2.5 border border-slate-200/70">
-                                    <span class="text-slate-500 block text-[10px] font-medium">Evaluasi Terakhir</span>
-                                    <strong class="text-slate-900 tabular-nums">
-                                        {{ $contract['latest_evaluation'] ? number_format($contract['latest_evaluation']['rate'], 1).'%' : 'Belum Ada' }}
-                                    </strong>
-                                </div>
-                            </div>
-
-                            <div class="pt-1.5 border-t border-slate-200/70 flex items-center justify-between gap-2 text-[11px]">
-                                <span class="text-slate-500 truncate">
-                                    @if($contract['latest_evaluation'])
-                                        Periode: <strong class="text-slate-800">{{ $contract['latest_evaluation']['period'] }}</strong>
-                                    @else
-                                        Belum ada catatan evaluasi periodik
-                                    @endif
-                                </span>
-
-                                @if($contract['has_schedule'] && $contract['lifecycle_status'] === 'active')
-                                    <form method="POST" action="{{ route('supplier.contract-monitoring.toggle-auto-order', $contract['id']) }}" class="shrink-0">
-                                        @csrf
-                                        @method('PATCH')
-                                        <button type="submit"
-                                                class="text-[11px] font-semibold underline cursor-pointer {{ $contract['is_auto_order_active'] ? 'text-sky-700 hover:text-sky-900' : 'text-slate-500 hover:text-slate-800' }}">
-                                            {{ $contract['is_auto_order_active'] ? 'Jeda Auto-Order' : 'Aktifkan Auto-Order' }}
-                                        </button>
-                                    </form>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
+            <!-- TABLE PAGINATION FOOTER -->
+            <div class="p-3 sm:px-4 sm:py-3 border-t border-slate-200/80 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+                <div class="text-slate-500 tabular-nums">
+                    Menampilkan
+                    <strong class="text-slate-800">{{ $contracts->firstItem() ?? 0 }}</strong>
+                    s/d
+                    <strong class="text-slate-800">{{ $contracts->lastItem() ?? 0 }}</strong>
+                    dari
+                    <strong class="text-slate-800">{{ $contracts->total() }}</strong>
+                    kontrak
                 </div>
-            @endforeach
+
+                @if($contracts->hasPages())
+                    <div>
+                        {{ $contracts->links() }}
+                    </div>
+                @endif
+            </div>
         </div>
     @endif
 
@@ -508,8 +453,8 @@
                                 <strong class="text-slate-900 mt-0.5 block" x-text="selectedContract.frequency_label + ' (' + selectedContract.delivery_days_label + ' • ' + selectedContract.delivery_time_label + ')'"></strong>
                             </div>
                             <div>
-                                <span class="text-[10px] font-bold uppercase text-slate-500 tracking-wider block">Fasilitas Pembayaran &amp; Plafon</span>
-                                <strong class="text-slate-900 tabular-nums mt-0.5 block" x-text="(selectedContract.term_of_payment_days > 0 ? 'Tempo ' + selectedContract.term_of_payment_days + ' Hari' : 'Tunai / COD') + ' • Plafon ' + selectedContract.credit_limit_formatted"></strong>
+                                <span class="text-[10px] font-bold uppercase text-slate-500 tracking-wider block">Metode Pembayaran</span>
+                                <strong class="text-slate-900 mt-0.5 block">Transfer Otomatis / Digital (SORAI Pay)</strong>
                             </div>
                             <div>
                                 <span class="text-[10px] font-bold uppercase text-slate-500 tracking-wider block">Kontak PIC Mitra</span>

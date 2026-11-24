@@ -107,10 +107,10 @@ class PengajuanMasukController extends Controller
         ]);
 
         return redirect()->route('supplier.pengajuan-masuk.index')
-            ->with('success', 'Kemitraan berhasil diterima dan fasilitas pembayaran telah disetujui!');
+            ->with('success', 'Kemitraan berhasil disetujui dan aktif!');
     }
 
-    public function tolak(string $id)
+    public function tolak(Request $request, string $id)
     {
         $supplier = $this->getActiveSupplierProfile();
 
@@ -122,7 +122,20 @@ class PengajuanMasukController extends Controller
             ->where('status', 'pending')
             ->findOrFail($id);
 
-        $partnership->update(['status' => 'rejected']);
+        $validated = $request->validate([
+            'rejection_reason' => 'required|string|max:500',
+        ], [
+            'rejection_reason.required' => 'Mohon sertakan alasan penolakan sebelum mengirim.',
+        ]);
+
+        $reason = trim($validated['rejection_reason']);
+        $details = (string) $partnership->submission_details;
+        $updatedDetails = trim($details."\n[Alasan Penolakan: {$reason}]");
+
+        $partnership->update([
+            'status' => 'rejected',
+            'submission_details' => $updatedDetails,
+        ]);
 
         return redirect()->route('supplier.pengajuan-masuk.index')
             ->with('success', 'Pengajuan kemitraan telah ditolak.');

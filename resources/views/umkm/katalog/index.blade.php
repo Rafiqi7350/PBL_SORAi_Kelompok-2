@@ -31,6 +31,7 @@
             catalogSearch: '{{ addslashes($search ?? '') }}',
             visibleProductCount: {{ method_exists($products, 'total') ? $products->total() : $products->count() }},
             _searchUrlTimer: null,
+            isCatalogLoading: false,
 
             filterCatalog: function() {
                 var query = (this.catalogSearch || '').toLowerCase().trim();
@@ -120,6 +121,102 @@
                         });
                     }
                 }, 1000);
+
+                // Intercept clicks on catalog pagination for smooth AJAX swap
+                this.initCatalogAjaxPagination();
+
+                // Sinkronisasi awal supplier & komoditas di formulir supply planning
+                if (this.partnerSuppliers && this.partnerSuppliers.length > 0) {
+                    if (!this.planningForm.supplier_id) {
+                        this.planningForm.supplier_id = String(this.partnerSuppliers[0].id);
+                    }
+                    var comms = this.availableCommoditiesForSelectedSupplier;
+                    if (comms && comms.length > 0) {
+                        if (!this.planningForm.commodity || !comms.some(function(c) { return c.name === self.planningForm.commodity; })) {
+                            this.planningForm.commodity = comms[0].name;
+                            if (comms[0].unit) this.planningForm.unit = comms[0].unit;
+                        }
+                    }
+                }
+            },
+
+            initCatalogAjaxPagination: function() {
+                var self = this;
+                document.addEventListener('click', function(e) {
+                    var link = e.target.closest('#catalog-grid-wrapper a[href*="page="], #catalog-grid-wrapper .pagination a');
+                    if (!link) return;
+
+                    var url = link.getAttribute('href');
+                    if (!url || url.startsWith('javascript:')) return;
+
+                    e.preventDefault();
+                    self.loadCatalogPageAjax(url);
+                });
+
+                window.addEventListener('popstate', function(e) {
+                    var currentUrl = window.location.href;
+                    if (currentUrl.includes('page=') || currentUrl.includes('tab=katalog')) {
+                        self.loadCatalogPageAjax(currentUrl, false);
+                    }
+                });
+            },
+
+            loadCatalogPageAjax: function(url, push) {
+                if (push === undefined) push = true;
+                var self = this;
+                var wrapper = document.getElementById('catalog-grid-wrapper');
+                if (!wrapper) {
+                    window.location.href = url;
+                    return;
+                }
+
+                self.isCatalogLoading = true;
+                wrapper.classList.add('opacity-40', 'pointer-events-none');
+
+                fetch(url, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(function(res) {
+                    if (!res.ok) throw new Error('Network error');
+                    return res.text();
+                })
+                .then(function(html) {
+                    var parser = new DOMParser();
+                    var doc = parser.parseFromString(html, 'text/html');
+                    var newWrapper = doc.getElementById('catalog-grid-wrapper');
+
+                    if (newWrapper) {
+                        wrapper.innerHTML = newWrapper.innerHTML;
+                        if (window.Alpine) {
+                            window.Alpine.initTree(wrapper);
+                        }
+                        var cards = wrapper.querySelectorAll('.catalog-product-card');
+                        self.visibleProductCount = cards.length;
+
+                        if (push) {
+                            window.history.pushState({}, '', url);
+                        }
+
+                        if (self.catalogSearch && self.catalogSearch.trim() !== '') {
+                            self.filterCatalog();
+                        }
+
+                        wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    } else {
+                        window.location.href = url;
+                    }
+                })
+                .catch(function(err) {
+                    window.location.href = url;
+                })
+                .finally(function() {
+                    self.isCatalogLoading = false;
+                    if (wrapper) {
+                        wrapper.classList.remove('opacity-40', 'pointer-events-none');
+                    }
+                });
             },
             pendingValidationCount: {{ $pendingValidationCount ?? 0 }},
             pendingBackorderCount: {{ $pendingBackorderCount ?? 0 }},
@@ -129,14 +226,45 @@
             rejectingAction: 'create_backorder',
             approvingBackorderOrder: null,
             pendingPaymentCount: {{ $pendingPaymentCount ?? 0 }},
+            pendingReviewCount: {{ $pendingReviewCount ?? 0 }},
 
+            partnerSuppliers: @json($partnerSuppliers ?? []),
             planningForm: {
-                commodity: '{{ $availableCommodities->first()?->name ?? "Daging Ayam Broiler Segar" }}',
-                volume: 200,
-                unit: 'kg',
+                commodity: '{{ $availableCommodities->first()?->name ?? "" }}',
+                volume: '',
+                unit: '{{ $availableCommodities->first()?->unit ?? "kg" }}',
                 targetDate: '{{ now()->addMonth()->format("Y-m") }}',
                 supplier_id: '{{ $availableSuppliers->first()?->id ?? "" }}',
-                notes: 'Standar potongan karkas dingin, pengiriman pagi pukul 05:00 WIB.'
+                notes: ''
+            },
+            get availableCommoditiesForSelectedSupplier() {
+                var self = this;
+                var supplier = (this.partnerSuppliers || []).find(function(s) {
+                    return String(s.id) === String(self.planningForm.supplier_id);
+                });
+                if (supplier && supplier.commodities && supplier.commodities.length > 0) {
+                    return supplier.commodities;
+                }
+                return [];
+            },
+            onSupplierChange: function() {
+                var comms = this.availableCommoditiesForSelectedSupplier;
+                if (comms && comms.length > 0) {
+                    this.planningForm.commodity = comms[0].name;
+                    if (comms[0].unit) {
+                        this.planningForm.unit = comms[0].unit;
+                    }
+                } else {
+                    this.planningForm.commodity = '';
+                }
+            },
+            onCommodityChange: function() {
+                var self = this;
+                var comms = this.availableCommoditiesForSelectedSupplier;
+                var matched = comms.find(function(c) { return c.name === self.planningForm.commodity; });
+                if (matched && matched.unit) {
+                    this.planningForm.unit = matched.unit;
+                }
             },
 
             supplyPlans: @json($supplyPlans ?? []),
@@ -292,6 +420,66 @@
             autoOrdersList: @json($autoOrdersList ?? []),
 
             partnershipRequests: @json($partnershipRequests ?? []),
+            reqSearchQuery: '',
+            reqStatusFilter: 'all',
+            reqCurrentPage: 1,
+            reqPageSize: 10,
+            showReqInfoBanner: true,
+            selectedReqDetail: null,
+
+            openReqDetailModal: function(item) {
+                this.selectedReqDetail = item;
+            },
+
+            closeReqDetailModal: function() {
+                this.selectedReqDetail = null;
+            },
+
+            get filteredPartnershipRequests() {
+                var list = this.partnershipRequests || [];
+                var q = (this.reqSearchQuery || '').toLowerCase().trim();
+                var status = this.reqStatusFilter || 'all';
+
+                return list.filter(function(item) {
+                    if (status !== 'all') {
+                        var itemStatus = (item.status || '').toLowerCase();
+                        if (status === 'pending') {
+                            if (!['pending', 'menunggu', 'dalam_review'].includes(itemStatus)) return false;
+                        } else if (status === 'active') {
+                            if (!['active', 'approved', 'disetujui'].includes(itemStatus)) return false;
+                        } else if (status === 'rejected') {
+                            if (!['rejected', 'ditolak'].includes(itemStatus)) return false;
+                        }
+                    }
+
+                    if (q) {
+                        var comm = (item.commodity_name || '').toLowerCase();
+                        var sup = (item.supplier_name || '').toLowerCase();
+                        var ctr = (item.contract_code || '').toLowerCase();
+                        if (!comm.includes(q) && !sup.includes(q) && !ctr.includes(q)) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                });
+            },
+
+            get paginatedPartnershipRequests() {
+                var list = this.filteredPartnershipRequests;
+                var start = (this.reqCurrentPage - 1) * this.reqPageSize;
+                return list.slice(start, start + this.reqPageSize);
+            },
+
+            get reqTotalPages() {
+                return Math.ceil(this.filteredPartnershipRequests.length / this.reqPageSize) || 1;
+            },
+
+            setReqPage: function(p) {
+                if (p >= 1 && p <= this.reqTotalPages) {
+                    this.reqCurrentPage = p;
+                }
+            },
             showAjukanConfirmModal: false,
             editingPermintaan: null,
             cancellingPermintaan: null,
@@ -833,6 +1021,7 @@
                     self.isSubmittingReview = false;
                     self.showReviewModal = false;
                     self.ratingInputOrder = null;
+                    self.pendingReviewCount = Math.max(0, (self.pendingReviewCount || 0) - 1);
                     self.notify(resData.message || 'Ulasan & Rating berhasil disimpan!');
                     setTimeout(function() {
                         window.location.href = '{{ route("umkm.katalog.index", ["tab" => "pemesanan", "subtab" => "rating"]) }}';
@@ -880,6 +1069,9 @@
             isRecalculatingPerformance: false,
             recalculatingSupplierId: null,
             monitoringSearchQuery: '',
+            monitoringGradeFilter: 'all',
+            monitoringCurrentPage: 1,
+            monitoringPageSize: 10,
             supplierScores: {
                 @if(isset($contractedSuppliersPerformance))
                     @foreach($contractedSuppliersPerformance as $item)
@@ -911,35 +1103,63 @@
                 @endif
             },
 
+            get matchingSupplierIds() {
+                var self = this;
+                var keys = Object.keys(this.supplierScores || {});
+                var q = (this.monitoringSearchQuery || '').toLowerCase().trim();
+                var grade = this.monitoringGradeFilter || 'all';
+
+                return keys.filter(function(id) {
+                    var s = self.supplierScores[id];
+                    if (!s) return false;
+
+                    if (grade !== 'all') {
+                        if (grade === 'UNRATED') {
+                            if (s.grade !== 'UNRATED' && s.grade !== null && s.grade !== '') return false;
+                        } else {
+                            if (s.grade !== grade) return false;
+                        }
+                    }
+
+                    if (q) {
+                        var name = (s.company_name || '').toLowerCase();
+                        var addr = (s.warehouse_address || '').toLowerCase();
+                        var comm = (s.commodity_name || '').toLowerCase();
+                        var gr = (s.grade || '').toLowerCase();
+                        if (!name.includes(q) && !addr.includes(q) && !comm.includes(q) && !('grade ' + gr).includes(q)) {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                });
+            },
+
+            isSupplierVisibleOnPage: function(supplierId) {
+                if (!supplierId) return false;
+                var ids = this.matchingSupplierIds;
+                var idx = ids.indexOf(supplierId);
+                if (idx === -1) return false;
+                var start = (this.monitoringCurrentPage - 1) * this.monitoringPageSize;
+                return idx >= start && idx < start + this.monitoringPageSize;
+            },
+
             isSupplierMatched: function(supplierId, companyName, address, commodity) {
-                if (!this.monitoringSearchQuery) return true;
-                var q = this.monitoringSearchQuery.toLowerCase().trim();
-                var s = this.supplierScores[supplierId] || {};
-                var name = (s.company_name || companyName || '').toLowerCase();
-                var addr = (s.warehouse_address || address || '').toLowerCase();
-                var comm = (s.commodity_name || commodity || '').toLowerCase();
-                var gr = (s.grade || '').toLowerCase();
-                return name.includes(q) || addr.includes(q) || comm.includes(q) || ('grade ' + gr).includes(q);
+                return this.matchingSupplierIds.includes(supplierId);
             },
 
             get filteredSupplierCount() {
-                var self = this;
-                var keys = Object.keys(this.supplierScores);
-                if (!self.monitoringSearchQuery) return keys.length;
-                var q = self.monitoringSearchQuery.toLowerCase().trim();
-                var count = 0;
-                for (var i = 0; i < keys.length; i++) {
-                    var s = self.supplierScores[keys[i]];
-                    if (!s) continue;
-                    var name = (s.company_name || '').toLowerCase();
-                    var addr = (s.warehouse_address || '').toLowerCase();
-                    var comm = (s.commodity_name || '').toLowerCase();
-                    var gr = (s.grade || '').toLowerCase();
-                    if (name.includes(q) || addr.includes(q) || comm.includes(q) || ('grade ' + gr).includes(q)) {
-                        count++;
-                    }
+                return this.matchingSupplierIds.length;
+            },
+
+            get monitoringTotalPages() {
+                return Math.ceil(this.matchingSupplierIds.length / this.monitoringPageSize) || 1;
+            },
+
+            setMonitoringPage: function(p) {
+                if (p >= 1 && p <= this.monitoringTotalPages) {
+                    this.monitoringCurrentPage = p;
                 }
-                return count;
             },
 
             get monitoringAvgScore() {
@@ -1433,217 +1653,444 @@
     <!-- ========================================================= -->
     <!-- TAB: RIWAYAT PENGAJUAN PERMINTAAN (< 30 MENIT EDIT)       -->
     <!-- ========================================================= -->
-    <div {{ $serverActiveTab === 'riwayat-permintaan' ? '' : 'x-cloak style=display:none;' }} x-show="activeTab === 'riwayat-permintaan'" class="space-y-6">
+    <div {{ $serverActiveTab === 'riwayat-permintaan' ? '' : 'x-cloak style=display:none;' }} x-show="activeTab === 'riwayat-permintaan'" class="space-y-4">
 
-        <!-- HEADER SECTION -->
-        <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200/80 pb-4">
-            <div>
-                <div class="flex items-center gap-2">
+        <!-- HEADER SECTION & DISMISSIBLE INFO -->
+        <div class="space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-3">
+                <div class="flex items-center gap-2.5 flex-wrap">
                     <h2 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Riwayat Pengajuan Permintaan</h2>
-                    <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-orange-50 border border-orange-200/80 text-[#ea580c] tabular-nums" x-text="partnershipRequests.length + ' Pengajuan'"></span>
+                    <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-orange-50 border border-orange-200/80 text-[#ea580c] tabular-nums" x-text="filteredPartnershipRequests.length + ' Pengajuan'"></span>
                 </div>
-                <p class="text-sm sm:text-[15px] text-slate-600 mt-1 leading-relaxed">
-                    Pantau status pengajuan kemitraan pasokan bahan baku dapur Anda. Anda dapat mengubah rincian data dalam batas waktu <strong>&lt; 30 menit</strong> setelah pengajuan dikirim.
-                </p>
+                <div class="text-xs text-slate-500">
+                    Batas revisi mandiri: <strong class="text-slate-800 font-semibold">&lt; 30 menit</strong> setelah pengajuan
+                </div>
             </div>
-            <div class="shrink-0 self-start sm:self-end flex items-center gap-2">
-                <button type="button"
-                        @click="setTab('katalog')"
-                        class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#ea580c] hover:bg-[#c2410c] text-white text-xs font-semibold shadow-xs transition cursor-pointer">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                    <span>Ajukan Pasokan Baru</span>
+
+            <!-- COMPACT DISMISSIBLE BANNER -->
+            <div x-show="showReqInfoBanner" x-transition class="p-3 rounded-xl bg-amber-50/90 border border-amber-200/80 flex items-center justify-between gap-3 text-xs text-amber-900 shadow-2xs">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <div class="w-6 h-6 rounded-lg bg-amber-200/80 text-amber-800 flex items-center justify-center shrink-0">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <p class="text-[11px] sm:text-xs leading-relaxed truncate sm:whitespace-normal">
+                        <strong>Ketentuan Perubahan Data (&lt; 30 Menit):</strong> Data volume, jadwal, dan mutu dapat diubah dalam 30 menit pertama sebelum terkunci demi kepastian operasional armada pemasok.
+                    </p>
+                </div>
+                <button type="button" @click="showReqInfoBanner = false" class="text-amber-600 hover:text-amber-800 p-1 rounded-md transition cursor-pointer shrink-0" title="Tutup informasi">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
         </div>
 
-        <!-- INFO BANNER PERATURAN 30 MENIT -->
-        <div class="p-4 rounded-2xl bg-amber-50/80 border border-amber-200/80 flex items-start gap-3.5 text-xs text-amber-950">
-            <div class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 mt-0.5">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <!-- MAIN CARD: TOOLBAR & TABEL RIWAYAT PENGAJUAN (SEPERTI RIWAYAT TRANSAKSI) -->
+        <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-7 space-y-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+            <!-- Header & Action Button -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                <div>
+                    <h3 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight">Daftar Pengajuan Permintaan</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Kelola dan pantau status persetujuan serta ketentuan jadwal kemitraan pasokan dapur.</p>
+                </div>
+
+                <!-- Tombol Aksi Utama (Hanya 1 tanda +) -->
+                <button type="button"
+                        @click="setTab('katalog')"
+                        class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#ea580c] hover:bg-[#c2410c] text-white text-xs font-semibold shadow-xs transition cursor-pointer shrink-0 self-start sm:self-auto">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                    <span>Ajukan Pasokan Baru</span>
+                </button>
             </div>
-            <div class="space-y-0.5 leading-relaxed">
-                <p class="font-bold text-amber-900">Ketentuan Perubahan Data Pengajuan (&lt; 30 Menit)</p>
-                <p class="text-[11px] text-amber-800">
-                    Sistem memberikan fleksibilitas bagi dapur Anda untuk merevisi volume, jadwal tiba, atau spesifikasi mutu selama <strong>30 menit pertama</strong>. Setelah melewati 30 menit atau disetujui oleh pemasok, data pengajuan otomatis terkunci permanen untuk kepastian operasional armada pemasok.
-                </p>
+
+            <!-- Toolbar: Search Bar & Status Filter Pills -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <!-- Search Bar -->
+                <div class="relative w-full sm:w-72">
+                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    </span>
+                    <input type="text"
+                           x-model="reqSearchQuery"
+                           @input="reqCurrentPage = 1"
+                           placeholder="Cari komoditas, pemasok, kontrak..."
+                           class="w-full pl-8 pr-7 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[#ea580c] focus:bg-white transition">
+                    <button type="button"
+                            x-show="reqSearchQuery"
+                            @click="reqSearchQuery = ''; reqCurrentPage = 1"
+                            class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+
+                <!-- Status Filter Pills -->
+                <div class="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                    <button type="button"
+                            @click="reqStatusFilter = 'all'; reqCurrentPage = 1"
+                            :class="reqStatusFilter === 'all' ? 'bg-[#ea580c] text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'"
+                            class="px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap">
+                        Semua
+                    </button>
+                    <button type="button"
+                            @click="reqStatusFilter = 'pending'; reqCurrentPage = 1"
+                            :class="reqStatusFilter === 'pending' ? 'bg-[#ea580c] text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'"
+                            class="px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                        <span>Menunggu</span>
+                    </button>
+                    <button type="button"
+                            @click="reqStatusFilter = 'active'; reqCurrentPage = 1"
+                            :class="reqStatusFilter === 'active' ? 'bg-[#ea580c] text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'"
+                            class="px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                        <span>Disetujui &amp; Aktif</span>
+                    </button>
+                    <button type="button"
+                            @click="reqStatusFilter = 'rejected'; reqCurrentPage = 1"
+                            :class="reqStatusFilter === 'rejected' ? 'bg-[#ea580c] text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80'"
+                            class="px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer whitespace-nowrap flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                        <span>Ditolak</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Bordered Table (Preline UI Table) -->
+            <div class="overflow-x-auto border border-slate-200/80 rounded-xl">
+                <table class="min-w-full divide-y divide-slate-200/80 text-xs text-left">
+                    <thead class="bg-slate-50/90 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                        <tr>
+                            <th scope="col" class="py-3 px-4">Komoditas &amp; Kontrak</th>
+                            <th scope="col" class="py-3 px-4">Jadwal &amp; Volume</th>
+                            <th scope="col" class="py-3 px-4">Status &amp; Kunci Waktu</th>
+                            <th scope="col" class="py-3 px-4 text-right">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <template x-if="filteredPartnershipRequests.length === 0">
+                            <tr>
+                                <td colspan="4" class="py-12 px-4 text-center">
+                                    <div class="w-12 h-12 mx-auto rounded-2xl bg-orange-50 border border-orange-100 text-[#ea580c] flex items-center justify-center mb-3">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                                        </svg>
+                                    </div>
+                                    <template x-if="partnershipRequests.length === 0">
+                                        <div>
+                                            <p class="font-bold text-slate-800 text-sm">Belum Ada Pengajuan Permintaan</p>
+                                            <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">Anda belum mengajukan kemitraan pasokan bahan baku dapur.</p>
+                                            <button type="button" @click="setTab('katalog')" class="mt-3 px-4 py-2 bg-[#ea580c] hover:bg-[#c2410c] text-white text-xs font-semibold rounded-xl transition cursor-pointer">
+                                                Buka Katalog Bahan Baku
+                                            </button>
+                                        </div>
+                                    </template>
+                                    <template x-if="partnershipRequests.length > 0">
+                                        <div>
+                                            <p class="font-bold text-slate-800 text-sm">Tidak Ada Pengajuan yang Cocok</p>
+                                            <p class="text-xs text-slate-500 mt-1">Coba sesuaikan kata kunci pencarian atau ganti filter status pengajuan.</p>
+                                            <button type="button" @click="reqSearchQuery = ''; reqStatusFilter = 'all'; reqCurrentPage = 1" class="mt-3 px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition cursor-pointer">
+                                                Reset Filter
+                                            </button>
+                                        </div>
+                                    </template>
+                                </td>
+                            </tr>
+                        </template>
+
+                        <template x-for="item in paginatedPartnershipRequests" :key="item.id">
+                            <tr class="hover:bg-slate-50/70 transition">
+                                <!-- 1. Komoditas & Kontrak -->
+                                <td class="py-3.5 px-4">
+                                    <div class="flex items-center gap-3">
+                                        <template x-if="item.commodity_image">
+                                            <img :src="item.commodity_image" :alt="item.commodity_name" class="w-10 h-10 rounded-xl object-cover border border-slate-200/80 shrink-0">
+                                        </template>
+                                        <template x-if="!item.commodity_image">
+                                            <div class="w-10 h-10 rounded-xl bg-orange-50 border border-orange-100 text-[#ea580c] flex items-center justify-center shrink-0 font-bold text-xs">
+                                                <span x-text="item.commodity_name ? item.commodity_name.charAt(0) : 'P'"></span>
+                                            </div>
+                                        </template>
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                <span class="font-bold text-slate-900 text-xs truncate max-w-[170px] sm:max-w-xs" x-text="item.commodity_name"></span>
+                                                <span class="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200" x-text="item.contract_code"></span>
+                                            </div>
+                                            <p class="text-[11px] text-slate-500 mt-0.5 truncate">
+                                                Pemasok: <strong class="text-slate-700" x-text="item.supplier_name"></strong>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <!-- 2. Jadwal & Volume -->
+                                <td class="py-3.5 px-4 tabular-nums">
+                                    <div class="space-y-0.5">
+                                        <div class="font-bold text-slate-900 text-xs">
+                                            <span x-text="item.volume_per_delivery + ' ' + item.unit"></span>
+                                            <span class="text-slate-400 font-normal">&bull;</span>
+                                            <span class="font-medium text-slate-600" x-text="item.frequency_type"></span>
+                                        </div>
+                                        <div class="text-[11px] text-slate-500 flex items-center gap-1.5">
+                                            <span x-text="'Tiba ' + item.delivery_time + ' WIB'"></span>
+                                            <span class="text-slate-300">&bull;</span>
+                                            <span x-text="'Mulai ' + item.start_date_formatted"></span>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <!-- 3. Status & Kunci Waktu -->
+                                <td class="py-3.5 px-4">
+                                    <div class="space-y-1">
+                                        <div>
+                                            <template x-if="item.status === 'pending' || item.status === 'menunggu' || item.status === 'dalam_review'">
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-bold">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                                                    <span>Menunggu</span>
+                                                </span>
+                                            </template>
+                                            <template x-if="item.status === 'active' || item.status === 'approved' || item.status === 'disetujui'">
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[10px] font-bold">
+                                                    <svg class="w-3 h-3 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                                    <span>Disetujui &amp; Aktif</span>
+                                                </span>
+                                            </template>
+                                            <template x-if="item.status === 'rejected' || item.status === 'ditolak'">
+                                                <div class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-rose-50 border border-rose-200 text-rose-800 text-[10px] font-bold">
+                                                    <span>Ditolak</span>
+                                                </div>
+                                            </template>
+                                            <template x-if="item.status === 'cancelled' || item.status === 'dibatalkan'">
+                                                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[10px] font-semibold">
+                                                    <span>Dibatalkan</span>
+                                                </span>
+                                            </template>
+                                        </div>
+
+                                        <div class="flex items-center gap-2">
+                                            <template x-if="item.can_edit">
+                                                <span class="inline-flex items-center gap-1 text-[10px] text-emerald-700 font-semibold bg-emerald-50/90 border border-emerald-200/70 px-2 py-0.5 rounded-md tabular-nums">
+                                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
+                                                    <span x-text="'Bisa edit (' + item.remaining_minutes + ' mnt)'"></span>
+                                                </span>
+                                            </template>
+                                            <template x-if="!item.can_edit">
+                                                <span class="inline-flex items-center gap-1 text-[10px] text-slate-400">
+                                                    <svg class="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                                    <span>Terkunci</span>
+                                                </span>
+                                            </template>
+                                            <span class="text-[10px] text-slate-400 tabular-nums truncate" x-text="item.created_at_human"></span>
+                                        </div>
+                                    </div>
+                                </td>
+
+                                <!-- 4. Aksi -->
+                                <td class="py-3.5 px-4 text-right">
+                                    <div class="flex items-center justify-end gap-1.5">
+                                        <button type="button"
+                                                @click="openReqDetailModal(item)"
+                                                class="px-2.5 py-1.5 rounded-lg border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold inline-flex items-center gap-1 transition shadow-2xs cursor-pointer"
+                                                title="Lihat Detail Pengajuan">
+                                            <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                                            <span>Detail</span>
+                                        </button>
+
+                                        <template x-if="item.can_edit">
+                                            <button type="button"
+                                                    @click="openEditPermintaanModal(item)"
+                                                    class="px-2.5 py-1.5 rounded-lg border border-orange-200 bg-orange-50 hover:bg-orange-100 text-[#ea580c] text-xs font-semibold inline-flex items-center gap-1 transition shadow-2xs cursor-pointer"
+                                                    title="Ubah rincian pengajuan">
+                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                                                <span>Edit</span>
+                                            </button>
+                                        </template>
+                                        <template x-if="!item.can_edit">
+                                            <button type="button"
+                                                    disabled
+                                                    class="px-2.5 py-1.5 rounded-lg border border-slate-200/70 bg-slate-50 text-slate-300 text-xs font-semibold inline-flex items-center gap-1 cursor-not-allowed"
+                                                    title="Pengajuan telah terkunci (> 30 menit atau sudah disetujui)">
+                                                <svg class="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                                <span>Edit</span>
+                                            </button>
+                                        </template>
+                                    </div>
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- TABLE PAGINATION FOOTER: HANYA TAMPIL JIKA DATA > 10 -->
+            <div x-show="filteredPartnershipRequests.length > 10" class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+                <div class="text-slate-500 tabular-nums">
+                    Menampilkan
+                    <strong class="text-slate-800" x-text="filteredPartnershipRequests.length === 0 ? 0 : ((reqCurrentPage - 1) * reqPageSize + 1)"></strong>
+                    s/d
+                    <strong class="text-slate-800" x-text="Math.min(reqCurrentPage * reqPageSize, filteredPartnershipRequests.length)"></strong>
+                    dari
+                    <strong class="text-slate-800" x-text="filteredPartnershipRequests.length"></strong>
+                    pengajuan
+                </div>
+
+                <div x-show="reqTotalPages > 1" class="flex items-center gap-1 self-end sm:self-auto">
+                    <button type="button"
+                            @click="setReqPage(reqCurrentPage - 1)"
+                            :disabled="reqCurrentPage <= 1"
+                            class="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer">
+                        Sebelumnya
+                    </button>
+                    <span class="px-2 py-1 font-semibold text-slate-700 tabular-nums" x-text="reqCurrentPage + ' / ' + reqTotalPages"></span>
+                    <button type="button"
+                            @click="setReqPage(reqCurrentPage + 1)"
+                            :disabled="reqCurrentPage >= reqTotalPages"
+                            class="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer">
+                        Selanjutnya
+                    </button>
+                </div>
             </div>
         </div>
 
-        <!-- DAFTAR RIWAYAT PERMINTAAN -->
-        <div class="space-y-4">
-            <!-- EMPTY STATE -->
-            <template x-if="partnershipRequests.length === 0">
-                <div class="bg-white rounded-2xl border border-slate-200/80 p-12 text-center space-y-4">
-                    <div class="w-16 h-16 mx-auto rounded-2xl bg-orange-50 border border-orange-100 text-[#ea580c] flex items-center justify-center shadow-2xs">
-                        <svg class="w-8 h-8 text-[#ea580c]" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.8">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                        </svg>
-                    </div>
-                    <div class="space-y-1">
-                        <h3 class="text-base font-bold text-slate-900">Belum Ada Pengajuan Permintaan</h3>
-                        <p class="text-xs text-slate-500 max-w-sm mx-auto">
-                            Anda belum mengajukan kemitraan pasokan bahan baku. Silakan telusuri katalog komoditas untuk memulai pengajuan pasokan dapur Anda.
-                        </p>
-                    </div>
-                    <button type="button"
-                            @click="setTab('katalog')"
-                            class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#ea580c] hover:bg-[#c2410c] text-white text-xs font-semibold shadow-xs transition cursor-pointer">
-                        <span>Buka Katalog Bahan Baku</span>
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
-                    </button>
-                </div>
-            </template>
+        <!-- SLIDE-OVER DRAWER DETAIL PENGAJUAN PERMINTAAN -->
+        <div x-cloak
+             x-show="selectedReqDetail"
+             class="fixed inset-0 z-50 overflow-hidden"
+             aria-labelledby="slide-over-title"
+             role="dialog"
+             aria-modal="true">
+            <div class="absolute inset-0 bg-slate-900/50 backdrop-blur-xs transition-opacity"
+                 x-show="selectedReqDetail"
+                 x-transition:enter="ease-in-out duration-300"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="ease-in-out duration-200"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0"
+                 @click="closeReqDetailModal()"></div>
 
-            <!-- LIST OF CARDS -->
-            <template x-for="item in partnershipRequests" :key="item.id">
-                <div class="bg-white rounded-2xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition overflow-hidden">
-                    <div class="p-5 sm:p-6 space-y-4">
+            <div class="fixed inset-y-0 right-0 pl-10 max-w-full flex">
+                <div class="w-screen max-w-md bg-white shadow-2xl flex flex-col border-l border-slate-200"
+                     x-show="selectedReqDetail"
+                     x-transition:enter="transform transition ease-in-out duration-300"
+                     x-transition:enter-start="translate-x-full"
+                     x-transition:enter-end="translate-x-0"
+                     x-transition:leave="transform transition ease-in-out duration-200"
+                     x-transition:leave-start="translate-x-0"
+                     x-transition:leave-end="translate-x-full">
 
-                        <!-- CARD HEADER -->
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
-                            <div class="flex items-start sm:items-center gap-3">
-                                <template x-if="item.commodity_image">
-                                    <img :src="item.commodity_image" :alt="item.commodity_name" class="w-12 h-12 rounded-xl object-cover border border-slate-200/80 shrink-0">
-                                </template>
-                                <template x-if="!item.commodity_image">
-                                    <div class="w-12 h-12 rounded-xl bg-orange-50 border border-orange-100 text-[#ea580c] flex items-center justify-center shrink-0 font-bold text-sm">
-                                        <span x-text="item.commodity_name ? item.commodity_name.charAt(0) : 'P'"></span>
-                                    </div>
-                                </template>
-                                <div>
-                                    <div class="flex items-center gap-2 flex-wrap">
-                                        <h3 class="font-bold text-base text-slate-900 tracking-tight" x-text="item.commodity_name"></h3>
-                                        <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600" x-text="item.contract_code"></span>
-                                    </div>
-                                    <p class="text-xs text-slate-500 mt-0.5">
-                                        Pemasok: <strong class="text-slate-800" x-text="item.supplier_name"></strong> &bull; Diajukan: <span x-text="item.created_at_human"></span>
-                                    </p>
-                                </div>
+                    <!-- Drawer Header -->
+                    <div class="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-xl bg-orange-50 text-[#ea580c] border border-orange-100 flex items-center justify-center font-bold text-xs">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                             </div>
+                            <div>
+                                <h3 class="font-bold text-sm text-slate-900">Rincian Pengajuan Permintaan</h3>
+                                <p class="text-[11px] text-slate-500 font-mono" x-text="selectedReqDetail?.contract_code"></p>
+                            </div>
+                        </div>
+                        <button type="button" @click="closeReqDetailModal()" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 transition cursor-pointer">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
 
-                            <!-- STATUS BADGE -->
-                            <div class="flex items-center gap-2 shrink-0">
-                                <template x-if="item.status === 'pending' || item.status === 'menunggu' || item.status === 'dalam_review'">
-                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200/80 text-amber-800 text-[11px] font-semibold">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
-                                        <span>Menunggu Persetujuan Pemasok</span>
-                                    </span>
-                                </template>
-                                <template x-if="item.status === 'active' || item.status === 'approved' || item.status === 'disetujui'">
-                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] font-semibold">
-                                        <svg class="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                                        <span>Disetujui &amp; Aktif</span>
-                                    </span>
-                                </template>
-                                <template x-if="item.status === 'rejected' || item.status === 'ditolak'">
-                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 border border-rose-200 text-rose-800 text-[11px] font-semibold">
-                                        <span>Ditolak</span>
-                                    </span>
-                                </template>
-                                <template x-if="item.status === 'cancelled' || item.status === 'dibatalkan'">
-                                    <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-semibold">
-                                        <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                        <span>Dibatalkan oleh UMKM</span>
-                                    </span>
-                                </template>
+                    <!-- Drawer Body -->
+                    <div class="p-5 space-y-4 flex-1 overflow-y-auto text-xs">
+                        <!-- Komoditas & Pemasok Card -->
+                        <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center gap-3">
+                            <template x-if="selectedReqDetail?.commodity_image">
+                                <img :src="selectedReqDetail?.commodity_image" :alt="selectedReqDetail?.commodity_name" class="w-12 h-12 rounded-xl object-cover border border-slate-200 shrink-0">
+                            </template>
+                            <div class="min-w-0 flex-1">
+                                <span class="font-bold text-sm text-slate-900 block truncate" x-text="selectedReqDetail?.commodity_name"></span>
+                                <span class="text-xs text-slate-600 block mt-0.5" x-text="'Pemasok: ' + selectedReqDetail?.supplier_name"></span>
+                                <span class="text-[10px] text-slate-400 block tabular-nums mt-0.5" x-text="'Diajukan pada ' + selectedReqDetail?.created_at_human"></span>
                             </div>
                         </div>
 
-                        <!-- DETAILS GRID -->
-                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs tabular-nums bg-slate-50/70 p-3.5 rounded-xl border border-slate-100">
-                            <div>
-                                <span class="text-[10px] uppercase font-semibold text-slate-400 block tracking-wider">Volume per Kirim</span>
-                                <span class="font-bold text-slate-900 text-sm mt-0.5 block" x-text="item.volume_per_delivery + ' ' + item.unit"></span>
+                        <!-- Param Jadwal & Volume -->
+                        <div class="grid grid-cols-2 gap-2.5 tabular-nums">
+                            <div class="p-3 rounded-xl border border-slate-200/80 bg-white">
+                                <span class="text-[10px] uppercase font-semibold text-slate-400 block">Volume per Kirim</span>
+                                <span class="font-bold text-slate-900 text-sm mt-0.5 block" x-text="selectedReqDetail?.volume_per_delivery + ' ' + selectedReqDetail?.unit"></span>
                             </div>
-                            <div>
-                                <span class="text-[10px] uppercase font-semibold text-slate-400 block tracking-wider">Pola Frekuensi</span>
-                                <span class="font-semibold text-slate-800 text-xs mt-0.5 block" x-text="item.frequency_type"></span>
+                            <div class="p-3 rounded-xl border border-slate-200/80 bg-white">
+                                <span class="text-[10px] uppercase font-semibold text-slate-400 block">Pola Frekuensi</span>
+                                <span class="font-semibold text-slate-800 text-xs mt-0.5 block" x-text="selectedReqDetail?.frequency_type"></span>
                             </div>
-                            <div>
-                                <span class="text-[10px] uppercase font-semibold text-slate-400 block tracking-wider">Jam Tiba Dapur</span>
-                                <span class="font-semibold text-slate-800 text-xs mt-0.5 block" x-text="item.delivery_time + ' WIB'"></span>
+                            <div class="p-3 rounded-xl border border-slate-200/80 bg-white">
+                                <span class="text-[10px] uppercase font-semibold text-slate-400 block">Jam Tiba Dapur</span>
+                                <span class="font-semibold text-slate-800 text-xs mt-0.5 block" x-text="selectedReqDetail?.delivery_time + ' WIB'"></span>
                             </div>
-                            <div>
-                                <span class="text-[10px] uppercase font-semibold text-slate-400 block tracking-wider">Mulai Kirim Perdana</span>
-                                <span class="font-semibold text-slate-800 text-xs mt-0.5 block" x-text="item.start_date_formatted"></span>
+                            <div class="p-3 rounded-xl border border-slate-200/80 bg-white">
+                                <span class="text-[10px] uppercase font-semibold text-slate-400 block">Mulai Kirim Perdana</span>
+                                <span class="font-semibold text-slate-800 text-xs mt-0.5 block" x-text="selectedReqDetail?.start_date_formatted"></span>
                             </div>
                         </div>
 
-                        <!-- KETENTUAN MUTU & CATATAN KHUSUS -->
-                        <div class="space-y-2 text-xs">
-                            <template x-if="item.quality_terms && item.quality_terms.length > 0">
-                                <div class="flex items-center gap-1.5 flex-wrap">
-                                    <span class="text-[11px] text-slate-400 font-semibold mr-1">Aturan Mutu:</span>
-                                    <template x-for="qt in item.quality_terms" :key="qt">
-                                        <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-white border border-slate-200 text-slate-700 text-[10px] font-medium" x-text="qt"></span>
+                        <!-- Aturan Mutu Spesifik -->
+                        <div class="p-3.5 rounded-xl border border-slate-200/80 bg-white space-y-2">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Ketentuan Mutu Khusus</span>
+                            <template x-if="selectedReqDetail?.quality_terms && selectedReqDetail?.quality_terms.length > 0">
+                                <div class="flex flex-wrap gap-1.5">
+                                    <template x-for="qt in selectedReqDetail.quality_terms" :key="qt">
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-md bg-orange-50 border border-orange-200/80 text-[#ea580c] text-[11px] font-semibold" x-text="qt"></span>
                                     </template>
                                 </div>
                             </template>
-
-                            <template x-if="item.clean_notes">
-                                <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-slate-600 text-[11px]">
-                                    <span class="font-bold text-slate-700">Catatan Dapur:</span>
-                                    <span x-text="item.clean_notes"></span>
-                                </div>
+                            <template x-if="!selectedReqDetail?.quality_terms || selectedReqDetail?.quality_terms.length === 0">
+                                <p class="text-slate-400 italic text-[11px]">Tidak ada ketentuan mutu khusus yang dilampirkan.</p>
                             </template>
                         </div>
 
-                        <!-- CARD FOOTER (SLA TIMER & TOMBOL UBAH) -->
-                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
-                            <!-- Left SLA Indicator -->
-                            <div>
-                                <template x-if="item.can_edit">
-                                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-medium">
-                                        <span class="relative flex h-2 w-2">
-                                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-600"></span>
-                                        </span>
-                                        <span>Dapat diubah bebas &bull; Sisa waktu: <strong class="text-emerald-800 font-bold" x-text="item.remaining_minutes + ' menit'"></strong></span>
-                                    </div>
-                                </template>
-
-                                <template x-if="!item.can_edit">
-                                    <div class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-500 text-xs font-medium">
-                                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                                        <span>Data Terkunci (&gt; 30 menit sejak pengajuan)</span>
-                                    </div>
-                                </template>
-                            </div>
-
-                            <!-- Right Action Buttons -->
-                            <div class="flex items-center gap-2">
-                                <template x-if="item.can_edit">
-                                    <div class="flex items-center gap-2">
-                                        <button type="button"
-                                                @click="openEditPermintaanModal(item)"
-                                                class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-orange-50 border border-orange-300 text-[#ea580c] hover:border-[#ea580c] font-bold text-xs rounded-xl shadow-2xs transition cursor-pointer">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
-                                            <span>Ubah Data</span>
-                                        </button>
-
-                                        <button type="button"
-                                                @click="openBatalPermintaanModal(item)"
-                                                class="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-rose-50 border border-rose-300 text-rose-600 hover:border-rose-500 font-bold text-xs rounded-xl shadow-2xs transition cursor-pointer">
-                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                            <span>Batalkan Pengajuan</span>
-                                        </button>
-                                    </div>
-                                </template>
-
-                                <template x-if="!item.can_edit">
-                                    <button type="button"
-                                            disabled
-                                            class="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-50 border border-slate-200 text-slate-400 font-semibold text-xs rounded-xl cursor-not-allowed">
-                                        <svg class="w-3.5 h-3.5 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                                        <span>Terkunci</span>
-                                    </button>
-                                </template>
-                            </div>
+                        <!-- Catatan Dapur -->
+                        <div class="p-3.5 rounded-xl border border-slate-200/80 bg-white space-y-1">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Catatan Dapur</span>
+                            <p class="text-slate-700 text-xs leading-relaxed" x-text="selectedReqDetail?.clean_notes || 'Tidak ada catatan tambahan.'"></p>
                         </div>
 
+                        <!-- Status Kunci Data -->
+                        <div class="p-3 rounded-xl border text-xs" :class="selectedReqDetail?.can_edit ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800' : 'bg-slate-50 border-slate-200 text-slate-600'">
+                            <template x-if="selectedReqDetail?.can_edit">
+                                <div class="flex items-center gap-2">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0"></span>
+                                    <span>Data masih dapat diubah bebas (<strong x-text="selectedReqDetail?.remaining_minutes + ' menit tersisa'"></strong>)</span>
+                                </div>
+                            </template>
+                            <template x-if="!selectedReqDetail?.can_edit">
+                                <div class="flex items-center gap-1.5">
+                                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                    <span>Data telah terkunci permanen untuk stabilitas operasional pemasok.</span>
+                                </div>
+                            </template>
+                        </div>
                     </div>
+
+                    <!-- Drawer Footer Actions -->
+                    <div class="p-4 border-t border-slate-100 bg-slate-50/60 flex items-center justify-between gap-2">
+                        <template x-if="selectedReqDetail?.can_edit">
+                            <div class="flex items-center gap-2 w-full">
+                                <button type="button"
+                                        @click="closeReqDetailModal(); openEditPermintaanModal(selectedReqDetail)"
+                                        class="flex-1 py-2 px-3 bg-[#ea580c] hover:bg-[#c2410c] text-white rounded-xl text-xs font-semibold transition cursor-pointer text-center">
+                                    Ubah Data
+                                </button>
+                                <button type="button"
+                                        @click="closeReqDetailModal(); openBatalPermintaanModal(selectedReqDetail)"
+                                        class="py-2 px-3 bg-white hover:bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs font-semibold transition cursor-pointer">
+                                    Batal
+                                </button>
+                            </div>
+                        </template>
+                        <template x-if="!selectedReqDetail?.can_edit">
+                            <button type="button"
+                                    @click="closeReqDetailModal()"
+                                    class="w-full py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 rounded-xl text-xs font-semibold transition cursor-pointer">
+                                Tutup
+                            </button>
+                        </template>
+                    </div>
+
                 </div>
-            </template>
+            </div>
         </div>
 
     </div>
@@ -1793,49 +2240,6 @@
         <!-- Hidden anchor & Accessibility Title -->
         <div id="katalog-search-bar" class="sr-only scroll-mt-28">Katalog Bahan Baku</div>
 
-        <!-- 2. QUICK CATEGORY FILTER PILLS (CHIPS DENGAN CLEAN SVG ICONS) -->
-        <div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-            <a href="{{ route('umkm.katalog.index', array_merge(request()->except(['category', 'page']), ['tab' => 'katalog', 'category' => 'Semua Kategori'])) }}"
-               class="px-4 py-2.5 rounded-xl font-bold transition flex items-center gap-2 shrink-0 {{ empty($category) || $category === 'Semua Kategori' ? 'bg-[#ea580c] text-white shadow-xs' : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90' }}">
-                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
-                <span>Semua Kategori</span>
-            </a>
-            @foreach($categories as $cat)
-                @php
-                    $isDaging = str_contains(strtolower($cat), 'daging');
-                    $isBumbu = str_contains(strtolower($cat), 'bumbu') || str_contains(strtolower($cat), 'rempah');
-                    $isSembako = str_contains(strtolower($cat), 'sembako');
-                    $isSayuran = str_contains(strtolower($cat), 'sayur');
-                    $isBuah = str_contains(strtolower($cat), 'buah');
-                @endphp
-                <a href="{{ route('umkm.katalog.index', array_merge(request()->except(['category', 'page']), ['tab' => 'katalog', 'category' => $cat])) }}"
-                   class="px-4 py-2.5 rounded-xl font-bold transition flex items-center gap-2 shrink-0 {{ $category === $cat ? 'bg-[#ea580c] text-white shadow-xs' : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90' }}">
-                    @if($isDaging)
-                        <svg class="w-4 h-4 shrink-0 {{ $category === $cat ? 'text-white' : 'text-rose-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 2a4 4 0 00-4 4c0 1.95 1.4 3.58 3.25 3.93A7.502 7.502 0 004 17.5V20a1 1 0 001 1h14a1 1 0 001-1v-2.5a7.502 7.502 0 00-7.25-7.57A4.001 4.001 0 0012 2z"/>
-                        </svg>
-                    @elseif($isBumbu)
-                        <svg class="w-4 h-4 shrink-0 {{ $category === $cat ? 'text-white' : 'text-amber-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343a7.975 7.975 0 012.344 5.657c0 2.12-.838 4.156-2.343 5.657z"/>
-                        </svg>
-                    @elseif($isSembako)
-                        <svg class="w-4 h-4 shrink-0 {{ $category === $cat ? 'text-white' : 'text-emerald-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                        </svg>
-                    @elseif($isSayuran)
-                        <svg class="w-4 h-4 shrink-0 {{ $category === $cat ? 'text-white' : 'text-emerald-600' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21V3m0 0c-4.418 0-8 3.582-8 8 0 2.21 1.79 4 4 4h4c2.21 0 4-1.79 4-4 0-4.418-3.582-8-8-8z"/>
-                        </svg>
-                    @else
-                        <svg class="w-4 h-4 shrink-0 {{ $category === $cat ? 'text-white' : 'text-[#ea580c]' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
-                        </svg>
-                    @endif
-                    <span>{{ $cat }}</span>
-                </a>
-            @endforeach
-        </div>
-
         <!-- 3. CONTAINER SEARCH & ADVANCED FILTERS -->
         <div class="bg-white p-5 sm:p-6 rounded-3xl shadow-xs border border-slate-200/80 space-y-4">
             <form method="GET" action="{{ route('umkm.katalog.index') }}" class="space-y-4">
@@ -1857,10 +2261,10 @@
                         @input="filterCatalog()"
                         value="{{ $search }}"
                         placeholder="Cari nama bahan baku (misal: Daging Ayam, Bawang Merah, Cabai) atau nama pemasok..."
-                        class="w-full pl-10 pr-24 py-3 text-xs sm:text-sm font-medium bg-slate-50 border border-slate-200/90 rounded-2xl text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition"
+                        class="w-full pl-10 pr-10 py-3 text-xs sm:text-sm font-medium bg-slate-50 border border-slate-200/90 rounded-2xl text-slate-900 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition"
                         {{ request()->has('search') ? 'autofocus' : '' }}
                     />
-                    <div class="absolute inset-y-0 right-0 pr-2 flex items-center gap-1">
+                    <div class="absolute inset-y-0 right-0 pr-3 flex items-center gap-1">
                         <button type="button"
                                 x-show="catalogSearch && catalogSearch.length > 0"
                                 @click="clearSearch()"
@@ -1869,11 +2273,6 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                             </svg>
-                        </button>
-                        <button type="button"
-                                @click="filterCatalog()"
-                                class="px-3.5 py-1.5 bg-slate-900 hover:bg-[#ea580c] text-white rounded-xl text-xs font-semibold transition-colors cursor-pointer shadow-2xs">
-                            Cari
                         </button>
                     </div>
                     @if($search)
@@ -1961,23 +2360,51 @@
             </form>
         </div>
 
-        <!-- 4. HASIL PENCARIAN & STATISTIK KOMODITAS -->
-        <div class="flex items-center justify-between text-xs text-slate-500 px-1">
-            <div>
-                Menampilkan <strong class="text-slate-900 font-bold" x-text="visibleProductCount">{{ method_exists($products, 'total') ? $products->total() : $products->count() }}</strong> pilihan bahan baku segar
-                @if($category && $category !== 'Semua Kategori')
-                    pada kategori <span class="text-[#ea580c] font-bold">{{ $category }}</span>
-                @endif
-            </div>
-            <div class="hidden sm:flex items-center gap-2">
-                <span class="inline-flex items-center gap-1.5 text-[11px] text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full font-semibold border border-emerald-200/60">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                    <span>Harga Grosir Terverifikasi</span>
-                </span>
-            </div>
+        <!-- 2. QUICK CATEGORY FILTER PILLS (DILETAKKAN DI BAWAH CARD FILTER & SEARCH) -->
+        <div class="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+            <a href="{{ route('umkm.katalog.index', array_merge(request()->except(['category', 'page']), ['tab' => 'katalog', 'category' => 'Semua Kategori'])) }}"
+               class="px-4 py-2.5 rounded-xl font-bold transition flex items-center gap-2 shrink-0 {{ empty($category) || $category === 'Semua Kategori' ? 'bg-[#ea580c] text-white shadow-xs' : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90' }}">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                <span>Semua Kategori</span>
+            </a>
+            @foreach($categories as $cat)
+                @php
+                    $isDaging = str_contains(strtolower($cat), 'daging');
+                    $isBumbu = str_contains(strtolower($cat), 'bumbu') || str_contains(strtolower($cat), 'rempah');
+                    $isSembako = str_contains(strtolower($cat), 'sembako');
+                    $isSayuran = str_contains(strtolower($cat), 'sayur');
+                    $isBuah = str_contains(strtolower($cat), 'buah');
+                @endphp
+                <a href="{{ route('umkm.katalog.index', array_merge(request()->except(['category', 'page']), ['tab' => 'katalog', 'category' => $cat])) }}"
+                   class="px-4 py-2.5 rounded-xl font-bold transition flex items-center gap-2 shrink-0 {{ $category === $cat ? 'bg-[#ea580c] text-white shadow-xs' : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90' }}">
+                    @if($isDaging)
+                        <svg class="w-4 h-4 shrink-0 {{ $category === $cat ? 'text-white' : 'text-rose-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 2a4 4 0 00-4 4c0 1.95 1.4 3.58 3.25 3.93A7.502 7.502 0 004 17.5V20a1 1 0 001 1h14a1 1 0 001-1v-2.5a7.502 7.502 0 00-7.25-7.57A4.001 4.001 0 0012 2z"/>
+                        </svg>
+                    @elseif($isBumbu)
+                        <svg class="w-4 h-4 shrink-0 {{ $category === $cat ? 'text-white' : 'text-amber-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343a7.975 7.975 0 012.344 5.657c0 2.12-.838 4.156-2.343 5.657z"/>
+                        </svg>
+                    @elseif($isSembako)
+                        <svg class="w-4 h-4 shrink-0 {{ $category === $cat ? 'text-white' : 'text-emerald-500' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                        </svg>
+                    @elseif($isSayuran)
+                        <svg class="w-4 h-4 shrink-0 {{ $category === $cat ? 'text-white' : 'text-emerald-600' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21V3m0 0c-4.418 0-8 3.582-8 8 0 2.21 1.79 4 4 4h4c2.21 0 4-1.79 4-4 0-4.418-3.582-8-8-8z"/>
+                        </svg>
+                    @else
+                        <svg class="w-4 h-4 shrink-0 {{ $category === $cat ? 'text-white' : 'text-[#ea580c]' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/>
+                        </svg>
+                    @endif
+                    <span>{{ $cat }}</span>
+                </a>
+            @endforeach
         </div>
 
         <!-- 5. GRID KATALOG KOMODITAS BAHAN BAKU -->
+        <div id="catalog-grid-wrapper" class="space-y-6 relative transition-opacity duration-200">
         @if($products->isEmpty())
             <div class="bg-white rounded-3xl p-12 text-center shadow-xs border border-slate-200/80 space-y-4">
                 <div class="w-16 h-16 mx-auto rounded-3xl bg-orange-50 border border-orange-100 flex items-center justify-center text-[#ea580c]">
@@ -2115,13 +2542,6 @@
                                     <span>Halal</span>
                                 </span>
                             @endif
-
-                            <!-- Bottom-Right Badge: Quality Grade -->
-                            @if(!empty($product->quality_grade))
-                                <span class="absolute bottom-2.5 right-3 bg-white/95 backdrop-blur-md text-slate-800 border border-slate-200 text-[10px] font-bold px-2 py-0.5 rounded-lg shadow-2xs">
-                                    {{ $product->quality_grade }}
-                                </span>
-                            @endif
                         </div>
 
                         <!-- Konten Kartu -->
@@ -2150,22 +2570,10 @@
                                 @endphp
                                 <div class="pt-2 flex items-center justify-between gap-2 text-[11px] border-t border-slate-100 tabular-nums">
                                     <div class="flex items-center gap-1.5 flex-wrap">
-                                        @if($perfScore && $perfScore->grade !== \App\Models\SupplierPerformanceScore::GRADE_UNRATED)
-                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-bold border {{ $perfScore->getGradeBadgeColor() }}">
-                                                Grade {{ $perfScore->grade }}
-                                            </span>
-                                            <span class="text-slate-800 font-bold inline-flex items-center gap-0.5 text-[11px]">
-                                                <svg class="w-3 h-3 text-amber-500 fill-amber-500" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                                                {{ number_format((float) ($perfScore->star_rating ?? 0), 1) }}
-                                            </span>
-                                            <span class="text-slate-500 text-[10px] font-medium">
-                                                {{ number_format((float) ($perfScore->metrics_breakdown['delivery']['otd_rate'] ?? 100), 0) }}% Tepat Waktu
-                                            </span>
-                                        @else
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200/80">
-                                                Vendor Terverifikasi
-                                            </span>
-                                        @endif
+                                        <span class="text-slate-800 font-bold inline-flex items-center gap-0.5 text-xs">
+                                            <svg class="w-3.5 h-3.5 text-amber-500 fill-amber-500" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                                            {{ number_format((float) ($perfScore->star_rating ?? 5.0), 1) }}
+                                        </span>
                                     </div>
                                     <button 
                                         type="button" 
@@ -2265,6 +2673,7 @@
                 {{ $products->links() }}
             </div>
         @endif
+        </div>
 
     </div>
 
@@ -2338,7 +2747,7 @@
                                 Mitra Pemasok Terpilih <span class="text-rose-500">*</span>
                             </label>
                             <div class="relative">
-                                <select name="supplier_id" x-model="planningForm.supplier_id" required class="w-full pl-3.5 pr-9 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-800 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] appearance-none cursor-pointer transition">
+                                <select name="supplier_id" x-model="planningForm.supplier_id" @change="onSupplierChange()" required class="w-full pl-3.5 pr-9 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-800 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] appearance-none cursor-pointer transition">
                                     <option value="" disabled>-- Pilih Mitra Pemasok --</option>
                                     @forelse($availableSuppliers as $sup)
                                         <option value="{{ $sup->id }}">{{ $sup->company_name }} ({{ $sup->delivery_area ?? 'Lokal' }})</option>
@@ -2357,16 +2766,16 @@
                                 Komoditas Bahan Baku <span class="text-rose-500">*</span>
                             </label>
                             <div class="relative">
-                                <select name="commodity_name" x-model="planningForm.commodity" required class="w-full pl-3.5 pr-9 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-800 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] appearance-none cursor-pointer transition">
-                                    @forelse($availableCommodities as $comm)
-                                        <option value="{{ $comm->name }}">{{ $comm->name }} ({{ $comm->category }})</option>
-                                    @empty
+                                <select name="commodity_name" x-model="planningForm.commodity" @change="onCommodityChange()" required class="w-full pl-3.5 pr-9 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-slate-800 font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] appearance-none cursor-pointer transition">
+                                    <option value="" disabled>-- Pilih Komoditas --</option>
+                                    <template x-for="comm in availableCommoditiesForSelectedSupplier" :key="comm.id || comm.name">
+                                        <option :value="comm.name" x-text="comm.name + (comm.category ? ' (' + comm.category + ')' : '')"></option>
+                                    </template>
+                                    @if(empty($partnerSuppliers) || count($partnerSuppliers) === 0)
                                         <option>Daging Ayam Broiler Segar</option>
                                         <option>Bawang Merah Biru Probolinggo</option>
                                         <option>Telur Ayam Ras Grade A</option>
-                                        <option>Cabai Rawit Merah Super</option>
-                                        <option>Daging Sapi Lokal Segar</option>
-                                    @endforelse
+                                    @endif
                                 </select>
                                 <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-400">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
@@ -2382,18 +2791,15 @@
                                 Estimasi Kuantitas &amp; Satuan <span class="text-rose-500">*</span>
                             </label>
                             <div class="flex rounded-xl overflow-hidden bg-slate-50 border border-slate-200/90 focus-within:bg-white focus-within:border-[#ea580c] focus-within:ring-2 focus-within:ring-orange-500/15 transition">
-                                <input type="number" step="0.1" min="0.1" name="estimated_quantity" x-model="planningForm.volume" required placeholder="Masukkan kuantitas kebutuhan" class="w-full px-3.5 py-2.5 bg-transparent text-slate-900 font-semibold tabular-nums placeholder:text-slate-400 border-0 focus:outline-none" />
-                                <select name="unit" x-model="planningForm.unit" class="bg-slate-100 border-l border-slate-200/80 px-3 py-2.5 text-slate-700 font-semibold focus:outline-none cursor-pointer text-xs">
-                                    @forelse($availableUnits as $unit)
-                                        <option value="{{ $unit->name }}">{{ $unit->name }} ({{ $unit->symbol }})</option>
-                                    @empty
-                                        <option value="kg">kg</option>
-                                        <option value="liter">liter</option>
-                                        <option value="pcs">pcs</option>
-                                        <option value="ikat">ikat</option>
-                                        <option value="karung">karung</option>
-                                        <option value="dus">dus</option>
-                                    @endforelse
+                                <input type="number" step="0.1" min="0.1" name="estimated_quantity" x-model="planningForm.volume" required placeholder="Masukkan kuantitas kebutuhan (misal: 100)" class="w-full px-3.5 py-2.5 bg-transparent text-slate-900 font-semibold tabular-nums placeholder:text-slate-400 border-0 focus:outline-none" />
+                                <select name="unit" x-model="planningForm.unit" class="bg-slate-100 border-l border-slate-200/80 px-3 py-2.5 text-slate-700 font-semibold focus:outline-none cursor-pointer text-xs shrink-0 min-w-[90px]">
+                                    <option value="kg">kg</option>
+                                    <option value="gram">gram</option>
+                                    <option value="liter">liter</option>
+                                    <option value="pcs">pcs</option>
+                                    <option value="ikat">ikat</option>
+                                    <option value="karung">karung</option>
+                                    <option value="dus">dus</option>
                                 </select>
                             </div>
                         </div>
@@ -2714,8 +3120,8 @@
                             <span class="inline-flex items-center gap-1 text-[10px] bg-amber-500 text-white px-1.5 py-0.2 rounded font-bold" x-text="pendingPaymentCount + ' Siap Bayar'"></span>
                         </template>
                     </div>
-                    <p class="font-bold text-slate-900 text-xs">3. Bayar via Midtrans</p>
-                    <p class="text-[10px] text-slate-500 mt-0.5 leading-snug">Dana aman di Rekening Bersama per kloter</p>
+                    <p class="font-bold text-slate-900 text-xs">3. Bayar Tagihan</p>
+                    <p class="text-[10px] text-slate-500 mt-0.5 leading-snug">Pembayaran aman invoice pasokan bahan baku</p>
                 </button>
 
                 <!-- Tahap 4: Ulas Mutu -->
@@ -2725,7 +3131,12 @@
                         :class="orderSubTab === 'rating' ? 'bg-orange-50/70 border-orange-300 ring-1 ring-orange-400/30' : 'bg-slate-50/70 border-slate-200/90 hover:bg-slate-100/70'">
                     <div class="flex items-center justify-between gap-1 mb-1.5">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Langkah 4</span>
-                        <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        <template x-if="pendingReviewCount > 0">
+                            <span class="inline-flex items-center gap-1 text-[10px] bg-orange-600 text-white px-1.5 py-0.2 rounded font-bold" x-text="pendingReviewCount + ' Perlu Ulas'"></span>
+                        </template>
+                        <template x-if="pendingReviewCount === 0">
+                            <svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                        </template>
                     </div>
                     <p class="font-bold text-slate-900 text-xs">4. Nilai Mutu Pemasok</p>
                     <p class="text-[10px] text-slate-500 mt-0.5 leading-snug">Rating kesegaran komoditas &amp; ketepatan waktu</p>
@@ -2754,28 +3165,26 @@
                 class="pb-3.5 relative transition flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
                 :class="orderSubTab === 'confirm' ? 'text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'">
                 <span>2. Konfirmasi Terima Barang</span>
-                <template x-if="pendingValidationCount > 0">
-                    <span class="bg-[#ea580c] text-white text-[10px] px-2 py-0.5 rounded-md font-semibold tabular-nums"
-                          x-text="pendingValidationCount">
-                    </span>
-                </template>
+                <span x-cloak x-show="pendingValidationCount > 0" class="bg-[#ea580c] text-white text-[10px] px-2 py-0.5 rounded-md font-semibold tabular-nums"
+                      x-text="pendingValidationCount">
+                    {{ $pendingValidationCount ?? 0 }}
+                </span>
                 <template x-if="orderSubTab === 'confirm'">
                     <span class="absolute bottom-0 left-0 w-full h-0.5 bg-[#ea580c] rounded-full"></span>
                 </template>
             </button>
 
-            <!-- 3. Pembayaran Midtrans -->
+            <!-- 3. Pembayaran -->
             <button 
                 type="button"
                 @click="orderSubTab = 'payment'"
                 class="pb-3.5 relative transition flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
                 :class="orderSubTab === 'payment' ? 'text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'">
-                <span>3. Bayar Tagihan (Midtrans)</span>
-                <template x-if="pendingPaymentCount > 0">
-                    <span class="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-md font-semibold tabular-nums"
-                          x-text="pendingPaymentCount">
-                    </span>
-                </template>
+                <span>3. Bayar Tagihan</span>
+                <span x-cloak x-show="pendingPaymentCount > 0" class="bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded-md font-semibold tabular-nums"
+                      x-text="pendingPaymentCount">
+                    {{ $pendingPaymentCount ?? 0 }}
+                </span>
                 <template x-if="orderSubTab === 'payment'">
                     <span class="absolute bottom-0 left-0 w-full h-0.5 bg-[#ea580c] rounded-full"></span>
                 </template>
@@ -2787,17 +3196,15 @@
                 @click="orderSubTab = 'backorder'"
                 class="pb-3.5 relative transition flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
                 :class="orderSubTab === 'backorder' ? 'text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'">
-                <span>Pasokan Menyusul (Kloter 2)</span>
-                <template x-if="pendingBackorderApprovalCount > 0">
-                    <span class="bg-rose-600 text-white text-[10px] px-2 py-0.5 rounded-md font-semibold tabular-nums animate-pulse"
-                          x-text="pendingBackorderApprovalCount + ' Pengajuan'">
-                    </span>
-                </template>
-                <template x-if="pendingBackorderApprovalCount === 0 && pendingBackorderCount > 0">
-                    <span class="bg-amber-100 text-amber-900 border border-amber-200 text-[10px] px-2 py-0.5 rounded-md font-bold tabular-nums"
-                          x-text="pendingBackorderCount">
-                    </span>
-                </template>
+                <span>Pasokan Menyusul</span>
+                <span x-cloak x-show="pendingBackorderApprovalCount > 0" class="bg-rose-600 text-white text-[10px] px-2 py-0.5 rounded-md font-semibold tabular-nums animate-pulse"
+                      x-text="pendingBackorderApprovalCount + ' Pengajuan'">
+                    {{ ($pendingBackorderApprovalCount ?? 0) > 0 ? $pendingBackorderApprovalCount . ' Pengajuan' : '' }}
+                </span>
+                <span x-cloak x-show="pendingBackorderApprovalCount === 0 && pendingBackorderCount > 0" class="bg-amber-100 text-amber-900 border border-amber-200 text-[10px] px-2 py-0.5 rounded-md font-bold tabular-nums"
+                      x-text="pendingBackorderCount">
+                    {{ $pendingBackorderCount ?? 0 }}
+                </span>
                 <template x-if="orderSubTab === 'backorder'">
                     <span class="absolute bottom-0 left-0 w-full h-0.5 bg-[#ea580c] rounded-full"></span>
                 </template>
@@ -2810,11 +3217,10 @@
                 class="pb-3.5 relative transition flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0"
                 :class="orderSubTab === 'rating' ? 'text-slate-900 font-bold' : 'text-slate-500 hover:text-slate-900'">
                 <span>4. Rating &amp; Ulasan</span>
-                @if(isset($reviewOrders) && $reviewOrders->isNotEmpty())
-                    <span class="bg-orange-50 text-[#ea580c] border border-orange-200/70 text-[10px] px-2 py-0.5 rounded-md font-bold tabular-nums">
-                        {{ $reviewOrders->count() }}
-                    </span>
-                @endif
+                <span x-cloak x-show="pendingReviewCount > 0" class="bg-orange-50 text-[#ea580c] border border-orange-200/70 text-[10px] px-2 py-0.5 rounded-md font-bold tabular-nums"
+                      x-text="pendingReviewCount">
+                    {{ $pendingReviewCount ?? 0 }}
+                </span>
                 <template x-if="orderSubTab === 'rating'">
                     <span class="absolute bottom-0 left-0 w-full h-0.5 bg-[#ea580c] rounded-full"></span>
                 </template>
@@ -4833,41 +5239,52 @@
             </div>
         </div>
 
-        <!-- DAFTAR EVALUASI PER KEMITRAAN / PEMASOK -->
-        <div class="space-y-4">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <h3 class="font-bold text-base text-slate-900 flex items-center gap-2 tabular-nums">
-                    <span>Daftar Kontrak &amp; Realisasi Layanan Vendor</span>
-                    <span class="text-xs font-medium text-slate-400" x-text="'(' + filteredSupplierCount + ' Mitra Ditampilkan)'">({{ $perfItems->count() }} Mitra Aktif)</span>
-                </h3>
+        <!-- MAIN CARD: TABEL PEMANTAUAN MUTU & SLA (SEPERTI RIWAYAT TRANSAKSI) -->
+        <div class="bg-white rounded-2xl border border-slate-200/80 p-6 sm:p-7 space-y-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+            <!-- Header & Toolbar -->
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+                <div>
+                    <h3 class="text-base sm:text-lg font-bold text-slate-900 tracking-tight">Daftar Kinerja &amp; SLA Vendor</h3>
+                    <p class="text-xs text-slate-500 mt-0.5">Pantau realisasi ketepatan waktu pengiriman, pemenuhan kuota, dan mutu pasokan mitra.</p>
+                </div>
 
-                <!-- SEARCH BAR INPUT -->
-                <div class="relative w-full sm:w-80">
-                    <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                    </span>
-                    <input 
-                        type="text" 
-                        x-model="monitoringSearchQuery" 
-                        placeholder="Cari pemasok, komoditas, atau alamat..." 
-                        class="w-full pl-10 pr-9 py-2.5 rounded-xl bg-white border border-slate-200/90 text-xs font-medium text-slate-800 placeholder:text-slate-400 shadow-2xs focus:outline-none focus:ring-2 focus:ring-orange-500/15 focus:border-[#ea580c] transition"
-                    />
-                    <button 
-                        type="button" 
-                        x-show="monitoringSearchQuery" 
-                        @click="monitoringSearchQuery = ''" 
-                        class="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
-                    </button>
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2.5">
+                    <!-- Dropdown Filter Grade / Kepatuhan -->
+                    <div class="relative min-w-[170px]">
+                        <select x-model="monitoringGradeFilter"
+                                @change="monitoringCurrentPage = 1"
+                                class="w-full py-2 pl-3 pr-8 rounded-xl bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[#ea580c] focus:bg-white transition cursor-pointer">
+                            <option value="all">Semua Grade &amp; SLA</option>
+                            <option value="A">Grade A (SLA Prima)</option>
+                            <option value="B">Grade B (SLA Standar)</option>
+                            <option value="C">Grade C (Defisit Telat)</option>
+                            <option value="D">Grade D (Peringatan)</option>
+                            <option value="UNRATED">Masa Observasi (Baru)</option>
+                        </select>
+                    </div>
+
+                    <!-- Search Input -->
+                    <div class="relative w-full sm:w-64">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        </span>
+                        <input type="text"
+                               x-model="monitoringSearchQuery"
+                               @input="monitoringCurrentPage = 1"
+                               placeholder="Cari pemasok, komoditas..."
+                               class="w-full pl-8 pr-7 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/20 focus:border-[#ea580c] focus:bg-white transition">
+                        <button type="button"
+                                x-show="monitoringSearchQuery"
+                                @click="monitoringSearchQuery = ''; monitoringCurrentPage = 1"
+                                class="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                        </button>
+                    </div>
                 </div>
             </div>
 
             @if($perfItems->isEmpty())
-                <div class="bg-white rounded-2xl p-10 text-center border border-slate-200/80 shadow-xs space-y-3">
+                <div class="rounded-xl p-10 text-center border border-slate-200/80 bg-slate-50/50 space-y-3">
                     <div class="w-12 h-12 bg-orange-50 text-[#ea580c] rounded-2xl flex items-center justify-center mx-auto border border-orange-200/70">
                         <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -4880,194 +5297,186 @@
                     </button>
                 </div>
             @else
-                <!-- State Jika Tidak Ada Hasil Pencarian -->
-                <div x-show="filteredSupplierCount === 0 && monitoringSearchQuery" class="bg-white rounded-2xl p-8 text-center border border-slate-200/80 shadow-xs space-y-3">
-                    <div class="w-11 h-11 bg-slate-100 text-slate-500 rounded-2xl flex items-center justify-center mx-auto border border-slate-200/80">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                        </svg>
-                    </div>
-                    <h4 class="font-bold text-sm text-slate-900">Tidak ada pemasok yang cocok</h4>
-                    <p class="text-xs text-slate-500 max-w-sm mx-auto">Tidak ditemukan mitra pemasok dengan kata kunci "<span class="font-semibold text-slate-800" x-text="monitoringSearchQuery"></span>".</p>
-                    <button type="button" @click="monitoringSearchQuery = ''" class="px-4 py-2 rounded-xl text-xs font-semibold text-[#ea580c] bg-orange-50 hover:bg-orange-100 border border-orange-200/80 transition cursor-pointer">
-                        Reset Pencarian
-                    </button>
+                <!-- Bordered Table Wrapper -->
+                <div class="overflow-x-auto border border-slate-200/80 rounded-xl">
+                    <table class="min-w-full divide-y divide-slate-200/80 text-xs text-left">
+                        <thead class="bg-slate-50/90 text-slate-500 font-bold uppercase tracking-wider text-[11px]">
+                            <tr>
+                                <th scope="col" class="py-3 px-4">Mitra Pemasok &amp; Komoditas</th>
+                                <th scope="col" class="py-3 px-3.5">Ketepatan (OTD)</th>
+                                <th scope="col" class="py-3 px-3.5">Pemenuhan (OFR)</th>
+                                <th scope="col" class="py-3 px-3.5">Bebas Retur</th>
+                                <th scope="col" class="py-3 px-4 text-right">Status &amp; Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <!-- State Tidak Ada Hasil Filter -->
+                            <tr x-show="filteredSupplierCount === 0">
+                                <td colspan="5" class="py-10 px-4 text-center">
+                                    <div class="w-10 h-10 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center mx-auto mb-2">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                                    </div>
+                                    <p class="font-bold text-slate-800 text-sm">Tidak Ada Pemasok yang Cocok</p>
+                                    <p class="text-xs text-slate-500 mt-0.5">Tidak ditemukan mitra pemasok dengan filter atau pencarian saat ini.</p>
+                                    <button type="button" @click="monitoringSearchQuery = ''; monitoringGradeFilter = 'all'; monitoringCurrentPage = 1" class="mt-2.5 px-3.5 py-1.5 bg-orange-50 hover:bg-orange-100 text-[#ea580c] border border-orange-200 text-xs font-semibold rounded-xl transition cursor-pointer">
+                                        Reset Filter Pencarian
+                                    </button>
+                                </td>
+                            </tr>
+
+                            @foreach($perfItems as $item)
+                                @php
+                                    $sup = $item['supplier'];
+                                    $score = $item['score'];
+                                    $p = $item['partnership'];
+                                    $metrics = $score?->metrics_breakdown ?? [];
+                                    $gradeBadge = $score ? $score->getGradeBadgeColor() : 'bg-slate-100 text-slate-700 border-slate-200';
+                                    $gradeLabel = $score ? $score->getGradeLabel() : 'Vendor Baru';
+                                    $grade = $score?->grade ?? 'UNRATED';
+                                    $otdRate = $metrics['delivery']['otd_rate'] ?? 100.0;
+                                    $fillRate = $metrics['fulfillment']['fill_rate'] ?? 100.0;
+                                    $avgDelay = $metrics['delivery']['avg_delay_hours'] ?? 0.0;
+                                    $backorderRate = $metrics['fulfillment']['backorder_rate'] ?? 0.0;
+                                    $defectFree = $metrics['quality']['defect_free_rate'] ?? 100.0;
+                                @endphp
+                                <tr x-show="isSupplierVisibleOnPage('{{ $sup?->id }}')" class="hover:bg-slate-50/70 transition">
+                                    <!-- 1. Mitra Pemasok & Komoditas -->
+                                    <td class="py-3.5 px-4">
+                                        <div class="flex items-center gap-3">
+                                            <div class="w-9 h-9 rounded-xl bg-orange-50 text-[#ea580c] font-bold text-xs flex items-center justify-center border border-orange-200/70 shrink-0">
+                                                {{ substr($sup?->company_name ?? 'P', 0, 1) }}
+                                            </div>
+                                            <div class="min-w-0">
+                                                <div class="flex items-center gap-2 flex-wrap tabular-nums">
+                                                    <span class="font-bold text-slate-900 text-xs truncate max-w-[170px] sm:max-w-xs">{{ $sup?->company_name ?? 'Pemasok Mitra' }}</span>
+                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border transition-colors"
+                                                          :class="supplierScores['{{ $sup?->id }}']?.grade_badge_color || '{{ $gradeBadge }}'"
+                                                          x-text="'Grade ' + (supplierScores['{{ $sup?->id }}']?.grade || '{{ $grade }}')">
+                                                        Grade {{ $grade }}
+                                                    </span>
+                                                    <span class="inline-flex items-center gap-0.5 text-[11px] font-bold text-amber-600">
+                                                        <svg class="w-3 h-3 text-amber-500 fill-amber-500" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                                                        <span x-text="Number(supplierScores['{{ $sup?->id }}']?.star_rating || {{ $score?->star_rating ?? 5.0 }}).toFixed(1)">
+                                                            {{ number_format((float) ($score?->star_rating ?? 5.0), 1) }}
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                                <p class="text-[11px] text-slate-500 mt-0.5 truncate tabular-nums">
+                                                    <span>{{ $sup?->warehouse_address ?? 'Area Lokal' }}</span>
+                                                    <span class="text-slate-300">&bull;</span>
+                                                    <span class="font-medium text-slate-700" x-text="supplierScores['{{ $sup?->id }}']?.commodity_name || '{{ $item['commodity_name'] ?? '' }}'"></span>
+                                                    @if(!empty($p))
+                                                        <span class="text-slate-400">({{ number_format((float) ($p->volume_per_delivery ?? 0), 0) }} {{ $p->commodity?->unit ?? 'kg' }})</span>
+                                                    @endif
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <!-- 2. Ketepatan Waktu (OTD) -->
+                                    <td class="py-3.5 px-3.5 tabular-nums">
+                                        <div class="space-y-1">
+                                            <div class="flex items-center justify-between text-xs">
+                                                <span class="font-bold text-slate-900" x-text="(supplierScores['{{ $sup?->id }}']?.otd_rate ?? {{ $otdRate }}) + '%'">{{ $otdRate }}%</span>
+                                            </div>
+                                            <div class="w-24 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                                <div class="h-1.5 rounded-full bg-emerald-500 transition-all duration-300"
+                                                     :style="'width: ' + Math.min(100, Math.max(0, supplierScores['{{ $sup?->id }}']?.otd_rate ?? {{ $otdRate }})) + '%'"></div>
+                                            </div>
+                                            <div class="text-[10px] text-slate-400">
+                                                Rerata telat <span x-text="(supplierScores['{{ $sup?->id }}']?.avg_delay ?? {{ $avgDelay }}) + ' jam'">{{ $avgDelay }} jam</span>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <!-- 3. Pemenuhan Kuota (OFR) -->
+                                    <td class="py-3.5 px-3.5 tabular-nums">
+                                        <div class="space-y-1">
+                                            <div class="flex items-center justify-between text-xs">
+                                                <span class="font-bold text-slate-900" x-text="(supplierScores['{{ $sup?->id }}']?.fill_rate ?? {{ $fillRate }}) + '%'">{{ $fillRate }}%</span>
+                                            </div>
+                                            <div class="w-24 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                                <div class="h-1.5 rounded-full bg-sky-500 transition-all duration-300"
+                                                     :style="'width: ' + Math.min(100, Math.max(0, supplierScores['{{ $sup?->id }}']?.fill_rate ?? {{ $fillRate }})) + '%'"></div>
+                                            </div>
+                                            <div class="text-[10px] text-slate-400">
+                                                Backorder <span x-text="(supplierScores['{{ $sup?->id }}']?.backorder_rate ?? {{ $backorderRate }}) + '%'">{{ $backorderRate }}%</span>
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <!-- 4. Bebas Retur & Cacat -->
+                                    <td class="py-3.5 px-3.5 tabular-nums">
+                                        <div class="space-y-1">
+                                            <div class="flex items-center justify-between text-xs">
+                                                <span class="font-bold text-slate-900" x-text="(supplierScores['{{ $sup?->id }}']?.defect_free ?? {{ $defectFree }}) + '%'">{{ $defectFree }}%</span>
+                                            </div>
+                                            <div class="w-24 bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                                                <div class="h-1.5 rounded-full bg-purple-500 transition-all duration-300"
+                                                     :style="'width: ' + Math.min(100, Math.max(0, supplierScores['{{ $sup?->id }}']?.defect_free ?? {{ $defectFree }})) + '%'"></div>
+                                            </div>
+                                            <div class="text-[10px] text-slate-400">
+                                                Kesesuaian Spesifikasi
+                                            </div>
+                                        </div>
+                                    </td>
+
+                                    <!-- 5. Status & Aksi -->
+                                    <td class="py-3.5 px-4 text-right">
+                                        <div class="flex items-center justify-end gap-1.5">
+                                            <!-- Tombol Hitung Ulang -->
+                                            <button type="button"
+                                                    @click="recalculateSupplierTracker('{{ $sup?->id }}', '{{ $p?->id }}', true)"
+                                                    :disabled="recalculatingSupplierId === '{{ $sup?->id }}'"
+                                                    class="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition shadow-2xs cursor-pointer disabled:opacity-50"
+                                                    title="Hitung Ulang Skor SLA">
+                                                <svg class="w-3.5 h-3.5" :class="recalculatingSupplierId === '{{ $sup?->id }}' ? 'animate-spin text-[#ea580c]' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                </svg>
+                                            </button>
+
+                                            <!-- Tombol Rapor SLA -->
+                                            <button type="button"
+                                                    @click="openSupplierTrackerModal('{{ $sup?->id }}', '{{ $p?->id }}')"
+                                                    class="px-2.5 py-1.5 rounded-lg border border-orange-200 bg-orange-50 hover:bg-orange-100 text-[#ea580c] text-xs font-semibold inline-flex items-center gap-1 transition shadow-2xs cursor-pointer">
+                                                <span>Rapor Detail SLA</span>
+                                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
 
-                <div class="grid grid-cols-1 gap-5">
-                    @foreach($perfItems as $item)
-                        @php
-                            $sup = $item['supplier'];
-                            $score = $item['score'];
-                            $p = $item['partnership'];
-                            $metrics = $score?->metrics_breakdown ?? [];
-                            $gradeBadge = $score ? $score->getGradeBadgeColor() : 'bg-slate-100 text-slate-700 border-slate-200';
-                            $gradeLabel = $score ? $score->getGradeLabel() : 'Vendor Baru';
-                            $grade = $score?->grade ?? 'UNRATED';
-                            $otdRate = $metrics['delivery']['otd_rate'] ?? 100.0;
-                            $fillRate = $metrics['fulfillment']['fill_rate'] ?? 100.0;
-                            $avgDelay = $metrics['delivery']['avg_delay_hours'] ?? 0.0;
-                            $backorderRate = $metrics['fulfillment']['backorder_rate'] ?? 0.0;
-                            $defectFree = $metrics['quality']['defect_free_rate'] ?? 100.0;
-                        @endphp
-                        <div x-show="isSupplierMatched('{{ $sup?->id }}', '{{ addslashes($sup?->company_name ?? '') }}', '{{ addslashes($sup?->warehouse_address ?? '') }}', '{{ addslashes($item['commodity_name'] ?? '') }}')" class="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-xs hover:shadow-md hover:border-slate-300/80 transition-all duration-200 space-y-5">
-                            <!-- Card Header -->
-                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
-                                <div class="flex items-start gap-3.5">
-                                    <div class="w-11 h-11 rounded-xl bg-orange-50 text-[#ea580c] font-bold flex items-center justify-center text-base border border-orange-200/70 shrink-0">
-                                        {{ substr($sup?->company_name ?? 'P', 0, 1) }}
-                                    </div>
-                                    <div>
-                                        <div class="flex items-center gap-2 flex-wrap tabular-nums">
-                                            <h4 class="font-bold text-base text-slate-900">{{ $sup?->company_name ?? 'Pemasok Mitra' }}</h4>
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold border transition-colors"
-                                                  :class="supplierScores['{{ $sup?->id }}']?.grade_badge_color || '{{ $gradeBadge }}'"
-                                                  x-text="'Grade ' + (supplierScores['{{ $sup?->id }}']?.grade || '{{ $grade }}')">
-                                                Grade {{ $grade }}
-                                            </span>
-                                            <span class="inline-flex items-center gap-1 text-xs font-semibold text-amber-600">
-                                                <svg class="w-3.5 h-3.5 text-amber-500 fill-amber-500" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                                                <span x-text="Number(supplierScores['{{ $sup?->id }}']?.star_rating || {{ $score?->star_rating ?? 5.0 }}).toFixed(1)">
-                                                    {{ number_format((float) ($score?->star_rating ?? 5.0), 1) }}
-                                                </span>
-                                            </span>
-                                        </div>
-                                        <p class="text-xs text-slate-500 mt-1 flex items-center gap-1.5 flex-wrap tabular-nums">
-                                            <span>{{ $sup?->warehouse_address ?? 'Area Lokal' }}</span>
-                                            <span class="text-slate-300">•</span>
-                                            <span>Komoditas: <strong class="text-slate-800 font-semibold">{{ $item['commodity_name'] }}</strong> ({{ number_format((float) ($item['volume_per_delivery'] ?? 0), 0) }} {{ $item['unit'] }}/jadwal)</span>
-                                        </p>
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-2 self-end sm:self-center">
-                                    <button 
-                                        type="button" 
-                                        @click="recalculateSupplierTracker('{{ $sup?->id }}', '{{ $p?->id }}', false)" 
-                                        :disabled="recalculatingSupplierId === '{{ $sup?->id }}'"
-                                        class="px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/90 transition flex items-center gap-1.5 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
-                                        <svg :class="recalculatingSupplierId === '{{ $sup?->id }}' ? 'animate-spin text-[#ea580c]' : 'text-slate-400'" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                                        </svg>
-                                        <span x-text="recalculatingSupplierId === '{{ $sup?->id }}' ? 'Menghitung...' : 'Hitung Ulang'">Hitung Ulang</span>
-                                    </button>
-                                    <button 
-                                        type="button" 
-                                        @click="openSupplierTrackerModal('{{ $sup?->id }}', '{{ $p?->id }}')" 
-                                        class="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-[#ea580c] hover:bg-[#c2410c] shadow-xs transition flex items-center gap-1.5 cursor-pointer">
-                                        <span>Rapor Detail SLA</span>
-                                        <svg class="w-3.5 h-3.5 text-white/85" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                                    </button>
-                                </div>
-                            </div>
+                <!-- TABLE PAGINATION FOOTER: HANYA TAMPIL JIKA DATA > 10 -->
+                <div x-show="filteredSupplierCount > 10" class="pt-3 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+                    <div class="text-slate-500 tabular-nums">
+                        Menampilkan
+                        <strong class="text-slate-800" x-text="filteredSupplierCount === 0 ? 0 : ((monitoringCurrentPage - 1) * monitoringPageSize + 1)"></strong>
+                        s/d
+                        <strong class="text-slate-800" x-text="Math.min(monitoringCurrentPage * monitoringPageSize, filteredSupplierCount)"></strong>
+                        dari
+                        <strong class="text-slate-800" x-text="filteredSupplierCount"></strong>
+                        mitra pemasok
+                    </div>
 
-                            <!-- 3 Pilar Penilaian Indikator Performa -->
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 tabular-nums">
-                                <!-- Pilar 1: On-Time Delivery -->
-                                <div class="bg-emerald-50/55 p-4 rounded-xl border border-emerald-200/60 space-y-2">
-                                    <div class="flex justify-between items-center text-xs">
-                                        <span class="font-semibold text-slate-800">1. Ketepatan Waktu (OTD)</span>
-                                        <span class="font-bold text-emerald-700" x-text="Number(supplierScores['{{ $sup?->id }}']?.otd_rate ?? {{ $otdRate }}).toFixed(1) + '%'">{{ number_format((float) ($otdRate ?? 0), 1) }}%</span>
-                                    </div>
-                                    <div class="w-full bg-emerald-100 h-2 rounded-full overflow-hidden">
-                                        <div class="bg-emerald-600 h-2 rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, (supplierScores['{{ $sup?->id }}']?.otd_rate ?? {{ $otdRate }})) + '%'" style="width: {{ min(100, $otdRate) }}%"></div>
-                                    </div>
-                                    <div class="flex justify-between text-[11px] text-slate-500">
-                                        <span x-text="'Rerata telat: ' + Number(supplierScores['{{ $sup?->id }}']?.avg_delay ?? {{ $avgDelay }}).toFixed(1) + ' jam'">Rerata telat: {{ number_format((float) ($avgDelay ?? 0), 1) }} jam</span>
-                                    </div>
-                                </div>
-
-                                <!-- Pilar 2: Order Fulfillment -->
-                                <div class="bg-sky-50/55 p-4 rounded-xl border border-sky-200/60 space-y-2">
-                                    <div class="flex justify-between items-center text-xs">
-                                        <span class="font-semibold text-slate-800">2. Pemenuhan Kuota (OFR)</span>
-                                        <span class="font-bold text-sky-700" x-text="Number(supplierScores['{{ $sup?->id }}']?.fill_rate ?? {{ $fillRate }}).toFixed(1) + '%'">{{ number_format((float) ($fillRate ?? 0), 1) }}%</span>
-                                    </div>
-                                    <div class="w-full bg-sky-100 h-2 rounded-full overflow-hidden">
-                                        <div class="bg-sky-600 h-2 rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, (supplierScores['{{ $sup?->id }}']?.fill_rate ?? {{ $fillRate }})) + '%'" style="width: {{ min(100, $fillRate) }}%"></div>
-                                    </div>
-                                    <div class="flex justify-between text-[11px] text-slate-500">
-                                        <span x-text="'Rasio Backorder: ' + Number(supplierScores['{{ $sup?->id }}']?.backorder_rate ?? {{ $backorderRate }}).toFixed(1) + '%'">Rasio Backorder: {{ number_format((float) ($backorderRate ?? 0), 1) }}%</span>
-                                    </div>
-                                </div>
-
-                                <!-- Pilar 3: Kualitas & Ulasan -->
-                                <div class="bg-amber-50/55 p-4 rounded-xl border border-amber-200/60 space-y-2">
-                                    <div class="flex justify-between items-center text-xs">
-                                        <span class="font-semibold text-slate-800">3. Bebas Retur &amp; Cacat</span>
-                                        <span class="font-bold text-amber-700" x-text="Number(supplierScores['{{ $sup?->id }}']?.defect_free ?? {{ $defectFree }}).toFixed(1) + '%'">{{ number_format((float) ($defectFree ?? 0), 1) }}%</span>
-                                    </div>
-                                    <div class="w-full bg-amber-100 h-2 rounded-full overflow-hidden">
-                                        <div class="bg-amber-500 h-2 rounded-full transition-all duration-500" :style="'width: ' + Math.min(100, (supplierScores['{{ $sup?->id }}']?.defect_free ?? {{ $defectFree }})) + '%'" style="width: {{ min(100, $defectFree) }}%"></div>
-                                    </div>
-                                    <div class="flex justify-between text-[11px] text-slate-500">
-                                        <span>Kesesuaian Spesifikasi</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Status Operasional Kontrak & Parameter Logistik -->
-                            <div class="bg-slate-50/80 rounded-xl p-3.5 border border-slate-200/70 flex flex-wrap items-center justify-between gap-3 text-xs tabular-nums">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-slate-500 font-medium">Status Kepatuhan SLA:</span>
-                                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg font-semibold text-[11px] transition-colors"
-                                          :class="{
-                                              'bg-emerald-50 border border-emerald-200/80 text-emerald-700': supplierScores['{{ $sup?->id }}']?.grade === 'A',
-                                              'bg-sky-50 border border-sky-200/80 text-sky-700': supplierScores['{{ $sup?->id }}']?.grade === 'B',
-                                              'bg-amber-50 border border-amber-200/80 text-amber-800': supplierScores['{{ $sup?->id }}']?.grade === 'C',
-                                              'bg-rose-50 border border-rose-200/80 text-rose-700': supplierScores['{{ $sup?->id }}']?.grade === 'D',
-                                              'bg-slate-100 border border-slate-200/80 text-slate-700': !supplierScores['{{ $sup?->id }}'] || supplierScores['{{ $sup?->id }}']?.grade === 'UNRATED'
-                                          }">
-                                        <template x-if="supplierScores['{{ $sup?->id }}']?.grade === 'A'">
-                                            <span class="flex items-center gap-1">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                                                <span>SLA Prima (Top Tier)</span>
-                                            </span>
-                                        </template>
-                                        <template x-if="supplierScores['{{ $sup?->id }}']?.grade === 'B'">
-                                            <span class="flex items-center gap-1">
-                                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
-                                                <span>SLA Standar Baik</span>
-                                            </span>
-                                        </template>
-                                        <template x-if="supplierScores['{{ $sup?->id }}']?.grade === 'C'">
-                                            <span class="flex items-center gap-1">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-                                                <span>Perhatian: Defisit Keterlambatan</span>
-                                            </span>
-                                        </template>
-                                        <template x-if="supplierScores['{{ $sup?->id }}']?.grade === 'D'">
-                                            <span class="flex items-center gap-1">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-rose-500"></span>
-                                                <span>Peringatan Pelanggaran SLA</span>
-                                            </span>
-                                        </template>
-                                        <template x-if="!supplierScores['{{ $sup?->id }}'] || supplierScores['{{ $sup?->id }}']?.grade === 'UNRATED'">
-                                            <span>Masa Observasi (Vendor Baru)</span>
-                                        </template>
-                                    </span>
-                                </div>
-
-                                <div class="flex flex-wrap items-center gap-4 text-slate-600 text-[11px]">
-                                    <div>
-                                        <span class="text-slate-400">Target Buffer Dapur:</span>
-                                        <span class="font-bold text-slate-800 ml-1" x-text="(supplierScores['{{ $sup?->id }}']?.grade === 'A' || supplierScores['{{ $sup?->id }}']?.grade === 'B') ? '1 Hari' : '2–3 Hari'">
-                                            {{ ($score && in_array($score->grade, ['A', 'B'])) ? '1 Hari' : '2–3 Hari' }}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <span class="text-slate-400">Rekomendasi Kuota:</span>
-                                        <span class="font-bold text-slate-800 ml-1" x-text="supplierScores['{{ $sup?->id }}']?.is_recommended_for_renewal ? 'Prioritas Utama' : 'Evaluasi Cadangan'">
-                                            {{ ($score && $score->isRecommendedForRenewal()) ? 'Prioritas Utama' : 'Evaluasi Cadangan' }}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <span class="text-slate-400">Pengiriman Tuntas:</span>
-                                        <span class="font-bold text-slate-800 ml-1" x-text="(supplierScores['{{ $sup?->id }}']?.total_shipments || 0) + ' Order'">{{ $metrics['total_shipments'] ?? 0 }} Order</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    @endforeach
+                    <div x-show="monitoringTotalPages > 1" class="flex items-center gap-1 self-end sm:self-auto">
+                        <button type="button"
+                                @click="setMonitoringPage(monitoringCurrentPage - 1)"
+                                :disabled="monitoringCurrentPage <= 1"
+                                class="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer">
+                            Sebelumnya
+                        </button>
+                        <span class="px-2 py-1 font-semibold text-slate-700 tabular-nums" x-text="monitoringCurrentPage + ' / ' + monitoringTotalPages"></span>
+                        <button type="button"
+                                @click="setMonitoringPage(monitoringCurrentPage + 1)"
+                                :disabled="monitoringCurrentPage >= monitoringTotalPages"
+                                class="px-2.5 py-1 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer">
+                            Selanjutnya
+                        </button>
+                    </div>
                 </div>
             @endif
         </div>
@@ -5939,13 +6348,11 @@
                     <!-- Score Card -->
                     <div class="bg-orange-50/70 rounded-2xl p-5 border border-orange-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4 tabular-nums">
                         <div class="space-y-1">
-                            <span class="text-[10px] font-bold text-[#ea580c] uppercase tracking-wider block">Skor Performa &amp; Kepatuhan Kontrak</span>
-                            <div class="flex items-baseline gap-2">
-                                <span class="text-3xl sm:text-4xl font-bold text-[#ea580c] tracking-tight" x-text="selectedSupplierPerformance?.final_score"></span>
-                                <span class="text-xs font-medium text-slate-400">/ 100</span>
-                                <span class="bg-amber-100 text-amber-800 font-semibold px-2.5 py-0.5 rounded-lg text-xs inline-flex items-center gap-1 ml-2">
-                                    <svg class="w-3.5 h-3.5 text-amber-500 fill-amber-500" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
-                                    <span x-text="selectedSupplierPerformance?.star_rating + ' / 5.0'"></span>
+                            <span class="text-[10px] font-bold text-[#ea580c] uppercase tracking-wider block">Rating &amp; Kepatuhan Kontrak</span>
+                            <div class="flex items-center gap-2 mt-1">
+                                <span class="bg-amber-100 text-amber-900 font-bold px-3 py-1.5 rounded-xl text-base inline-flex items-center gap-1.5">
+                                    <svg class="w-5 h-5 text-amber-500 fill-amber-500" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>
+                                    <span class="text-xl" x-text="'★ ' + (selectedSupplierPerformance?.star_rating || '5.0')"></span>
                                 </span>
                             </div>
                             <p class="text-xs font-semibold text-slate-700 mt-1" x-text="selectedSupplierPerformance?.grade_label"></p>
@@ -5995,7 +6402,7 @@
                                 </div>
                                 <div class="text-[11px] text-slate-600 space-y-1 pt-1.5 border-t border-amber-200/60">
                                     <div class="flex justify-between"><span>Bebas Retur</span><span class="font-semibold text-slate-900" x-text="selectedSupplierPerformance?.metrics_summary?.defect_free_rate + '%'"></span></div>
-                                    <div class="flex justify-between"><span>Rating Bintang</span><span class="font-semibold text-slate-900" x-text="selectedSupplierPerformance?.metrics_summary?.average_rating + ' / 5.0'"></span></div>
+                                    <div class="flex justify-between"><span>Rating Bintang</span><span class="font-semibold text-slate-900" x-text="selectedSupplierPerformance?.metrics_summary?.average_rating"></span></div>
                                     <div class="flex justify-between"><span>Total Ulasan</span><span class="font-semibold text-slate-900" x-text="selectedSupplierPerformance?.metrics_summary?.total_reviews + ' review'"></span></div>
                                 </div>
                             </div>

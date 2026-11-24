@@ -10,6 +10,7 @@ use App\Services\Reliability\UmkmReliabilityScoreService;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
@@ -43,9 +44,21 @@ class ContractMonitoringController extends Controller
             $statusFilter
         );
 
+        $page = max(1, (int) $request->input('page', 1));
+        $perPage = 10;
+        $filteredContracts = $monitoringData['contracts'];
+        $total = $filteredContracts->count();
+        $paginatedContracts = new LengthAwarePaginator(
+            $filteredContracts->forPage($page, $perPage)->values(),
+            $total,
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
         return view('supplier.contract-monitoring.index', [
             'supplier' => $supplier,
-            'contracts' => $monitoringData['contracts'],
+            'contracts' => $paginatedContracts,
             'allContractsCount' => $monitoringData['all_contracts_count'],
             'kpis' => $monitoringData['kpis'],
             'counts' => $monitoringData['counts'],
@@ -53,6 +66,33 @@ class ContractMonitoringController extends Controller
             'search' => $search,
             'statusFilter' => $statusFilter,
         ]);
+    }
+
+    /**
+     * Halaman detail kontrak kemitraan komprehensif.
+     */
+    public function show(string $partnership): View|RedirectResponse
+    {
+        $supplier = Auth::user()?->supplierProfile;
+
+        if (! $supplier) {
+            return redirect()->route('register.supplier')
+                ->with('error', 'Silakan daftarkan profil Pemasok terlebih dahulu.');
+        }
+
+        $contractModel = $this->findSupplierContractOrFail($partnership, [
+            'umkm.latestReliabilityScore',
+            'deliverySchedules.supplierProduct.commodity',
+            'orders.items',
+            'orders.review',
+            'orders.payments',
+            'orders.shipmentConfirmation',
+            'evaluations',
+        ]);
+
+        $contract = $this->contractService->mapPartnershipToContractItem($contractModel);
+
+        return view('supplier.contract-monitoring.show', compact('contract', 'contractModel', 'supplier'));
     }
 
     /**

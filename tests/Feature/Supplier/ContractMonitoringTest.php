@@ -937,6 +937,44 @@ class ContractMonitoringTest extends TestCase
         $this->assertSame(Partnership::STATUS_ACTIVE, $partnership->fresh()->status);
     }
 
+    public function test_supplier_can_view_contract_monitoring_detail_page(): void
+    {
+        ['user' => $supplierUser, 'supplier' => $supplier, 'product' => $product] = $this->createSupplierContext();
+        ['umkm' => $umkm] = $this->createUmkmContext('Warung Sejahtera Detail');
+
+        $partnership = Partnership::create([
+            'umkm_id' => $umkm->id,
+            'supplier_id' => $supplier->id,
+            'status' => Partnership::STATUS_ACTIVE,
+            'term_of_payment_days' => 14,
+            'credit_limit' => 5000000,
+        ]);
+
+        PartnershipDeliverySchedule::create([
+            'partnership_id' => $partnership->id,
+            'supplier_product_id' => $product->id,
+            'frequency_type' => 'weekly',
+            'delivery_days' => ['Senin', 'Kamis'],
+            'delivery_time' => '06:00:00',
+            'volume_per_delivery' => 25,
+            'total_contract_volume' => 200,
+            'unit' => 'kg',
+            'start_date' => now()->toDateString(),
+            'end_date' => now()->addMonths(2)->toDateString(),
+            'is_auto_order_active' => true,
+        ]);
+
+        $response = $this->actingAs($supplierUser)
+            ->get(route('supplier.contract-monitoring.show', $partnership->id));
+
+        $response->assertOk();
+        $response->assertSee($partnership->contract_code);
+        $response->assertSee('Warung Sejahtera Detail');
+        $response->assertSee($product->commodity->name);
+        $response->assertSee('Kontrak Aktif');
+        $response->assertSee('DETAIL KONTRAK KEMITRAAN RESMI');
+    }
+
     /**
      * @return array{user: User, supplier: SupplierProfile, product: SupplierProduct}
      */

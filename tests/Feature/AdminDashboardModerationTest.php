@@ -294,4 +294,63 @@ class AdminDashboardModerationTest extends TestCase
         $this->assertSame('sambal@example.com', $items[0]['email']);
         $this->assertStringContainsString('budi santoso', $items[0]['search_text']);
     }
+
+    public function test_admin_user_list_formats_distinct_sequential_user_ids(): void
+    {
+        $admin = User::create([
+            'email' => 'admin@sorai.id',
+            'password' => Hash::make('password123'),
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+
+        $user1 = User::create([
+            'email' => 'user1@example.com',
+            'password' => Hash::make('password123'),
+            'role' => 'umkm',
+            'status' => 'active',
+        ]);
+        $user1->created_at = now()->subDays(3);
+        $user1->save();
+
+        $user2 = User::create([
+            'email' => 'user2@example.com',
+            'password' => Hash::make('password123'),
+            'role' => 'supplier',
+            'status' => 'active',
+        ]);
+        $user2->created_at = now()->subDays(2);
+        $user2->save();
+
+        $user3 = User::create([
+            'email' => 'user3@example.com',
+            'password' => Hash::make('password123'),
+            'role' => 'umkm',
+            'status' => 'pending',
+        ]);
+        $user3->created_at = now()->subDay();
+        $user3->save();
+
+        $response = $this->actingAs($admin)->get(route('admin.dashboard', [
+            'tab' => 'users',
+        ]));
+
+        $response->assertOk();
+        $items = $response->viewData('users')->items();
+        $this->assertCount(3, $items);
+
+        // User paling baru (posisi paling atas) memiliki nomor urut registrasi terbaru (USR-003)
+        $this->assertSame('USR-003', $items[0]['id']);
+        $this->assertSame('user3@example.com', $items[0]['email']);
+
+        $this->assertSame('USR-002', $items[1]['id']);
+        $this->assertSame('user2@example.com', $items[1]['email']);
+
+        // User paling lama (posisi paling bawah) adalah USR-001
+        $this->assertSame('USR-001', $items[2]['id']);
+        $this->assertSame('user1@example.com', $items[2]['email']);
+
+        $allIds = collect($items)->pluck('id')->all();
+        $this->assertSame(array_unique($allIds), $allIds);
+    }
 }

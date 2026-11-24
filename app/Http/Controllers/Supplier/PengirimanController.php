@@ -67,7 +67,7 @@ class PengirimanController extends Controller
                 break;
         }
 
-        $orders = $query->paginate(15)->withQueryString();
+        $orders = $query->paginate(10)->withQueryString();
 
         // 1 SINGLE KONSOLIDASI QUERY untuk menghitung seluruh tab status pengiriman
         $counts = DB::table('orders')

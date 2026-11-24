@@ -130,7 +130,11 @@
                                             <span>Edit</span>
                                         </a>
 
-                                        <form method="POST" action="{{ route('supplier.katalog.destroy', $product->id) }}" onsubmit="return confirm('Yakin ingin menghapus komoditas ini?');" class="inline">
+                                        <form method="POST" action="{{ route('supplier.katalog.destroy', $product->id) }}"
+                                              data-confirm-type="delete"
+                                              data-confirm-title="Hapus Komoditas?"
+                                              data-confirm-message="Apakah Anda yakin ingin menghapus komoditas {{ addslashes($product->commodity?->name ?? 'ini') }} dari katalog pasokan?"
+                                              class="inline">
                                             @csrf
                                             @method('DELETE')
                                             <button type="submit"
