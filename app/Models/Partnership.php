@@ -26,6 +26,7 @@ class Partnership extends Model
         'status',
         'term_of_payment_days',
         'credit_limit',
+        'rejection_reason',
     ];
 
     protected function casts(): array
@@ -158,7 +159,24 @@ class Partnership extends Model
         }
 
         $cleaned = preg_replace('/\[Ketentuan Mutu:\s*[^\]]+\]\s*/i', '', (string) $this->submission_details);
+        $cleaned = preg_replace('/\[Alasan Penolakan:\s*[^\]]+\]\s*/i', '', (string) $cleaned);
 
         return trim((string) $cleaned);
+    }
+
+    /**
+     * Mengambil alasan penolakan kemitraan jika ditolak oleh pemasok.
+     */
+    public function getRejectionReasonAttribute(): ?string
+    {
+        if (! empty($this->attributes['rejection_reason'])) {
+            return $this->attributes['rejection_reason'];
+        }
+
+        if (preg_match('/\[Alasan Penolakan:\s*([^\]]+)\]/i', (string) $this->submission_details, $matches)) {
+            return trim($matches[1]);
+        }
+
+        return null;
     }
 }

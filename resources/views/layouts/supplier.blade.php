@@ -361,6 +361,7 @@
         </main>
     </div>
 
+    @include('partials.action-confirm-modal')
     @include('partials.logout-modal')
 
     {{-- Live-Sync & Auto-Reload Notification Component --}}

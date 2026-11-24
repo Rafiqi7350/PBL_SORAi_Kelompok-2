@@ -114,8 +114,8 @@ Route::prefix('supplier')->name('supplier.')->middleware(EnsureUserIsSupplier::c
     Route::delete('/katalog/{id}', [KatalogSupplierController::class, 'destroy'])->name('katalog.destroy');
 
     Route::get('/pengajuan-masuk', [PengajuanMasukController::class, 'index'])->name('pengajuan-masuk.index');
-    Route::patch('/pengajuan-masuk/{id}/terima', [PengajuanMasukController::class, 'terima'])->name('pengajuan-masuk.terima');
-    Route::patch('/pengajuan-masuk/{id}/tolak', [PengajuanMasukController::class, 'tolak'])->name('pengajuan-masuk.tolak');
+    Route::match(['patch', 'post'], '/pengajuan-masuk/{id}/terima', [PengajuanMasukController::class, 'terima'])->name('pengajuan-masuk.terima');
+    Route::match(['patch', 'post'], '/pengajuan-masuk/{id}/tolak', [PengajuanMasukController::class, 'tolak'])->name('pengajuan-masuk.tolak');
 
     Route::get('/supply-planning', [SupplierSupplyPlanningController::class, 'index'])->name('supply-planning.index');
     Route::patch('/supply-planning/{id}/konfirmasi', [SupplierSupplyPlanningController::class, 'konfirmasi'])->name('supply-planning.konfirmasi');
@@ -135,6 +135,7 @@ Route::prefix('supplier')->name('supplier.')->middleware(EnsureUserIsSupplier::c
     Route::get('/riwayat-transaksi', [RiwayatTransaksiController::class, 'index'])->name('riwayat-transaksi.index');
 
     Route::get('/contract-monitoring', [ContractMonitoringController::class, 'index'])->name('contract-monitoring.index');
+    Route::get('/contract-monitoring/{partnership}', [ContractMonitoringController::class, 'show'])->name('contract-monitoring.show');
     Route::post('/contract-monitoring/{partnership}/evaluations', [ContractMonitoringController::class, 'storeEvaluation'])->name('contract-monitoring.evaluations.store');
     Route::patch('/contract-monitoring/{partnership}/extend', [ContractMonitoringController::class, 'extendContract'])->name('contract-monitoring.extend');
     Route::patch('/contract-monitoring/{partnership}/toggle-auto-order', [ContractMonitoringController::class, 'toggleAutoOrder'])->name('contract-monitoring.toggle-auto-order');

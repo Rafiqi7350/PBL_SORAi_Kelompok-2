@@ -34,7 +34,7 @@ class KatalogController extends Controller
         $sort = $request->input('sort', 'terbaru');
 
         $likeOp = DB::connection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
-        $query = SupplierProduct::with(['supplier.user', 'supplier.latestPerformanceScore', 'commodity']);
+        $query = SupplierProduct::with(['supplier.latestPerformanceScore', 'commodity']);
 
         if ($search) {
             $query->where(function ($q) use ($search, $likeOp) {
@@ -65,7 +65,7 @@ class KatalogController extends Controller
         // Halal filter
         if ($isHalal) {
             $query->where('is_halal_certified', true);
-        }
+        }   
 
         // Max Price filter
         if ($maxPrice && is_numeric($maxPrice)) {
@@ -91,8 +91,19 @@ class KatalogController extends Controller
 
         $products = $query->paginate(12)->withQueryString();
 
-        // Get unique categories for the filter
-        $categories = Commodity::select('category')->distinct()->pluck('category');
+        // Get unique categories for the filter (cached to avoid repeat network queries)
+        $categories = Cache::remember('catalog_categories_list', 600, function () {
+            return Commodity::query()
+                ->whereNotNull('category')
+                ->where('category', '!=', '')
+                ->distinct()
+                ->pluck('category')
+                ->map(fn ($c) => is_array($c) ? ($c['name'] ?? reset($c)) : (string) $c)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+        });
 
         // Ambil profil UMKM user yang sedang login atau fallback untuk demo UMKM
         $umkm = Auth::user()?->umkmProfile;
@@ -104,6 +115,7 @@ class KatalogController extends Controller
         $allPartnerships = $umkm ? Partnership::with([
             'supplier.latestPerformanceScore',
             'latestSupplierPerformanceScore',
+            'supplier.products.commodity',
             'deliverySchedules.supplierProduct.commodity',
         ])
             ->where('umkm_id', $umkm->id)
@@ -235,14 +247,69 @@ class KatalogController extends Controller
         // Gabungkan dengan supply plans dari schedule (jika belum ada di supply_plans)
         $supplyPlans = ! empty($formattedSupplyPlans) ? $formattedSupplyPlans : $supplyPlans;
 
-        // Ambil daftar supplier aktif untuk dropdown form Collaborative Supply Planning
-        $availableSuppliers = SupplierProfile::whereHas('user', function ($q) {
-            $q->where('status', 'active');
-        })->orderBy('company_name')->get();
+        // Filter kemitraan aktif untuk dropdown mitra pemasok dan komoditas pasokannya
+        $activePartnerships = $allPartnerships
+            ->filter(fn ($p) => in_array(strtolower((string) $p->status), ['approved', 'active', 'disetujui']));
 
-        // Ambil master komoditas & satuan untuk opsi pilihan kebutuhan UMKM
-        $availableCommodities = Commodity::orderBy('name')->get();
-        $availableUnits = CommodityUnit::orderBy('name')->get();
+        $partnerSuppliers = $activePartnerships
+            ->groupBy('supplier_id')
+            ->map(function ($partnershipsForSupplier) {
+                $pFirst = $partnershipsForSupplier->first();
+                $supplier = $pFirst?->supplier;
+                if (! $supplier) {
+                    return null;
+                }
+
+                // Komoditas dari jadwal kemitraan aktif (hanya yang diajukan dalam jadwal pasokan kontrak)
+                $contractCommodities = $partnershipsForSupplier->flatMap(function ($p) {
+                    return $p->deliverySchedules->map(fn ($s) => $s->supplierProduct?->commodity);
+                })->filter();
+
+                // Komoditas dari produk pemasok mitra (fallback jika belum ada jadwal pasokan spesifik)
+                if ($contractCommodities->isEmpty()) {
+                    $contractCommodities = $supplier->products
+                        ->map(fn ($prod) => $prod->commodity)
+                        ->filter();
+                }
+
+                $commodities = $contractCommodities
+                    ->unique('id')
+                    ->values()
+                    ->map(fn ($c) => [
+                        'id' => (string) $c->id,
+                        'name' => (string) $c->name,
+                        'category' => (string) ($c->category ?? 'Bahan Baku'),
+                        'unit' => (string) ($c->unit ?: 'kg'),
+                    ]);
+
+                return [
+                    'id' => (string) $supplier->id,
+                    'company_name' => (string) $supplier->company_name,
+                    'delivery_area' => (string) ($supplier->delivery_area ?? 'Lokal'),
+                    'commodities' => $commodities->values()->toArray(),
+                ];
+            })
+            ->filter()
+            ->values();
+
+        // Tetap sediakan $availableSuppliers & $availableCommodities untuk kompatibilitas
+        $availableSuppliers = $partnerSuppliers->map(fn ($s) => (object) [
+            'id' => $s['id'],
+            'company_name' => $s['company_name'],
+            'delivery_area' => $s['delivery_area'],
+        ]);
+
+        $availableCommodities = $partnerSuppliers->isNotEmpty()
+            ? collect($partnerSuppliers->first()['commodities'])->map(fn ($c) => (object) $c)
+            : collect();
+
+        $availableUnits = Cache::remember('available_units_list_v2', 600, function () {
+            return CommodityUnit::orderBy('name')->get()->map(fn ($u) => (object) [
+                'id' => (string) $u->id,
+                'name' => (string) $u->name,
+                'symbol' => (string) ($u->symbol ?? $u->name),
+            ])->values();
+        });
 
         // Eliminasi query redundan: ekstrak langsung dari memory $allPartnerships
         $appliedProductIds = $allPartnerships
@@ -275,6 +342,7 @@ class KatalogController extends Controller
                     'commodity_image' => $commodity?->image_url ?? $product?->image_url,
                     'price' => (float) ($product?->price ?? 0),
                     'status' => $p->status,
+                    'rejection_reason' => $p->rejection_reason,
                     'volume_per_delivery' => (float) ($schedule?->volume_per_delivery ?? 0),
                     'total_contract_volume' => (float) ($schedule?->total_contract_volume ?? 0),
                     'unit' => $schedule?->unit ?? 'kg',
@@ -301,8 +369,13 @@ class KatalogController extends Controller
         $actionCounts = ($umkm && $partnershipIds->isNotEmpty())
             ? Order::whereIn('partnership_id', $partnershipIds)
                 ->selectRaw("
-                    COUNT(CASE WHEN order_status IN ('MENUNGGU_KONFIRMASI_BARANG', 'DIKIRIM', 'shipped', 'partially_shipped') AND EXISTS (
-                        SELECT 1 FROM shipment_confirmations sc WHERE sc.order_id = orders.id AND sc.shipment_batch = 1 AND sc.shipped_at IS NOT NULL AND sc.received_at IS NULL
+                    COUNT(CASE WHEN (
+                        (order_status IN ('MENUNGGU_KONFIRMASI_BARANG', 'DIKIRIM', 'shipped', 'partially_shipped') AND NOT EXISTS (
+                            SELECT 1 FROM shipment_confirmations sc WHERE sc.order_id = orders.id AND sc.received_at IS NOT NULL
+                        ))
+                        OR EXISTS (
+                            SELECT 1 FROM shipment_confirmations sc WHERE sc.order_id = orders.id AND sc.shipped_at IS NOT NULL AND sc.received_at IS NULL
+                        )
                     ) THEN 1 END) as pending_validation,
                     COUNT(CASE WHEN order_status = '".Order::STATUS_WAITING_BACKORDER_APPROVAL."' OR EXISTS (
                         SELECT 1 FROM shipment_confirmations sc WHERE sc.order_id = orders.id AND sc.backorder_action = 'create_backorder' AND sc.backorder_approval_status = 'pending'
@@ -399,6 +472,9 @@ class KatalogController extends Controller
             ->latest('created_at')
             ->get() : collect();
 
+        // Hitung jumlah pesanan lunas yang belum diberi rating/ulasan
+        $pendingReviewCount = $reviewOrders->filter(fn ($o) => is_null($o->review))->count();
+
         // Hitung total kontrak kemitraan aktif dan pending untuk UMKM ini secara riil (0 jika akun baru)
         $realActiveContractsCount = $allPartnerships->filter(fn ($p) => in_array(strtolower((string) $p->status), ['active', 'approved', 'accepted', 'disetujui']))->count();
         $realPendingContractsCount = $allPartnerships->filter(fn ($p) => in_array(strtolower((string) $p->status), ['pending', 'menunggu', 'dalam_review']))->count();
@@ -427,102 +503,121 @@ class KatalogController extends Controller
         $startOfLastMonth = now()->subMonth()->startOfMonth();
         $endOfLastMonth = now()->subMonth()->endOfMonth();
 
-        // Konsolidasi Query 1: Hitung statistik pesanan & pengeluaran (Bulan ini & Lalu) dalam 1 query agregat murni
-        if ($umkm && $partnershipIds->isNotEmpty()) {
-            $orderCounts = Order::whereIn('partnership_id', $partnershipIds)
-                ->selectRaw("
-                    COUNT(CASE WHEN order_status IN ('pending', 'confirmed', 'MENUNGGU_KONFIRMASI_BARANG', 'DIKIRIM', 'shipped', 'partially_shipped', '".Order::STATUS_WAITING_BACKORDER_APPROVAL."', '".Order::STATUS_BACKORDER_PENDING."') THEN 1 END) as active_count,
-                    COUNT(CASE WHEN order_status IN ('completed', 'BARANG_DITERIMA', '".Order::STATUS_COMPLETED_PARTIAL."') THEN 1 END) as completed_count,
-                    COUNT(CASE WHEN order_status = '".Order::STATUS_CANCELLED."' THEN 1 END) as cancelled_count,
-                    COALESCE(SUM(CASE WHEN created_at >= ? AND created_at <= ? AND (order_status IN ('completed', 'BARANG_DITERIMA', '".Order::STATUS_COMPLETED_PARTIAL."') OR EXISTS (SELECT 1 FROM payments p WHERE p.order_id = orders.id AND UPPER(p.payment_status) IN ('PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS', 'LUNAS'))) THEN total_amount ELSE 0 END), 0) as spend_this_month,
-                    COALESCE(SUM(CASE WHEN created_at >= ? AND created_at <= ? AND (order_status IN ('completed', 'BARANG_DITERIMA', '".Order::STATUS_COMPLETED_PARTIAL."') OR EXISTS (SELECT 1 FROM payments p WHERE p.order_id = orders.id AND UPPER(p.payment_status) IN ('PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS', 'LUNAS'))) THEN total_amount ELSE 0 END), 0) as spend_last_month
-                ", [$startOfMonth, $endOfMonth, $startOfLastMonth, $endOfLastMonth])
-                ->first();
+        $analyticsCacheKey = $umkm ? "umkm_dashboard_analytics_{$umkm->id}" : 'umkm_dashboard_analytics_guest';
+        $analytics = Cache::remember($analyticsCacheKey, 60, function () use ($umkm, $partnershipIds, $startOfMonth, $endOfMonth, $startOfLastMonth, $endOfLastMonth) {
+            if ($umkm && $partnershipIds->isNotEmpty()) {
+                $orderCounts = Order::whereIn('partnership_id', $partnershipIds)
+                    ->selectRaw("
+                        COUNT(CASE WHEN order_status IN ('pending', 'confirmed', 'MENUNGGU_KONFIRMASI_BARANG', 'DIKIRIM', 'shipped', 'partially_shipped', '".Order::STATUS_WAITING_BACKORDER_APPROVAL."', '".Order::STATUS_BACKORDER_PENDING."') THEN 1 END) as active_count,
+                        COUNT(CASE WHEN order_status IN ('completed', 'BARANG_DITERIMA', '".Order::STATUS_COMPLETED_PARTIAL."') THEN 1 END) as completed_count,
+                        COUNT(CASE WHEN order_status = '".Order::STATUS_CANCELLED."' THEN 1 END) as cancelled_count,
+                        COALESCE(SUM(CASE WHEN created_at >= ? AND created_at <= ? AND (order_status IN ('completed', 'BARANG_DITERIMA', '".Order::STATUS_COMPLETED_PARTIAL."') OR EXISTS (SELECT 1 FROM payments p WHERE p.order_id = orders.id AND UPPER(p.payment_status) IN ('PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS', 'LUNAS'))) THEN total_amount ELSE 0 END), 0) as spend_this_month,
+                        COALESCE(SUM(CASE WHEN created_at >= ? AND created_at <= ? AND (order_status IN ('completed', 'BARANG_DITERIMA', '".Order::STATUS_COMPLETED_PARTIAL."') OR EXISTS (SELECT 1 FROM payments p WHERE p.order_id = orders.id AND UPPER(p.payment_status) IN ('PAID', 'SETTLEMENT', 'CAPTURE', 'SUCCESS', 'LUNAS'))) THEN total_amount ELSE 0 END), 0) as spend_last_month
+                    ", [$startOfMonth, $endOfMonth, $startOfLastMonth, $endOfLastMonth])
+                    ->first();
 
-            $activeOrdersCount = (int) ($orderCounts->active_count ?? 0);
-            $completedOrdersCount = (int) ($orderCounts->completed_count ?? 0);
-            $cancelledOrdersCount = (int) ($orderCounts->cancelled_count ?? 0);
-            $totalPengeluaranBulanIni = (float) ($orderCounts->spend_this_month ?? 0.0);
-            $totalPengeluaranBulanLalu = (float) ($orderCounts->spend_last_month ?? 0.0);
-        } else {
-            $activeOrdersCount = 0;
-            $completedOrdersCount = 0;
-            $cancelledOrdersCount = 0;
-            $totalPengeluaranBulanIni = 0.0;
-            $totalPengeluaranBulanLalu = 0.0;
-        }
+                $activeOrdersCount = (int) ($orderCounts->active_count ?? 0);
+                $completedOrdersCount = (int) ($orderCounts->completed_count ?? 0);
+                $cancelledOrdersCount = (int) ($orderCounts->cancelled_count ?? 0);
+                $totalPengeluaranBulanIni = (float) ($orderCounts->spend_this_month ?? 0.0);
+                $totalPengeluaranBulanLalu = (float) ($orderCounts->spend_last_month ?? 0.0);
+            } else {
+                $activeOrdersCount = 0;
+                $completedOrdersCount = 0;
+                $cancelledOrdersCount = 0;
+                $totalPengeluaranBulanIni = 0.0;
+                $totalPengeluaranBulanLalu = 0.0;
+            }
 
-        $persentasePenghematan = 0.0;
-        if ($totalPengeluaranBulanLalu > 0) {
-            $persentasePenghematan = round((($totalPengeluaranBulanLalu - $totalPengeluaranBulanIni) / $totalPengeluaranBulanLalu) * 100, 1);
-        }
+            $persentasePenghematan = 0.0;
+            if ($totalPengeluaranBulanLalu > 0) {
+                $persentasePenghematan = round((($totalPengeluaranBulanLalu - $totalPengeluaranBulanIni) / $totalPengeluaranBulanLalu) * 100, 1);
+            }
 
-        // 2. Total Barang Diterima Bulan Ini
-        $totalDiterimaKg = ($umkm && $partnershipIds->isNotEmpty())
-            ? (float) OrderItem::whereHas('order', function ($oq) use ($partnershipIds, $startOfMonth, $endOfMonth) {
-                $oq->whereIn('partnership_id', $partnershipIds)
-                    ->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
-            })
-                ->sum('quantity_delivered')
-            : 0.0;
+            // 2. Total Barang Diterima Bulan Ini
+            $totalDiterimaKg = ($umkm && $partnershipIds->isNotEmpty())
+                ? (float) OrderItem::whereHas('order', function ($oq) use ($partnershipIds, $startOfMonth, $endOfMonth) {
+                    $oq->whereIn('partnership_id', $partnershipIds)
+                        ->whereBetween('created_at', [$startOfMonth, $endOfMonth]);
+                })
+                    ->sum('quantity_delivered')
+                : 0.0;
 
-        // 3. Skor Rata-Rata On-Time Delivery Bulan Ini
-        $onTimeDeliveryRate = ($umkm && $partnershipIds->isNotEmpty())
-            ? (float) (SupplierPerformanceScore::whereIn('partnership_id', $partnershipIds)
-                ->avg('on_time_delivery_score') ?? 0.0)
-            : 0.0;
+            // 3. Skor Rata-Rata On-Time Delivery Bulan Ini
+            $onTimeDeliveryRate = ($umkm && $partnershipIds->isNotEmpty())
+                ? (float) (SupplierPerformanceScore::whereIn('partnership_id', $partnershipIds)
+                    ->avg('on_time_delivery_score') ?? 0.0)
+                : 0.0;
 
-        // 4. Target Volume Kontrak Bulan Depan
-        $targetBulanDepan = ($umkm && $partnershipIds->isNotEmpty())
-            ? (float) PartnershipDeliverySchedule::whereIn('partnership_id', $partnershipIds)
-                ->whereHas('partnership', fn ($pq) => $pq->whereIn(DB::raw('LOWER(status)'), ['active', 'approved', 'disetujui']))
-                ->sum('total_contract_volume')
-            : 0.0;
+            // 4. Target Volume Kontrak Bulan Depan
+            $targetBulanDepan = ($umkm && $partnershipIds->isNotEmpty())
+                ? (float) PartnershipDeliverySchedule::whereIn('partnership_id', $partnershipIds)
+                    ->whereHas('partnership', fn ($pq) => $pq->whereIn(DB::raw('LOWER(status)'), ['active', 'approved', 'disetujui']))
+                    ->sum('total_contract_volume')
+                : 0.0;
 
-        // 5. Tren Pengadaan Bulanan (Mei - November 2026)
-        $trendMonths = [
-            '2026-05' => 'MEI',
-            '2026-06' => 'JUN',
-            '2026-07' => 'JUL',
-            '2026-08' => 'AGU',
-            '2026-09' => 'SEP',
-            '2026-10' => 'OKT',
-            '2026-11' => 'NOV',
-        ];
-
-        $monthFormatSql = DB::connection()->getDriverName() === 'sqlite'
-            ? "strftime('%Y-%m', created_at)"
-            : "TO_CHAR(created_at, 'YYYY-MM')";
-
-        // Konsolidasi Query 2: Realisasi volume & Total biaya bulanan dalam 1 query JOIN ringkas
-        $monthlyAgg = ($umkm && $partnershipIds->isNotEmpty())
-            ? OrderItem::whereHas('order', function ($oq) use ($partnershipIds) {
-                $oq->whereIn('partnership_id', $partnershipIds);
-            })
-                ->selectRaw("{$monthFormatSql} as month_key, SUM(quantity_delivered) as delivered_vol, SUM(subtotal) as cost_total")
-                ->groupBy(DB::raw($monthFormatSql))
-                ->get()
-            : collect();
-
-        $monthlyRealization = $monthlyAgg->pluck('delivered_vol', 'month_key')->toArray();
-        $monthlyCost = $monthlyAgg->pluck('cost_total', 'month_key')->toArray();
-
-        $trendsData = [];
-        $totalDeliveredAllMonths = 0.0;
-        foreach ($trendMonths as $key => $label) {
-            $vol = (float) ($monthlyRealization[$key] ?? 0.0);
-            $cost = (float) ($monthlyCost[$key] ?? 0.0);
-            $totalDeliveredAllMonths += $vol;
-            $trendsData[] = [
-                'key' => $key,
-                'label' => $label,
-                'volume' => $vol,
-                'cost' => $cost,
+            // 5. Tren Pengadaan Bulanan (Mei - November 2026)
+            $trendMonths = [
+                '2026-05' => 'MEI',
+                '2026-06' => 'JUN',
+                '2026-07' => 'JUL',
+                '2026-08' => 'AGU',
+                '2026-09' => 'SEP',
+                '2026-10' => 'OKT',
+                '2026-11' => 'NOV',
             ];
-        }
 
-        $currentMonthKey = now()->format('Y-m');
-        $realisasiPasokanBulanIni = (float) ($monthlyRealization[$currentMonthKey] ?? ($monthlyRealization['2026-10'] ?? 0.0));
+            $monthFormatSql = DB::connection()->getDriverName() === 'sqlite'
+                ? "strftime('%Y-%m', created_at)"
+                : "TO_CHAR(created_at, 'YYYY-MM')";
+
+            // Konsolidasi Query 2: Realisasi volume & Total biaya bulanan dalam 1 query JOIN ringkas
+            $monthlyAgg = ($umkm && $partnershipIds->isNotEmpty())
+                ? OrderItem::whereHas('order', function ($oq) use ($partnershipIds) {
+                    $oq->whereIn('partnership_id', $partnershipIds);
+                })
+                    ->selectRaw("{$monthFormatSql} as month_key, SUM(quantity_delivered) as delivered_vol, SUM(subtotal) as cost_total")
+                    ->groupBy(DB::raw($monthFormatSql))
+                    ->get()
+                : collect();
+
+            $monthlyRealization = $monthlyAgg->pluck('delivered_vol', 'month_key')->toArray();
+            $monthlyCost = $monthlyAgg->pluck('cost_total', 'month_key')->toArray();
+
+            $trendsData = [];
+            $totalDeliveredAllMonths = 0.0;
+            foreach ($trendMonths as $key => $label) {
+                $vol = (float) ($monthlyRealization[$key] ?? 0.0);
+                $cost = (float) ($monthlyCost[$key] ?? 0.0);
+                $totalDeliveredAllMonths += $vol;
+                $trendsData[] = [
+                    'key' => $key,
+                    'label' => $label,
+                    'volume' => $vol,
+                    'cost' => $cost,
+                ];
+            }
+
+            $currentMonthKey = now()->format('Y-m');
+            $realisasiPasokanBulanIni = (float) ($monthlyRealization[$currentMonthKey] ?? ($monthlyRealization['2026-10'] ?? 0.0));
+
+            return compact(
+                'activeOrdersCount',
+                'completedOrdersCount',
+                'cancelledOrdersCount',
+                'totalPengeluaranBulanIni',
+                'totalPengeluaranBulanLalu',
+                'persentasePenghematan',
+                'totalDiterimaKg',
+                'onTimeDeliveryRate',
+                'targetBulanDepan',
+                'trendsData',
+                'totalDeliveredAllMonths',
+                'realisasiPasokanBulanIni'
+            );
+        });
+
+        extract($analytics);
 
         $dashboardOrders = ($umkm && $partnershipIds->isNotEmpty())
             ? Order::with([
@@ -602,6 +697,7 @@ class KatalogController extends Controller
             'sort',
             'autoOrdersList',
             'supplyPlans',
+            'partnerSuppliers',
             'availableSuppliers',
             'availableCommodities',
             'availableUnits',
@@ -620,6 +716,7 @@ class KatalogController extends Controller
             'totalContractsCount',
             'activeContractCommodities',
             'reviewOrders',
+            'pendingReviewCount',
             'contractedSuppliersPerformance',
             'totalPengeluaranBulanIni',
             'totalPengeluaranBulanLalu',

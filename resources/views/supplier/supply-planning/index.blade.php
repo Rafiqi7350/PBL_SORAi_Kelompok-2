@@ -130,21 +130,31 @@ function supplierDemandPlanningPage() {
 
         approvePurchaseOrder(id) {
             var self = this;
-            if (!confirm('Terbitkan Purchase Order resmi ke pihak produsen/petani hulu?')) return;
-            fetch('{{ url("supplier/demand-planning/purchase-suggestion") }}/' + id + '/approve', {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            window.dispatchEvent(new CustomEvent('open-confirm-modal', {
+                detail: {
+                    type: 'create',
+                    badge: 'KONFIRMASI PURCHASE ORDER',
+                    title: 'Terbitkan Purchase Order?',
+                    message: 'Terbitkan Purchase Order resmi ke pihak produsen/petani hulu untuk menambah stok pengaman.',
+                    confirmText: 'Ya, Terbitkan PO',
+                    onConfirm: function() {
+                        fetch('/supplier/demand-planning/purchase-suggestion/' + encodeURIComponent(id) + '/approve', {
+                            method: 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                            }
+                        })
+                        .then(function(res) { return res.json(); })
+                        .then(function(json) {
+                            if (json.status === 'success') {
+                                self.notify('✓ ' + json.message);
+                                setTimeout(function() { window.location.reload(); }, 600);
+                            }
+                        });
+                    }
                 }
-            })
-            .then(function(res) { return res.json(); })
-            .then(function(json) {
-                if (json.status === 'success') {
-                    self.notify('✓ ' + json.message);
-                    setTimeout(function() { window.location.reload(); }, 600);
-                }
-            });
+            }));
         },
 
         ignorePurchaseOrder(id) {

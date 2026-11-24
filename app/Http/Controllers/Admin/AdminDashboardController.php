@@ -12,7 +12,6 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\View\View;
 
 class AdminDashboardController extends Controller
@@ -41,6 +40,19 @@ class AdminDashboardController extends Controller
 
         // 1. Users list with profiles (filtered & paginated for performance)
         $usersQuery = User::with(['umkmProfile', 'supplierProfile'])
+            ->select('users.*')
+            ->selectSub(function ($query) {
+                $query->from('users as u2')
+                    ->whereIn('u2.role', ['umkm', 'supplier'])
+                    ->where(function ($w) {
+                        $w->whereRaw("COALESCE(u2.created_at, '1970-01-01 00:00:00') < COALESCE(users.created_at, '1970-01-01 00:00:00')")
+                            ->orWhere(function ($tie) {
+                                $tie->whereRaw("COALESCE(u2.created_at, '1970-01-01 00:00:00') = COALESCE(users.created_at, '1970-01-01 00:00:00')")
+                                    ->whereColumn('u2.id', '<=', 'users.id');
+                            });
+                    })
+                    ->selectRaw('count(*)');
+            }, 'user_sequence')
             ->whereIn('role', ['umkm', 'supplier']);
 
         if ($userFilterRole === 'UMKM') {
@@ -74,6 +86,7 @@ class AdminDashboardController extends Controller
 
         $dbUsers = $usersQuery
             ->latest('created_at')
+            ->orderByDesc('id')
             ->paginate(10, ['*'], 'users_page')
             ->withQueryString();
 
@@ -96,11 +109,14 @@ class AdminDashboardController extends Controller
                 default => 'NONAKTIF',
             };
 
+            $seq = (int) ($u->user_sequence ?? 0);
+            $formattedId = 'USR-'.sprintf('%03d', $seq > 0 ? $seq : 1);
+
             return [
                 'raw_id' => $u->id,
-                'id' => 'USR-'.sprintf('%03d', $u->id),
+                'id' => $formattedId,
                 'name' => $name,
-                'search_text' => mb_strtolower(trim($name.' '.$ownerName.' '.$u->email)),
+                'search_text' => mb_strtolower(trim($name.' '.$ownerName.' '.$u->email.' '.$formattedId.' '.$u->id)),
                 'type' => $u->role === 'supplier' ? 'PEMASOK' : 'UMKM',
                 'email' => $u->email,
                 'phone' => $phone,
@@ -321,7 +337,7 @@ class AdminDashboardController extends Controller
             };
 
             return [
-                'id' => 'USR-'.substr((string) $u->id, 0, 8),
+                'id' => 'USR-'.strtoupper(substr((string) $u->id, 0, 8)),
                 'actor' => $name,
                 'role' => $u->role,
                 'status' => $u->status,

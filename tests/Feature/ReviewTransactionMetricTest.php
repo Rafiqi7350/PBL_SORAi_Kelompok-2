@@ -274,4 +274,57 @@ class ReviewTransactionMetricTest extends TestCase
             'transactions',
         ]);
     }
+
+    public function test_pending_review_count_decreases_when_umkm_rates_an_order(): void
+    {
+        $this->actingAs($this->umkmUser);
+
+        // Buat order kedua yang juga sudah selesai lunas
+        $order2 = Order::create([
+            'partnership_id' => $this->partnership->id,
+            'order_status' => 'completed',
+            'order_date' => now()->toDateString(),
+            'delivery_date' => now()->toDateString(),
+            'total_amount' => 150000,
+        ]);
+
+        Payment::create([
+            'order_id' => $order2->id,
+            'shipment_batch' => 1,
+            'invoice_number' => 'INV-TEST-002',
+            'amount' => 150000,
+            'payment_status' => 'PAID',
+        ]);
+
+        // Awalnya ada 2 pesanan yang belum diberi rating
+        $response1 = $this->get(route('umkm.katalog.index', ['tab' => 'pemesanan', 'subtab' => 'rating']));
+        $response1->assertOk();
+        $this->assertEquals(2, $response1->viewData('pendingReviewCount'));
+        $this->assertCount(2, $response1->viewData('reviewOrders'));
+
+        // Beri ulasan untuk order pertama
+        $postResponse = $this->postJson(route('umkm.pemesanan.ulasan', $this->completedOrder->id), [
+            'rating' => 5,
+            'review' => 'Kualitas ayam broiler sangat segar dan sesuai standar dapur!',
+        ]);
+        $postResponse->assertOk()->assertJson(['success' => true]);
+
+        // Setelah order pertama diulas, pendingReviewCount harus berkurang menjadi 1
+        $response2 = $this->get(route('umkm.katalog.index', ['tab' => 'pemesanan', 'subtab' => 'rating']));
+        $response2->assertOk();
+        $this->assertEquals(1, $response2->viewData('pendingReviewCount'));
+        $this->assertCount(2, $response2->viewData('reviewOrders'));
+
+        // Beri ulasan untuk order kedua
+        $postResponse2 = $this->postJson(route('umkm.pemesanan.ulasan', $order2->id), [
+            'rating' => 4,
+            'review' => 'Pengiriman tepat waktu dan kemasan rapi.',
+        ]);
+        $postResponse2->assertOk()->assertJson(['success' => true]);
+
+        // Setelah semua diulas, pendingReviewCount harus berkurang menjadi 0
+        $response3 = $this->get(route('umkm.katalog.index', ['tab' => 'pemesanan', 'subtab' => 'rating']));
+        $response3->assertOk();
+        $this->assertEquals(0, $response3->viewData('pendingReviewCount'));
+    }
 }

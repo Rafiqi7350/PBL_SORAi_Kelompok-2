@@ -72,7 +72,7 @@ class ContractMonitoringService
      *
      * @return array<string, mixed>
      */
-    protected function mapPartnershipToContractItem(Partnership $partnership): array
+    public function mapPartnershipToContractItem(Partnership $partnership): array
     {
         $today = Carbon::today();
         $schedule = $partnership->deliverySchedules->sortByDesc('created_at')->first();
@@ -482,7 +482,7 @@ class ContractMonitoringService
                 $invoices[] = [
                     'invoice_number' => $payment->invoice_number ?: ('INV-'.strtoupper(substr((string) $payment->id, 0, 8))),
                     'amount_formatted' => 'Rp '.number_format($amount, 0, ',', '.'),
-                    'due_date_formatted' => $effectiveDueDate ? $effectiveDueDate->locale('id')->translatedFormat('d M Y') : 'Tunai / COD',
+                    'due_date_formatted' => $effectiveDueDate ? $effectiveDueDate->locale('id')->translatedFormat('d M Y') : 'Standar / Non-Tempo',
                     'is_paid' => $isPaid,
                     'is_overdue' => $isOverdue,
                     'overdue_days' => $overdueDays,

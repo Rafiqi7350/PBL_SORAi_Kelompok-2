@@ -252,7 +252,7 @@
                                 @click="setTab('katalog')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
                             <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
-                                  :class="activeTab === 'katalog' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
+                                  :class="activeTab === 'katalog' ? 'text-[#ea580c] font-bold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
                                 <svg class="w-4 h-4 shrink-0 transition-colors"
                                      :class="activeTab === 'katalog' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -260,7 +260,7 @@
                                 </svg>
                                 <span>Katalog Bahan Baku</span>
                             </span>
-                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2.5px] rounded-full transition-colors duration-150"
                                   :class="activeTab === 'katalog' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
                         </button>
 
@@ -268,7 +268,7 @@
                                 @click="setTab('riwayat-permintaan')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
                             <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
-                                  :class="activeTab === 'riwayat-permintaan' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
+                                  :class="activeTab === 'riwayat-permintaan' ? 'text-[#ea580c] font-bold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
                                 <svg class="w-4 h-4 shrink-0 transition-colors"
                                      :class="activeTab === 'riwayat-permintaan' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -276,7 +276,7 @@
                                 </svg>
                                 <span>Riwayat Permintaan</span>
                             </span>
-                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2.5px] rounded-full transition-colors duration-150"
                                   :class="activeTab === 'riwayat-permintaan' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
                         </button>
 
@@ -284,7 +284,7 @@
                                 @click="setTab('supply-planning')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
                             <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
-                                  :class="activeTab === 'supply-planning' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
+                                  :class="activeTab === 'supply-planning' ? 'text-[#ea580c] font-bold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
                                 <svg class="w-4 h-4 shrink-0 transition-colors"
                                      :class="activeTab === 'supply-planning' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -292,7 +292,7 @@
                                 </svg>
                                 <span>Perencanaan Pasokan</span>
                             </span>
-                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2.5px] rounded-full transition-colors duration-150"
                                   :class="activeTab === 'supply-planning' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
                         </button>
 
@@ -300,7 +300,7 @@
                                 @click="setTab('pemesanan')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
                             <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
-                                  :class="activeTab === 'pemesanan' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
+                                  :class="activeTab === 'pemesanan' ? 'text-[#ea580c] font-bold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
                                 <svg class="w-4 h-4 shrink-0 transition-colors"
                                      :class="activeTab === 'pemesanan' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -308,7 +308,7 @@
                                 </svg>
                                 <span>Pesanan &amp; Pengiriman</span>
                             </span>
-                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2.5px] rounded-full transition-colors duration-150"
                                   :class="activeTab === 'pemesanan' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
                         </button>
 
@@ -316,7 +316,7 @@
                                 @click="setTab('dashboard')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
                             <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
-                                  :class="activeTab === 'dashboard' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
+                                  :class="activeTab === 'dashboard' ? 'text-[#ea580c] font-bold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
                                 <svg class="w-4 h-4 shrink-0 transition-colors"
                                      :class="activeTab === 'dashboard' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -324,7 +324,7 @@
                                 </svg>
                                 <span>Analisis Pengadaan</span>
                             </span>
-                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2.5px] rounded-full transition-colors duration-150"
                                   :class="activeTab === 'dashboard' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
                         </button>
 
@@ -332,7 +332,7 @@
                                 @click="setTab('monitoring')"
                                 class="relative h-full inline-flex items-center shrink-0 cursor-pointer group">
                             <span class="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors whitespace-nowrap"
-                                  :class="activeTab === 'monitoring' ? 'text-slate-950 font-semibold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
+                                  :class="activeTab === 'monitoring' ? 'text-[#ea580c] font-bold' : 'text-slate-500 font-medium group-hover:text-slate-900 group-hover:bg-slate-100/75'">
                                 <svg class="w-4 h-4 shrink-0 transition-colors"
                                      :class="activeTab === 'monitoring' ? 'text-[#ea580c]' : 'text-slate-400 group-hover:text-slate-600'"
                                      fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -340,7 +340,7 @@
                                 </svg>
                                 <span>Pemantauan Mutu &amp; SLA</span>
                             </span>
-                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2px] rounded-full transition-colors duration-150"
+                            <span class="absolute bottom-0 left-2.5 right-2.5 h-[2.5px] rounded-full transition-colors duration-150"
                                   :class="activeTab === 'monitoring' ? 'bg-[#ea580c]' : 'bg-transparent'"></span>
                         </button>
                     </nav>

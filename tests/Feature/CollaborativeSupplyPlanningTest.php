@@ -2,7 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\Commodity;
 use App\Models\Partnership;
+use App\Models\PartnershipDeliverySchedule;
+use App\Models\SupplierProduct;
 use App\Models\SupplierProfile;
 use App\Models\SupplyPlan;
 use App\Models\UmkmProfile;
@@ -194,5 +197,100 @@ class CollaborativeSupplyPlanningTest extends TestCase
         $plan->refresh();
         $this->assertEquals('DISESUAIKAN', $plan->supplier_confirmation_status);
         $this->assertEquals(180, (float) $plan->confirmed_quantity);
+    }
+
+    // Dropdown perencanaan pasokan hanya memuat mitra pemasok aktif dan komoditas yang disuplai
+    public function test_umkm_catalog_supply_planning_dropdown_only_contains_active_partnered_suppliers_and_their_commodities(): void
+    {
+        $this->actingAs($this->umkmUser);
+
+        // Buat komoditas dan produk untuk supplier yang bermitra ($this->supplierProfile)
+        $commAyam = Commodity::create([
+            'name' => 'Daging Ayam Broiler Segar',
+            'category' => 'Daging & Unggas',
+            'unit' => 'kg',
+        ]);
+
+        $prodAyam = SupplierProduct::create([
+            'supplier_id' => $this->supplierProfile->id,
+            'commodity_id' => $commAyam->id,
+            'price' => 35000,
+            'stock_capacity' => 1000,
+            'stock_status' => 'Tersedia',
+        ]);
+
+        PartnershipDeliverySchedule::create([
+            'partnership_id' => $this->partnership->id,
+            'supplier_product_id' => $prodAyam->id,
+            'volume_per_delivery' => 50,
+            'unit' => 'kg',
+            'frequency_type' => '2x Seminggu',
+        ]);
+
+        // Buat produk lain milik supplier mitra, tapi TIDAK diajukan dalam jadwal pasokan kontrak
+        $commBebek = Commodity::create([
+            'name' => 'Bebek Ungkep Frozen',
+            'category' => 'Daging & Unggas',
+            'unit' => 'ekor',
+        ]);
+
+        SupplierProduct::create([
+            'supplier_id' => $this->supplierProfile->id,
+            'commodity_id' => $commBebek->id,
+            'price' => 45000,
+            'stock_capacity' => 500,
+            'stock_status' => 'Tersedia',
+        ]);
+
+        // Buat supplier lain yang BELUM bekerja sama dengan UMKM
+        $otherSupplierUser = User::create([
+            'email' => 'unpartnered@example.com',
+            'password' => Hash::make('password123'),
+            'role' => 'supplier',
+            'status' => 'active',
+        ]);
+
+        $unpartneredSupplier = SupplierProfile::create([
+            'user_id' => $otherSupplierUser->id,
+            'company_name' => 'Bahan Kue Diva',
+            'owner_name' => 'Diva',
+            'phone' => '081999888777',
+            'warehouse_address' => 'Jl. Kue No. 1',
+            'delivery_area' => 'Kota Malang',
+        ]);
+
+        $commKue = Commodity::create([
+            'name' => 'Tepung Terigu Segitiga',
+            'category' => 'Bahan Kue',
+            'unit' => 'kg',
+        ]);
+
+        SupplierProduct::create([
+            'supplier_id' => $unpartneredSupplier->id,
+            'commodity_id' => $commKue->id,
+            'price' => 15000,
+            'stock_capacity' => 500,
+            'stock_status' => 'Tersedia',
+        ]);
+
+        $response = $this->get(route('umkm.katalog.index', ['tab' => 'supply-planning']));
+        $response->assertOk();
+
+        $partnerSuppliers = $response->viewData('partnerSuppliers');
+        $this->assertNotNull($partnerSuppliers);
+
+        $supplierIds = $partnerSuppliers->pluck('id')->all();
+        // Hanya memuat supplier yang sudah bermitra aktif
+        $this->assertContains($this->supplierProfile->id, $supplierIds);
+        $this->assertNotContains($unpartneredSupplier->id, $supplierIds);
+
+        // Komoditas untuk supplier mitra hanya komoditas yang disuplai olehnya
+        $firstSupplier = $partnerSuppliers->firstWhere('id', $this->supplierProfile->id);
+        $commodityNames = collect($firstSupplier['commodities'])->pluck('name')->all();
+
+        // Hanya memuat komoditas yang diajukan dalam jadwal pasokan kontrak aktif
+        $this->assertContains('Daging Ayam Broiler Segar', $commodityNames);
+        $this->assertNotContains('Bebek Ungkep Frozen', $commodityNames);
+        $this->assertNotContains('Tepung Terigu Segitiga', $commodityNames);
     }
 }
